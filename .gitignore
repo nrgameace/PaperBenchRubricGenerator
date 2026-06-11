@@ -216,3 +216,8 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# PaperBenchRubricGenerator run artifacts (transient working files)
+rubric_state.json
+rubric_state.json.tmp
+rubric_draft.json

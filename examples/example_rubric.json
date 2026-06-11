@@ -1,0 +1,712 @@
+{
+  "id": "root",
+  "requirements": "The core contributions of '1000 Layer Networks for Self-Supervised RL: Scaling Depth Can Enable New Goal-Reaching Capabilities' have been reproduced.",
+  "weight": 1,
+  "sub_tasks": [
+    {
+      "id": "env-setup",
+      "requirements": "The environment and infrastructure for reproducing the experiments has been set up correctly.",
+      "weight": 1,
+      "sub_tasks": [
+        {
+          "id": "env-setup-1",
+          "requirements": "The JaxGCRL codebase has been installed with the compatible versions of MJX and Brax. The paper used MJX 3.2.6 and Brax 0.10.1, but other versions are acceptable as long as the scaling behavior is consistent across depths and the code works on the environment given.",
+          "weight": 2,
+          "sub_tasks": [],
+          "task_category": "Code Development",
+          "finegrained_task_category": "Environment & Infrastructure Setup"
+        },
+        {
+          "id": "env-setup-2",
+          "requirements": "All 10 environments are configured and runnable: ant_big_maze, ant_hardest_maze, arm_binpick_hard, arm_push_easy, arm_push_hard, humanoid, humanoid_big_maze, humanoid_u_maze, ant_u4_maze, ant_u5_maze.",
+          "weight": 2,
+          "sub_tasks": [],
+          "task_category": "Code Execution",
+          "finegrained_task_category": "Environment & Infrastructure Setup"
+        },
+        {
+          "id": "env-setup-3",
+          "requirements": "The hyperparameters from Table 7 have been implemented, including UTD ratio of 1:40, max replay size 10000, min replay size 1000, episode length 1000, discounting 0.99, num_envs 512, batch size 512, policy_lr 3e-4, critic_lr 3e-4, InfoNCE contrastive loss, L2 energy function, and logsumexp penalty of 0.1. Note that batch size and network depth vary per experiment and are specified in the respective experiment nodes, however a batch_size of 512 is the default size unless specified by an experiment.",
+          "weight": 2,
+          "sub_tasks": [],
+          "task_category": "Code Development",
+          "finegrained_task_category": "Experimental Setup"
+        },
+        {
+          "id": "env-setup-4",
+          "requirements": "The residual network architecture has been implemented with each residual block consisting of four repeated units of Dense, LayerNorm, and Swish activation, with residual connections applied after the final activation of each block. A single final Dense layer is applied after all residual blocks as an output projection. The depth of the network is defined as the total number of Dense layers across all residual blocks, equating to 4N for N blocks, not counting the final output Dense layer.",
+          "weight": 3,
+          "sub_tasks": [],
+          "task_category": "Code Development",
+          "finegrained_task_category": "Method Implementation"
+        },
+        {
+          "id": "env-setup-5",
+          "requirements": "The CRL actor and critic networks use the residual architecture, where the critic is parametrized with two encoder networks returning state-action embedding phi(s,a) and goal embedding psi(g), and the critic output is the L2 norm between these embeddings.",
+          "weight": 3,
+          "sub_tasks": [
+            {
+            "id": "env-setup-5-1",
+            "requirements": "The actor network uses the residual architecture and takes the current state and goal as input, outputting an action.",
+            "weight": 1,
+            "sub_tasks": [],
+            "task_category": "Code Development",
+            "finegrained_task_category": "Method Implementation"
+            },
+            {
+            "id": "env-setup-5-2",
+            "requirements": "The critic network is parametrized with two separate encoder networks: a state-action encoder phi(s,a) and a goal encoder psi(g), both using the residual architecture.",
+            "weight": 2,
+            "sub_tasks": [],
+            "task_category": "Code Development",
+            "finegrained_task_category": "Method Implementation"
+            },
+            {
+            "id": "env-setup-5-3",
+            "requirements": "The critic output is defined as the L2 norm between the state-action embedding phi(s,a) and the goal embedding psi(g), i.e. f(s,a,g) = ||phi(s,a) - psi(g)||_2.",
+            "weight": 2,
+            "sub_tasks": [],
+            "task_category": "Code Development",
+            "finegrained_task_category": "Method Implementation"
+            }
+        ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+            "id": "env-setup-6",
+            "requirements": "The CRL training objectives have been implemented correctly utilizing the information in Section 3 Preliminaries.",
+            "weight": 2,
+            "sub_tasks": [
+                {
+                "id": "env-setup-6-1",
+                "requirements": "The critic is trained with the InfoNCE objective over batches B, where si, ai, gi are sampled from the same trajectory and gj is sampled from a different random trajectory. The objective minimizes the negative log of the softmax over critic outputs across the batch.",
+                "weight": 2,
+                "sub_tasks": [],
+                "task_category": "Code Development",
+                "finegrained_task_category": "Method Implementation"
+                },
+                {
+                "id": "env-setup-6-2",
+                "requirements": "The actor is trained to maximize the critic output fϕ,ψ(s,a,g) under the expectation over the initial state distribution p0(s0), transition dynamics p(st+1|st,at), goal prior pg(g), and the policy πθ(a|s,g).",
+                "weight": 1,
+                "sub_tasks": [],
+                "task_category": "Code Development",
+                "finegrained_task_category": "Method Implementation"
+                }
+            ],
+            "task_category": null,
+            "finegrained_task_category": null
+        },  
+        {
+            "id": "env-setup-7",
+            "requirements": "Performance is evaluated and logged correctly throughout training.",
+            "weight": 1,
+            "sub_tasks": [
+                {
+                "id": "env-setup-7-1",
+                "requirements": "Performance is evaluated as the number of timesteps out of 1000 that the agent is near the goal, averaged over the last 5 epochs of training.",
+                "weight": 2,
+                "sub_tasks": [],
+                "task_category": "Code Development",
+                "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                },
+                {
+                "id": "env-setup-7-2",
+                "requirements": "The evaluation metric is correctly logged and recorded during training runs, such that performance curves over environment steps can be reproduced.",
+                "weight": 2,
+                "sub_tasks": [],
+                "task_category": "Code Execution",
+                "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                }
+            ],
+            "task_category": null,
+            "finegrained_task_category": null
+        }
+
+      ],
+      "task_category": null,
+      "finegrained_task_category": null
+    },
+    {
+        "id": "scaling-depth",
+        "requirements": "The main scaling depth experiment has been reproduced, demonstrating that increasing CRL network depth from 4 to 64 layers yields significant performance improvements across all 10 environments.",
+        "weight": 3,
+        "sub_tasks": [
+            {
+            "id": "scaling-depth-1",
+            "requirements": "CRL has been trained at depths 4, 8, 16, 32, and 64 across all 10 environments using 5 random seeds, with performance curves logged over environment steps.",
+            "weight": 2,
+            "sub_tasks": [],
+            "task_category": "Code Execution",
+            "finegrained_task_category": "Experimental Setup"
+            },
+            {
+            "id": "scaling-depth-2",
+            "requirements": "Performance curves for all 5 depths across all 10 environments have been generated, reproducing Figure 1. The curves should show that performance generally increases with depth, with jumps occurring at critical depth thresholds that vary by environment.",
+            "weight": 2,
+            "sub_tasks": [
+                {
+                "id": "scaling-depth-2-1",
+                "requirements": "Performance curves for all 5 depths (4, 8, 16, 32, 64) across all 10 environments have been generated, reproducing Figure 1.",
+                "weight": 1,
+                "sub_tasks": [],
+                "task_category": "Code Development",
+                "finegrained_task_category": "Logging, Analysis & Presentation"
+                },
+                {
+                "id": "scaling-depth-2-2",
+                "requirements": "The generated performance curves show that performance generally increases with depth across all 10 environments, with pronounced jumps occurring at critical depth thresholds rather than gradual improvement, consistent with Figure 1. The critical depths vary by environment, for example 8 layers on Ant Big Maze and 64 layers on Humanoid U-Maze.",
+                "weight": 2,
+                "sub_tasks": [],
+                "task_category": "Result Analysis",
+                "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                }
+            ],
+            "task_category": null,
+            "finegrained_task_category": null
+            },
+            {
+            "id": "scaling-depth-3",
+            "requirements": "The robotic manipulation tasks (arm_push_easy, arm_push_hard, arm_binpick_hard) show 2-5x performance improvement from depth 4 to depth 64, consistent with Table 1.",
+            "weight": 2,
+            "sub_tasks": [],
+            "task_category": "Result Analysis",
+            "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+            "id": "scaling-depth-4",
+            "requirements": "The long horizon maze tasks (ant_u4_maze, ant_u5_maze, ant_big_maze, ant_hardest_maze) show at least 20x performance improvement from depth 4 to depth 64 on the harder maze tasks, consistent with Table 1. A reasonable margin of error is acceptable.",
+            "weight": 2,
+            "sub_tasks": [],
+            "task_category": "Result Analysis",
+            "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+            "id": "scaling-depth-5",
+            "requirements": "The humanoid based tasks (humanoid, humanoid_u_maze, humanoid_big_maze) show at least 50x performance improvement from depth 4 to depth 64, consistent with Table 1. A reasonable margin of error is acceptable.",
+            "weight": 2,
+            "sub_tasks": [],
+            "task_category": "Result Analysis",
+            "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+            "id": "scaling-depth-6",
+            "requirements": "Table 1 has been reproduced, reporting the final performance at depth 4 and depth 64 for all 10 environments along with the improvement multiplier, averaged over the last 5 epochs of training across 5 seeds.",
+            "weight": 2,
+            "sub_tasks": [],
+            "task_category": "Result Analysis",
+            "finegrained_task_category": "Logging, Analysis & Presentation"
+            },
+            {
+                "id": "scaling-depth-7",
+                "requirements": "The emergent policies through depth experiment has been reproduced, demonstrating that increasing depth results in qualitatively distinct behaviors and that performance jumps occur at critical depth thresholds.",
+                "weight": 2,
+                "sub_tasks": [
+                    {
+                    "id": "scaling-depth-7-1",
+                    "requirements": "Figure 5 has been reproduced, showing that incrementally increasing depth without residual connections results in only marginal performance gains, while networks with residual connections show dramatic performance improvements once a critical depth threshold is reached. The figure shows results for depths 3, 4, 5, 6 without residual connections and depths 4, 8, 16, 32 with residual connections on the Humanoid environment.",
+                    "weight": 3,
+                    "sub_tasks": [
+                        {
+                        "id": "scaling-depth-7-1-1",
+                        "requirements": "Training runs have been conducted for depths 3, 4, 5, 6 without residual connections and depths 4, 8, 16, 32 with residual connections on the Humanoid environment.",
+                        "weight": 2,
+                        "sub_tasks": [],
+                        "task_category": "Code Execution",
+                        "finegrained_task_category": "Experimental Setup"
+                        },
+                        {
+                        "id": "scaling-depth-7-1-2",
+                        "requirements": "Figure 5 has been generated showing the two panels: marginal gains without residual connections on the left and dramatic performance jumps with residual connections on the right.",
+                        "weight": 1,
+                        "sub_tasks": [],
+                        "task_category": "Code Development",
+                        "finegrained_task_category": "Logging, Analysis & Presentation"
+                        },
+                        {
+                        "id": "scaling-depth-7-1-3",
+                        "requirements": "The results show that without residual connections performance gains are marginal across depths 3 to 6, while with residual connections there is a dramatic performance jump at a critical depth threshold, consistent with Figure 5.",
+                        "weight": 2,
+                        "sub_tasks": [],
+                        "task_category": "Result Analysis",
+                        "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                        }
+                    ],
+                    "task_category": null,
+                    "finegrained_task_category": null
+                    },
+                    {
+                    "id": "scaling-depth-7-2",
+                    "requirements": "Figure 3 has been generated, visualizing the learned policies at depths 4, 16, 64, and 256 on the Humanoid environment, showing qualitatively distinct behaviors at each depth.",
+                    "weight": 1,
+                    "sub_tasks": [
+                        {
+                        "id": "scaling-depth-7-2-1",
+                        "requirements": "Training runs have been conducted at depths 4, 16, 64, and 256 on the Humanoid environment to obtain the policies for visualization.",
+                        "weight": 2,
+                        "sub_tasks": [],
+                        "task_category": "Code Execution",
+                        "finegrained_task_category": "Experimental Setup"
+                        },
+                        {
+                        "id": "scaling-depth-7-2-2",
+                        "requirements": "Code exists to render and save policy visualizations at specified depths for the Humanoid environment.",
+                        "weight": 1,
+                        "sub_tasks": [],
+                        "task_category": "Code Development",
+                        "finegrained_task_category": "Logging, Analysis & Presentation"
+                        }
+                    ],
+                    "task_category": null,
+                    "finegrained_task_category": null
+                    }
+                ],
+                "task_category": null,
+                "finegrained_task_category": null
+            }
+        ],
+        "task_category": null,
+        "finegrained_task_category": null
+    },
+    {
+        "id": "baselines",
+        "requirements": "Scaled CRL has been compared against baseline goal-conditioned algorithms including CRL, SAC, SAC+HER, TD3+HER, GCBC, and GCSL across all 10 environments.",
+        "weight": 2,
+        "sub_tasks": [
+            {
+            "id": "baselines-1",
+            "requirements": "All 6 baseline algorithms have been trained across all 10 environments using 3 random seeds: CRL (depth 4), SAC, SAC+HER, TD3+HER, GCBC, and GCSL.",
+            "weight": 2,
+            "sub_tasks": [],
+            "task_category": "Code Execution",
+            "finegrained_task_category": "Experimental Setup"
+            },
+            {
+            "id": "baselines-2",
+            "requirements": "Performance curves for all 6 algorithms across all 10 environments have been generated, reproducing Figure 12 from Appendix A.1.",
+            "weight": 1,
+            "sub_tasks": [],
+            "task_category": "Code Development",
+            "finegrained_task_category": "Logging, Analysis & Presentation"
+            },
+            {
+            "id": "baselines-3",
+            "requirements": "Scaled CRL outperforms all baseline algorithms in at least 8 out of 10 environments, consistent with the findings of Appendix A.1. The only environments where Scaled CRL does not outperform all baselines are the Humanoid maze environments, where SAC achieves better final performance.",
+            "weight": 3,
+            "sub_tasks": [],
+            "task_category": "Result Analysis",
+            "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+            "id": "baselines-4",
+            "requirements": "GCSL and GCBC fail to achieve meaningful performance on the Humanoid and Ant Big Maze tasks, achieving near zero Time at Goal scores, consistent with Appendix A.2.",
+            "weight": 2,
+            "sub_tasks": [],
+            "task_category": "Result Analysis",
+            "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+            "id": "baselines-5",
+            "requirements": "SAC, SAC+HER, and TD3+HER do not benefit from depths beyond 4 layers, showing either zero or negative performance gains from deeper networks, consistent with Appendix A.2.",
+            "weight": 2,
+            "sub_tasks": [],
+            "task_category": "Result Analysis",
+            "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+            "id": "baselines-6",
+            "requirements": "SAC shows greater sample efficiency than Scaled CRL early in training on Humanoid maze environments but does not outperform Scaled CRL on non-maze environments, consistent with Section 4.2.",
+            "weight": 1,
+            "sub_tasks": [],
+            "task_category": "Result Analysis",
+            "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+            "id": "baselines-7",
+            "requirements": "GCBC shows improved performance with increased depth specifically on the Arm Push Easy environment, representing an exception to the general finding that non-CRL algorithms do not benefit from depth scaling, consistent with Section 4.5.",
+            "weight": 1,
+            "sub_tasks": [],
+            "task_category": "Result Analysis",
+            "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            }
+        ],
+        "task_category": null,
+        "finegrained_task_category": null
+    },
+    {
+        "id": "what-matters",
+        "requirements": "The experiments investigating what matters for CRL scaling have been reproduced, including width vs depth comparison, actor vs critic scaling, batch size scaling, and 1000+ layer scaling.",
+        "weight": 2,
+        "sub_tasks": [
+            {
+            "id": "what-matters-1",
+            "requirements": "The width vs depth scaling experiment has been reproduced, comparing width scaling against depth scaling on Humanoid, Ant Big Maze, and Arm Push Easy.",
+            "weight": 3,
+            "sub_tasks": [
+                {
+                "id": "what-matters-1-1",
+                "requirements": "Width scaling experiments have been run with widths 128, 256, 512, 1024, 2048 with depth fixed at 4, and depth scaling experiments have been run with depths 4, 8, 16, 32, 64 with width fixed at 256, across Humanoid, Ant Big Maze, and Arm Push Easy using 3 random seeds.",
+                "weight": 2,
+                "sub_tasks": [],
+                "task_category": "Code Execution",
+                "finegrained_task_category": "Experimental Setup"
+                },
+                {
+                "id": "what-matters-1-2",
+                "requirements": "Figure 4 has been generated showing width vs depth scaling comparison across the 3 environments, with model parameter count on the x-axis and Time at Goal on the y-axis.",
+                "weight": 1,
+                "sub_tasks": [],
+                "task_category": "Code Development",
+                "finegrained_task_category": "Logging, Analysis & Presentation"
+                },
+                {
+                "id": "what-matters-1-3",
+                "requirements": "The results show that simply doubling depth to 8 with width fixed at 256 outperforms the widest network (width 2048, depth 4) in all 3 environments, consistent with Figure 4.",
+                "weight": 2,
+                "sub_tasks": [],
+                "task_category": "Result Analysis",
+                "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                },
+                {
+                "id": "what-matters-1-4",
+                "requirements": "The results demonstrate that parameter count scales linearly with width but quadratically with depth. Specifically a network with 4 MLP layers and 2048 hidden units has roughly 35M parameters while a network with depth 32 and 256 hidden units has only around 2M parameters, consistent with Section 4.4.",
+                "weight": 2,
+                "sub_tasks": [],
+                "task_category": "Result Analysis",
+                "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                },
+                {
+                "id": "what-matters-1-5",
+                "requirements": "The comparative advantage of depth scaling is most pronounced in the Humanoid environment (observation dimension 268), followed by Ant Big Maze (dimension 29) and Arm Push Easy (dimension 17), suggesting the benefit increases with higher observation dimensionality, consistent with Section 4.4.",
+                "weight": 1,
+                "sub_tasks": [],
+                "task_category": "Result Analysis",
+                "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                }
+            ],
+            "task_category": null,
+            "finegrained_task_category": null
+            },
+            {
+            "id": "what-matters-2",
+            "requirements": "The actor vs critic scaling experiment has been reproduced, investigating the role of scaling actor and critic networks independently and jointly.",
+            "weight": 2,
+            "sub_tasks": [
+                {
+                "id": "what-matters-2-1",
+                "requirements": "A grid of actor depth vs critic depth combinations has been trained across Humanoid, Ant Big Maze, and Arm Push Easy using 3 random seeds, with actor depths 4, 8, 16, 32, 64 and critic depths 4, 8, 16, 32, 64.",
+                "weight": 2,
+                "sub_tasks": [],
+                "task_category": "Code Execution",
+                "finegrained_task_category": "Experimental Setup"
+                },
+                {
+                "id": "what-matters-2-2",
+                "requirements": "Figure 6 has been generated showing the heatmap of final performance for all actor vs critic depth combinations across the 3 environments.",
+                "weight": 1,
+                "sub_tasks": [],
+                "task_category": "Code Development",
+                "finegrained_task_category": "Logging, Analysis & Presentation"
+                },
+                {
+                "id": "what-matters-2-3",
+                "requirements": "The results show that scaling the critic is more impactful in Humanoid and Arm Push Easy, while scaling the actor is more impactful in Ant Big Maze, and that scaling both jointly is complementary, consistent with Figure 6.",
+                "weight": 2,
+                "sub_tasks": [],
+                "task_category": "Result Analysis",
+                "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                }
+            ],
+            "task_category": null,
+            "finegrained_task_category": null
+            },
+            {
+            "id": "what-matters-3",
+            "requirements": "The batch size scaling experiment has been reproduced, investigating how network depth interacts with batch size scaling on the Humanoid environment.",
+            "weight": 2,
+            "sub_tasks": [
+                {
+                "id": "what-matters-3-1",
+                "requirements": "Batch size scaling experiments have been run with batch sizes 128, 256, 512, 1024, 2048 at depths 4, 8, 16, 64 on the Humanoid environment using 3 random seeds.",
+                "weight": 2,
+                "sub_tasks": [],
+                "task_category": "Code Execution",
+                "finegrained_task_category": "Experimental Setup"
+                },
+                {
+                "id": "what-matters-3-2",
+                "requirements": "Figure 7 has been generated showing performance curves for all batch size and depth combinations on Humanoid.",
+                "weight": 1,
+                "sub_tasks": [],
+                "task_category": "Code Development",
+                "finegrained_task_category": "Logging, Analysis & Presentation"
+                },
+                {
+                "id": "what-matters-3-3",
+                "requirements": "The results show that increasing batch size yields only marginal differences for the shallow depth 4 network, but becomes increasingly effective as network depth grows to 8, 16, and 64, consistent with Figure 7.",
+                "weight": 2,
+                "sub_tasks": [],
+                "task_category": "Result Analysis",
+                "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                }
+            ],
+            "task_category": null,
+            "finegrained_task_category": null
+            },
+            {
+            "id": "what-matters-4",
+            "requirements": "The 1000+ layer scaling experiment has been reproduced, investigating whether performance continues to improve beyond 64 layers on the Humanoid maze environments.",
+            "weight": 2,
+            "sub_tasks": [
+                {
+                "id": "what-matters-4-1",
+                "requirements": "Training runs have been conducted at depths 4, 64, 256, and 1024 on Humanoid U-Maze and Humanoid Big Maze using 3 random seeds. For the 1024 layer network, the actor depth is maintained at 512 while 1024 layers are used only for the two critic encoders, due to actor loss explosion at 1024 layers.",
+                "weight": 2,
+                "sub_tasks": [],
+                "task_category": "Code Execution",
+                "finegrained_task_category": "Experimental Setup"
+                },
+                {
+                "id": "what-matters-4-2",
+                "requirements": "Figure 12 in Section 4.6 has been generated showing performance curves for depths 4, 64, 256, and 1024 on Humanoid U-Maze and Humanoid Big Maze.",
+                "weight": 1,
+                "sub_tasks": [],
+                "task_category": "Code Development",
+                "finegrained_task_category": "Logging, Analysis & Presentation"
+                },
+                {
+                "id": "what-matters-4-3",
+                "requirements": "The results show that performance continues to substantially improve as network depth reaches 256 and 1024 layers on Humanoid U-Maze, consistent with Figure 12 in Section 4.6. Note that for the 1024 layer network, the actor depth is maintained at 512 while 1024 layers are used only for the two critic encoders.",
+                "weight": 2,
+                "sub_tasks": [],
+                "task_category": "Result Analysis",
+                "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                }
+            ],
+            "task_category": null,
+            "finegrained_task_category": null
+            }
+        ],
+        "task_category": null,
+        "finegrained_task_category": null
+    },
+    {
+        "id": "why-scaling",
+        "requirements": "The experiments investigating why scaling works have been reproduced, including contrastive representation analysis, exploration vs expressivity disentanglement, representational capacity analysis, and generalization stitching.",
+        "weight": 1,
+        "sub_tasks": [
+            {
+            "id": "why-scaling-1",
+            "requirements": "The depth enhances contrastive representations experiment has been reproduced, analyzing Q-value distributions for depth 4 vs depth 64 networks on the Ant U4-Maze environment.",
+            "weight": 2,
+            "sub_tasks": [
+                {
+                "id": "why-scaling-1-1",
+                "requirements": "Code exists to compute and visualize Q-values from the critic encoder representations across the Ant U4-Maze state space for both depth 4 and depth 64 networks, reproducing Figure 9.",
+                "weight": 1,
+                "sub_tasks": [],
+                "task_category": "Code Development",
+                "finegrained_task_category": "Logging, Analysis & Presentation"
+                },
+                {
+                "id": "why-scaling-1-2",
+                "requirements": "The Q-value heatmap visualization has been generated and executed for both depth 4 and depth 64 networks on Ant U4-Maze.",
+                "weight": 1,
+                "sub_tasks": [],
+                "task_category": "Code Execution",
+                "finegrained_task_category": "Logging, Analysis & Presentation"
+                },
+                {
+                "id": "why-scaling-1-3",
+                "requirements": "The Q-values near the start position for the depth 4 network are higher than those of the depth 64 network near the start, despite the maze wall blocking the direct path. The depth 64 network shows Q-values clustered at the goal and tapering along the interior of the maze, consistent with Figure 9.",
+                "weight": 3,
+                "sub_tasks": [],
+                "task_category": "Result Analysis",
+                "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                }
+            ],
+            "task_category": null,
+            "finegrained_task_category": null
+            },
+            {
+            "id": "why-scaling-2",
+            "requirements": "The exploration vs expressivity disentanglement experiment has been reproduced, training three networks in parallel across Humanoid, Ant Big Maze, and Arm Push Easy.",
+            "weight": 3,
+            "sub_tasks": [
+                {
+                "id": "why-scaling-2-1",
+                "requirements": "Three networks have been trained in parallel for both deep collector (depth 32) and shallow collector (depth 4) conditions: a collector network that interacts with the environment, a deep learner (depth 32) that trains only from the collector's replay buffer, and a shallow learner (depth 4) that also trains only from the collector's replay buffer. Experiments are run across Humanoid, Ant Big Maze, and Arm Push Easy using 3 random seeds.",
+                "weight": 2,
+                "sub_tasks": [],
+                "task_category": "Code Execution",
+                "finegrained_task_category": "Experimental Setup"
+                },
+                {
+                "id": "why-scaling-2-2",
+                "requirements": "Figure 8 has been generated showing performance curves for the collector, deep learner, and shallow learner under both deep and shallow collector conditions across all 3 environments.",
+                "weight": 1,
+                "sub_tasks": [],
+                "task_category": "Code Development",
+                "finegrained_task_category": "Logging, Analysis & Presentation"
+                },
+                {
+                "id": "why-scaling-2-3",
+                "requirements": "With a deep collector, the deep learner substantially outperforms the shallow learner across all 3 environments, indicating expressivity is critical when data coverage is good. With a shallow collector, both deep and shallow learners achieve similarly poor performance, indicating that deep networks cannot overcome insufficient data coverage, consistent with Figure 8.",
+                "weight": 3,
+                "sub_tasks": [],
+                "task_category": "Result Analysis",
+                "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                }
+            ],
+            "task_category": null,
+            "finegrained_task_category": null
+            },
+            {
+            "id": "why-scaling-3",
+            "requirements": "The representational capacity analysis has been reproduced, analyzing state-action embeddings along a successful trajectory in the Humanoid environment for depth 4 vs depth 64 networks.",
+            "weight": 2,
+            "sub_tasks": [
+                {
+                "id": "why-scaling-3-1",
+                "requirements": "Code exists to extract state-action embeddings from the critic encoder along a successful trajectory, apply PCA to reduce to 3 dimensions, and visualize the trajectory in embedding space for both depth 4 and depth 64 networks, reproducing Figure 10.",
+                "weight": 1,
+                "sub_tasks": [],
+                "task_category": "Code Development",
+                "finegrained_task_category": "Logging, Analysis & Presentation"
+                },
+                {
+                "id": "why-scaling-3-2",
+                "requirements": "The PCA embedding visualization has been generated and executed for both depth 4 and depth 64 networks along a successful Humanoid trajectory.",
+                "weight": 1,
+                "sub_tasks": [],
+                "task_category": "Code Execution",
+                "finegrained_task_category": "Logging, Analysis & Presentation"
+                },
+                {
+                "id": "why-scaling-3-3",
+                "requirements": "The variance of state-action embeddings near the goal is measurably higher for the depth 64 network compared to the depth 4 network, indicating that deeper networks allocate greater representational capacity to goal-relevant states. The depth 4 network should show tightly clustered embeddings near the goal while depth 64 embeddings expand across a curved surface, consistent with Figure 10.",
+                "weight": 3,
+                "sub_tasks": [],
+                "task_category": "Result Analysis",
+                "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                }
+            ],
+            "task_category": null,
+            "finegrained_task_category": null
+            },
+            {
+            "id": "why-scaling-4",
+            "requirements": "The generalization stitching experiment has been reproduced on a modified Ant U-Maze environment where training start-goal pairs are at most 3 units apart and evaluation pairs are never seen during training.",
+            "weight": 2,
+            "sub_tasks": [
+                {
+                "id": "why-scaling-4-1",
+                "requirements": "The modified Ant U-Maze environment has been implemented such that training start-goal pairs are separated by at most 3 units, ensuring none of the evaluation pairs appear in the training set.",
+                "weight": 2,
+                "sub_tasks": [],
+                "task_category": "Code Development",
+                "finegrained_task_category": "Experimental Setup"
+                },
+                {
+                "id": "why-scaling-4-2",
+                "requirements": "Training runs have been conducted at depths 4, 16, and 64 on the modified Ant U-Maze environment using 3 random seeds.",
+                "weight": 2,
+                "sub_tasks": [],
+                "task_category": "Code Execution",
+                "finegrained_task_category": "Experimental Setup"
+                },
+                {
+                "id": "why-scaling-4-3",
+                "requirements": "Figure 11 has been generated showing the bar chart of generalization performance at depths 4, 16, and 64 on the evaluation goal positions.",
+                "weight": 1,
+                "sub_tasks": [],
+                "task_category": "Code Development",
+                "finegrained_task_category": "Logging, Analysis & Presentation"
+                },
+                {
+                "id": "why-scaling-4-4",
+                "requirements": "The results show that depth 4 networks show limited generalization solving only the easiest goal position, depth 16 networks achieve moderate success, and depth 64 networks excel sometimes solving the most challenging goal position, consistent with Figure 11.",
+                "weight": 3,
+                "sub_tasks": [],
+                "task_category": "Result Analysis",
+                "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                }
+            ],
+            "task_category": null,
+            "finegrained_task_category": null
+            }
+        ],
+        "task_category": null,
+        "finegrained_task_category": null
+    },
+    {
+        "id": "offline-crl",
+        "requirements": "The offline contrastive RL scaling experiments have been reproduced using OGBench, demonstrating that depth scaling does not consistently improve performance in the offline setting.",
+        "weight": 1,
+        "sub_tasks": [
+            {
+            "id": "offline-crl-1",
+            "requirements": "Training runs have been conducted at depths 4, 8, 16, 32, and 64 on the 3 OGBench environments: antmaze-giant-navigate, antmaze-medium-stitch, and humanoidmaze-medium-navigate using 3 random seeds.",
+            "weight": 2,
+            "sub_tasks": [],
+            "task_category": "Code Execution",
+            "finegrained_task_category": "Experimental Setup"
+            },
+            {
+            "id": "offline-crl-2",
+            "requirements": "Figure 18 has been generated showing performance curves for all 5 depths across the 3 OGBench environments.",
+            "weight": 1,
+            "sub_tasks": [],
+            "task_category": "Code Development",
+            "finegrained_task_category": "Logging, Analysis & Presentation"
+            },
+            {
+            "id": "offline-crl-3",
+            "requirements": "The results show that depth scaling does not consistently improve performance in the offline setting, with performance declining as depth scales from 4 to 64 in at least 2 out of 3 environments, and only a slight improvement seen on antmaze-medium-stitch, consistent with Figure 18.",
+            "weight": 3,
+            "sub_tasks": [],
+            "task_category": "Result Analysis",
+            "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+            "id": "offline-crl-4",
+            "requirements": "The ablations from Section 4.6 have been conducted, investigating whether alternative scaling strategies improve offline CRL performance.",
+            "weight": 2,
+            "sub_tasks": [
+                {
+                "id": "offline-crl-4-1",
+                "requirements": "Code exists to run the two ablations from Section 4.6: scaling critic depth while holding the actor fixed at 4 or 8 layers, and applying cold initialization to the final layers of the critic encoders.",
+                "weight": 1,
+                "sub_tasks": [],
+                "task_category": "Code Development",
+                "finegrained_task_category": "Experimental Setup"
+                },
+                {
+                "id": "offline-crl-4-2",
+                "requirements": "Both ablations have been executed on the OGBench environments using 3 random seeds.",
+                "weight": 1,
+                "sub_tasks": [],
+                "task_category": "Code Execution",
+                "finegrained_task_category": "Experimental Setup"
+                },
+                {
+                "id": "offline-crl-4-3",
+                "requirements": "In ablation conditions, often baseline depth 4 networks achieve the highest success, consistent with Section 4.6.",
+                "weight": 2,
+                "sub_tasks": [],
+                "task_category": "Result Analysis",
+                "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                }
+            ],
+            "task_category": null,
+            "finegrained_task_category": null
+            }
+        ],
+        "task_category": null,
+        "finegrained_task_category": null
+    }
+  ],
+  "task_category": null,
+  "finegrained_task_category": null
+}
