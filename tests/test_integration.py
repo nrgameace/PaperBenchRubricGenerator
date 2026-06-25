@@ -12,7 +12,7 @@ _BASE = {"root": {"requirements": "Reproduce the paper end to end."},
                       {"requirements": "Report final metric", "expandable": False, "task_category": "Result Analysis"}]}
 
 _EXPANSION = {"children": [{"requirements": "Implement the core method", "expandable": False, "task_category": "Code Development"},
-                          {"requirements": "Run the training script", "expandable": False, "task_category": "Code Execution"}]}
+                           {"requirements": "Run the training script", "expandable": False, "task_category": "Code Execution"}]}
 
 
 def _auto_approve(monkeypatch):
@@ -29,42 +29,51 @@ def _patch_llm(monkeypatch):
     monkeypatch.setattr(rubric_gen, "load_few_shot", lambda: '{"id": "root", "requirements": "example", "weight": 1, "sub_tasks": [], "task_category": "Code Development"}')
     monkeypatch.setattr(rubric_gen, "run_base_llm", lambda *a, **k: _BASE)
     monkeypatch.setattr(rubric_gen, "run_expansion_llm", lambda *a, **k: _EXPANSION)
-    monkeypatch.setattr(rubric_gen, "run_weight_llm", lambda *a, **k: {})  # all weights default to 1
+    monkeypatch.setattr(rubric_gen, "run_weight_llm", lambda *a, **k: {})
+
+
+def _make_input_dir(tmp_path):
+    """Create a minimal valid input directory with a fake PDF and MinerU folder."""
+    input_dir = tmp_path / "input"
+    input_dir.mkdir()
+    (input_dir / "paper.pdf").write_bytes(b"%PDF-1.4 fake")
+    mineru = input_dir / "mineru_out"
+    mineru.mkdir()
+    (mineru / "content_list.json").write_text("[]")
+    return input_dir
 
 
 def test_full_pipeline_produces_valid_final(tmp_path, monkeypatch):
-    monkeypatch.chdir(tmp_path)
-    pdf = tmp_path / "paper.pdf"
-    pdf.write_bytes(b"%PDF-1.4 fake")
+    input_dir = _make_input_dir(tmp_path)
+    output_dir = tmp_path / "output"
     _patch_llm(monkeypatch)
     _auto_approve(monkeypatch)
-    monkeypatch.setattr(sys, "argv", ["rubric_gen", str(pdf)])
+    monkeypatch.setattr(sys, "argv", ["rubric_gen", "--input", str(input_dir), "--output", str(output_dir)])
 
     rubric_gen.main()
 
-    final = json.loads((tmp_path / "rubric_final.json").read_text())
-    validate_final(final)  # must load into the genuine TaskNode without error
+    final = json.loads((output_dir / "rubric_final.json").read_text())
+    validate_final(final)
     assert final["id"] == "root"
     leaf_categories = {n["task_category"] for n in _walk(final) if not n["sub_tasks"]}
     assert leaf_categories <= {"Code Development", "Code Execution", "Result Analysis"}
-    assert (tmp_path / "rubric_state.json").exists()
+    assert (output_dir / "rubric_state.json").exists()
 
 
 def test_rerun_with_final_present_short_circuits(tmp_path, monkeypatch, capsys):
-    monkeypatch.chdir(tmp_path)
-    pdf = tmp_path / "paper.pdf"
-    pdf.write_bytes(b"%PDF-1.4 fake")
-    (tmp_path / "rubric_final.json").write_text(json.dumps({"id": "root"}))
-    (tmp_path / "rubric_state.json").write_text(json.dumps({"rubric": {"id": "root"}, "queue": [], "hints": {}}))
+    input_dir = _make_input_dir(tmp_path)
+    output_dir = tmp_path / "output"
+    output_dir.mkdir()
+    (output_dir / "rubric_final.json").write_text(json.dumps({"id": "root"}))
+    (output_dir / "rubric_state.json").write_text(json.dumps({"rubric": {"id": "root"}, "queue": [], "hints": {}}))
     _patch_llm(monkeypatch)
-    monkeypatch.setattr(sys, "argv", ["rubric_gen", str(pdf), "--resume"])
+    monkeypatch.setattr(sys, "argv", ["rubric_gen", "--input", str(input_dir), "--output", str(output_dir), "--resume"])
 
     rubric_gen.main()
     assert "already exists" in capsys.readouterr().out
 
 
 def _walk(node):
-    """Yield every node in the tree."""
     yield node
     for child in node["sub_tasks"]:
         yield from _walk(child)

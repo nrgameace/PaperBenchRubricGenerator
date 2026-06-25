@@ -22,6 +22,7 @@ try:
 except ImportError:
     pass
 
+from pb_input import discover_mineru_dir, discover_pdf, load_content_list
 from pb_passes import (apply_base, apply_expansion, apply_weights, build_llm, build_system_message,
                        pdf_to_block, run_base_llm, run_expansion_llm, run_weight_llm)
 from pb_review import RerunPass, pretty_print_nodes, review_pass
@@ -33,16 +34,14 @@ HERE = Path(__file__).resolve().parent
 MODEL = "claude-opus-4-8"
 MAX_TOKENS = 8000
 FEW_SHOT_RUBRIC_PATH = Path(os.environ.get("FEW_SHOT_RUBRIC_PATH", HERE / "examples" / "example_rubric.json"))
-STATE_FILE = Path("rubric_state.json")
-DRAFT_FILE = Path("rubric_draft.json")
-FINAL_FILE = Path("rubric_final.json")
 
 
 def parse_args():
-    """Parse the PDF path and the optional --resume flag."""
+    """Parse --input and --output directory flags plus the optional --resume flag."""
     parser = argparse.ArgumentParser(description="Generate a PaperBench rubric from a paper PDF.")
-    parser.add_argument("pdf_path", help="Path to the paper PDF.")
-    parser.add_argument("--resume", action="store_true", help="Resume from an existing rubric_state.json.")
+    parser.add_argument("--input", required=True, help="Path to the input directory (contains PDF and MinerU folder).")
+    parser.add_argument("--output", required=True, help="Path to the output directory (receives state and final rubric).")
+    parser.add_argument("--resume", action="store_true", help="Resume from an existing rubric_state.json in the output dir.")
     return parser.parse_args()
 
 
@@ -72,40 +71,40 @@ def prune_hints(state: dict) -> None:
     state["hints"] = {key: value for key, value in state["hints"].items() if key in queued}
 
 
-def commit(state: dict) -> None:
-    """Persist the current state to the checkpoint file."""
-    save_state(STATE_FILE, state["rubric"], state["queue"], state["hints"])
+def commit(state: dict, output_dir: Path) -> None:
+    """Persist the current state to the checkpoint file in output_dir."""
+    save_state(output_dir / "rubric_state.json", state["rubric"], state["queue"], state["hints"])
 
 
-def run_base_phase(llm, system_message, pdf_block, state) -> None:
+def run_base_phase(llm, system_message, pdf_block, state, output_dir) -> None:
     """Generate, review, and save the base nodes."""
     print("\n>>> BASE NODE PASS: generating root and top-level nodes...")
     while True:
         rubric, queue, hints = apply_base(run_base_llm(llm, system_message, pdf_block))
         pretty_print_nodes("Generated base nodes", rubric["sub_tasks"])
         try:
-            approved = review_pass(rubric, DRAFT_FILE, lambda candidate: validate_partial(candidate, queue))
+            approved = review_pass(rubric, output_dir / "rubric_draft.json", lambda candidate: validate_partial(candidate, queue))
         except RerunPass:
             print("Re-running base pass...")
             continue
         state["rubric"], state["hints"] = approved, hints
         state["queue"] = reconcile_queue(approved, queue)
         prune_hints(state)
-        commit(state)
+        commit(state, output_dir)
         return
 
 
-def run_expansion_phase(llm, system_message, pdf_block, state) -> None:
+def run_expansion_phase(llm, system_message, pdf_block, state, output_dir) -> None:
     """Breadth-first expand every queued node, reviewing and saving each pass."""
     while state["queue"]:
         node_id = state["queue"][0]
         target = find_node(state["rubric"], node_id)
         hint = state["hints"].get(node_id, "Expand this node into its sub-tasks based on the paper.")
         print(f"\n>>> EXPANSION PASS: '{node_id}' — {target['requirements'][:70]}")
-        _expand_one(llm, system_message, pdf_block, state, node_id, hint)
+        _expand_one(llm, system_message, pdf_block, state, node_id, hint, output_dir)
 
 
-def _expand_one(llm, system_message, pdf_block, state, node_id, hint) -> None:
+def _expand_one(llm, system_message, pdf_block, state, node_id, hint, output_dir) -> None:
     """Run, review, and save a single node's expansion pass."""
     while True:
         parsed = run_expansion_llm(llm, system_message, pdf_block, state["rubric"], node_id, hint)
@@ -115,18 +114,18 @@ def _expand_one(llm, system_message, pdf_block, state, node_id, hint) -> None:
         remaining = [q for q in state["queue"] if q != node_id] + new_pending
         pretty_print_nodes(f"Children of '{node_id}'", find_node(candidate, node_id)["sub_tasks"])
         try:
-            approved = review_pass(candidate, DRAFT_FILE, lambda c: validate_partial(c, remaining))
+            approved = review_pass(candidate, output_dir / "rubric_draft.json", lambda c: validate_partial(c, remaining))
         except RerunPass:
             print("Re-running expansion pass...")
             continue
         state["rubric"], state["hints"] = approved, candidate_hints
         state["queue"] = reconcile_queue(approved, remaining)
         prune_hints(state)
-        commit(state)
+        commit(state, output_dir)
         return
 
 
-def run_weight_phase(llm, system_message, pdf_block, state) -> dict:
+def run_weight_phase(llm, system_message, pdf_block, state, output_dir) -> dict:
     """Assign, review, and save integer weights across the whole tree."""
     print("\n>>> WEIGHT PASS: assigning integer weights to every node...")
     while True:
@@ -134,52 +133,61 @@ def run_weight_phase(llm, system_message, pdf_block, state) -> dict:
         apply_weights(candidate, run_weight_llm(llm, system_message, pdf_block, state["rubric"]))
         pretty_print_nodes("Weighted rubric", candidate)
         try:
-            approved = review_pass(candidate, DRAFT_FILE, validate_final)
+            approved = review_pass(candidate, output_dir / "rubric_draft.json", validate_final)
         except RerunPass:
             print("Re-running weight pass...")
             continue
         state["rubric"], state["queue"] = approved, []
-        commit(state)
+        commit(state, output_dir)
         return approved
 
 
-def finalize(rubric: dict) -> None:
-    """Validate the completed rubric and write rubric_final.json."""
+def finalize(rubric: dict, output_dir: Path) -> None:
+    """Validate the completed rubric and write rubric_final.json to output_dir."""
     validate_final(rubric)
-    with open(FINAL_FILE, "w", encoding="utf-8") as handle:
+    final_file = output_dir / "rubric_final.json"
+    with open(final_file, "w", encoding="utf-8") as handle:
         json.dump(rubric, handle, indent=2, ensure_ascii=False)
-    print(f"\nFinal rubric written to {FINAL_FILE} ({len(all_ids(rubric))} nodes) and validated.")
+    print(f"\nFinal rubric written to {final_file} ({len(all_ids(rubric))} nodes) and validated.")
 
 
 def main() -> None:
     """Drive the rubric-generation pipeline, resuming if requested."""
     args = parse_args()
-    if not Path(args.pdf_path).exists():
-        raise SystemExit(f"PDF not found: {args.pdf_path}")
+    input_dir = Path(args.input)
+    output_dir = Path(args.output)
 
-    state = load_state(STATE_FILE) if args.resume else None
+    if not input_dir.exists():
+        raise SystemExit(f"Input directory not found: {input_dir}")
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    pdf_path = discover_pdf(input_dir)
+    state_file = output_dir / "rubric_state.json"
+    final_file = output_dir / "rubric_final.json"
+
+    state = load_state(state_file) if args.resume else None
     if state is None:
-        if not args.resume and STATE_FILE.exists():
-            print(f"Note: {STATE_FILE} exists but --resume was not passed; starting fresh and overwriting it.")
+        if not args.resume and state_file.exists():
+            print(f"Note: {state_file} exists but --resume was not passed; starting fresh and overwriting it.")
         state = empty_state()
 
-    phase = determine_phase(state, FINAL_FILE.exists() and args.resume)
+    phase = determine_phase(state, final_file.exists() and args.resume)
     if phase == PHASE_DONE:
-        print(f"{FINAL_FILE} already exists; nothing to do. Delete it or omit --resume to start over.")
+        print(f"{final_file} already exists; nothing to do. Delete it or omit --resume to start over.")
         return
 
     system_message = build_system_message(load_few_shot())
-    pdf_block = pdf_to_block(args.pdf_path)
+    pdf_block = pdf_to_block(pdf_path)
     llm = build_llm(MODEL, MAX_TOKENS)
 
     if phase == PHASE_BASE:
-        run_base_phase(llm, system_message, pdf_block, state)
+        run_base_phase(llm, system_message, pdf_block, state, output_dir)
         phase = PHASE_EXPANSION
     if phase == PHASE_EXPANSION:
-        run_expansion_phase(llm, system_message, pdf_block, state)
+        run_expansion_phase(llm, system_message, pdf_block, state, output_dir)
         phase = PHASE_WEIGHT
     if phase == PHASE_WEIGHT:
-        finalize(run_weight_phase(llm, system_message, pdf_block, state))
+        finalize(run_weight_phase(llm, system_message, pdf_block, state, output_dir), output_dir)
 
 
 if __name__ == "__main__":
