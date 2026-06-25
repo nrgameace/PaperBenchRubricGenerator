@@ -1,6 +1,4 @@
-# Runtime dependencies for the PaperBench rubric generator.
-langchain-anthropic==1.4.4
-langchain-core==1.4.3
+anthropic>=0.49.0
 python-dotenv==1.2.2
 
 # Testing

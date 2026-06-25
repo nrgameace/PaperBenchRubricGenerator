@@ -142,41 +142,54 @@ def test_apply_weights_rejects_negative_and_bool():
     assert find_node(rubric, "a")["weight"] == 1
 
 
+class _FakeBlock:
+    def __init__(self, text):
+        self.text = text
+
+
 class _FakeResponse:
-    """Minimal stand-in for a LangChain message response."""
-
-    def __init__(self, content):
-        self.content = content
+    def __init__(self, text):
+        self.content = [_FakeBlock(text)]
 
 
-class _FakeLLM:
-    """Fake chat model returning a canned response, capturing the messages sent."""
-
+class _FakeMessages:
     def __init__(self, content):
         self._content = content
         self.calls = []
 
-    def invoke(self, messages):
-        self.calls.append(messages)
+    def create(self, **kwargs):
+        self.calls.append(kwargs)
         return _FakeResponse(self._content)
 
 
-def test_run_base_llm_with_fake_model():
-    llm = _FakeLLM('```json\n{"root": {"requirements": "repro"}, "children": [{"requirements": "s", "expandable": true, "expansion_hint": "h"}]}\n```')
-    parsed = pb_passes.run_base_llm(llm, "SYS", {"type": "file"})
+class _FakeClient:
+    def __init__(self, content):
+        self.messages = _FakeMessages(content)
+
+
+def test_run_base_llm_with_fake_client():
+    client = _FakeClient(
+        '```json\n{"root": {"requirements": "repro"}, '
+        '"children": [{"requirements": "s", "expandable": true, "expansion_hint": "h"}]}\n```'
+    )
+    parsed = pb_passes.run_base_llm(
+        client,
+        [{"type": "text", "text": "sys"}],
+        {"type": "document"},
+        "claude-opus-4-8",
+    )
     rubric, queue, _ = pb_passes.apply_base(parsed)
     assert rubric["requirements"] == "repro" and len(queue) == 1
-    assert llm.calls  # the model was actually invoked
+    assert client.messages.calls
 
 
 def test_invoke_llm_wraps_errors():
-    class _Boom:
-        def invoke(self, _):
+    class _BoomMessages:
+        def create(self, **kwargs):
             raise RuntimeError("network down")
 
+    class _BoomClient:
+        messages = _BoomMessages()
+
     with pytest.raises(RuntimeError, match="Anthropic API call failed"):
-        pb_passes.invoke_llm(_Boom(), "sys", "human")
-
-
-def test_join_text_blocks_handles_list():
-    assert pb_passes._join_text_blocks([{"type": "text", "text": "a"}, {"type": "text", "text": "b"}]) == "ab"
+        pb_passes.invoke_llm(_BoomClient(), [], [], "claude-opus-4-8")

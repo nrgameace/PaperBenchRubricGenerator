@@ -1,4 +1,4 @@
-"""LLM passes: prompt construction, ChatAnthropic invocation, JSON parsing, node merging.
+"""LLM passes: prompt construction, Anthropic SDK invocation, JSON parsing, node merging.
 
 All network access is funneled through ``invoke_llm`` so the merge/parse helpers stay
 pure and unit-testable. Generated nodes are always grounded in the supplied paper; the
@@ -10,8 +10,7 @@ import json
 import re
 from pathlib import Path
 
-from langchain_anthropic import ChatAnthropic
-from langchain_core.messages import HumanMessage, SystemMessage
+import anthropic
 
 from pb_schema import FINEGRAINED_CATEGORIES, LEAF_CATEGORIES, all_ids, find_node, iter_nodes
 
@@ -127,44 +126,54 @@ or, for an atomic leaf requirement:
 {"id": "kebab-case-id", "requirements": "...", "expandable": false, "expansion_hint": null, "task_category": "Code Development", "finegrained_task_category": null}"""
 
 
-def build_llm(model: str, max_tokens: int = 8000) -> ChatAnthropic:
-    """Construct the ChatAnthropic client (reads ANTHROPIC_API_KEY from the environment)."""
-    return ChatAnthropic(model=model, max_tokens=max_tokens)
+def build_client() -> anthropic.Anthropic:
+    """Construct the Anthropic client with the extended-cache-ttl beta enabled."""
+    return anthropic.Anthropic(
+        default_headers={
+            "anthropic-beta": "prompt-caching-2024-07-31,extended-cache-ttl-2025-02-19"
+        }
+    )
 
 
-def build_system_message(few_shot_json: str) -> SystemMessage:
-    """Build the system message: grounding rules plus the few-shot format exemplar."""
+def build_system_blocks(few_shot_json: str) -> list:
+    """Build the cached system block: grounding rules plus the few-shot format exemplar."""
     text = f"{SYSTEM_PREAMBLE}\n\n{_EXAMPLE_HEADER}\n{few_shot_json}\n{_EXAMPLE_FOOTER}"
-    return SystemMessage(content=text)
+    return [{"type": "text", "text": text, "cache_control": {"type": "ephemeral"}}]
 
 
 def pdf_to_block(pdf_path) -> dict:
-    """Read a PDF and return a base64 LangChain file content block."""
+    """Read a PDF and return a cached base64 document content block."""
     data = Path(pdf_path).read_bytes()
     encoded = base64.b64encode(data).decode("utf-8")
-    return {"type": "file", "source_type": "base64", "mime_type": "application/pdf", "data": encoded}
+    return {
+        "type": "document",
+        "source": {"type": "base64", "media_type": "application/pdf", "data": encoded},
+        "cache_control": {"type": "ephemeral"},
+    }
 
 
-def _human_message(pdf_block: dict, instruction: str) -> HumanMessage:
-    """Wrap the PDF block and an instruction string into a HumanMessage."""
-    return HumanMessage(content=[pdf_block, {"type": "text", "text": instruction}])
+def _human_message(pdf_block: dict, instruction: str) -> dict:
+    """Return a user-role message containing the PDF block and a text instruction."""
+    return {"role": "user", "content": [pdf_block, {"type": "text", "text": instruction}]}
 
 
-def _join_text_blocks(content) -> str:
-    """Join the text portions of a structured LangChain response into one string."""
-    if isinstance(content, str):
-        return content
-    parts = [block.get("text", "") for block in content if isinstance(block, dict)]
-    return "".join(parts)
+def _text_message(instruction: str) -> dict:
+    """Return a user-role message with a text instruction only (no PDF)."""
+    return {"role": "user", "content": [{"type": "text", "text": instruction}]}
 
 
-def invoke_llm(llm, system_message, human_message) -> str:
-    """Invoke the model with one system and one human message; return its text. Raises on failure."""
+def invoke_llm(client, system_blocks, messages, model, max_tokens=8000) -> str:
+    """Invoke the model and return its text. Raises RuntimeError on API failure."""
     try:
-        response = llm.invoke([system_message, human_message])
+        response = client.messages.create(
+            model=model,
+            max_tokens=max_tokens,
+            system=system_blocks,
+            messages=messages,
+        )
     except Exception as exc:
         raise RuntimeError(f"Anthropic API call failed: {exc}") from exc
-    return _join_text_blocks(response.content)
+    return response.content[0].text
 
 
 def _strip_code_fences(text: str) -> str:
@@ -300,7 +309,7 @@ def apply_weights(rubric: dict, weights: dict) -> None:
         node["weight"] = int(value) if isinstance(value, (int, float)) and not isinstance(value, bool) and value >= 0 else 1
 
 
-def run_base_llm(llm, system_message, pdf_block) -> dict:
+def run_base_llm(client, system_blocks, pdf_block, model) -> dict:
     """Run the base node pass and return the parsed response."""
     instruction = (
         "TASK: Generate the BASE of the rubric for the attached paper.\n\n"
@@ -311,10 +320,12 @@ def run_base_llm(llm, system_message, pdf_block) -> dict:
         '{"root": {"requirements": "<one sentence describing full reproduction of THIS paper>"}, '
         '"children": [ <child objects> ]}\n\n' + _CHILD_SHAPE
     )
-    return parse_json_response(invoke_llm(llm, system_message, _human_message(pdf_block, instruction)))
+    return parse_json_response(
+        invoke_llm(client, system_blocks, [_human_message(pdf_block, instruction)], model)
+    )
 
 
-def run_expansion_llm(llm, system_message, pdf_block, rubric: dict, node_id: str, hint: str) -> dict:
+def run_expansion_llm(client, system_blocks, pdf_block, rubric: dict, node_id: str, hint: str, model) -> dict:
     """Run an expansion pass for one node and return the parsed response."""
     target = find_node(rubric, node_id)
     instruction = (
@@ -324,10 +335,12 @@ def run_expansion_llm(llm, system_message, pdf_block, rubric: dict, node_id: str
         f"FULL RUBRIC SO FAR (context only):\n{json.dumps(rubric, indent=2, ensure_ascii=False)}\n\n"
         'Respond with JSON ONLY: {"children": [ <child objects> ]}\n\n' + _CHILD_SHAPE
     )
-    return parse_json_response(invoke_llm(llm, system_message, _human_message(pdf_block, instruction)))
+    return parse_json_response(
+        invoke_llm(client, system_blocks, [_human_message(pdf_block, instruction)], model)
+    )
 
 
-def run_weight_llm(llm, system_message, pdf_block, rubric: dict) -> dict:
+def run_weight_llm(client, system_blocks, pdf_block, rubric: dict, model) -> dict:
     """Run the weight pass and return the id->weight mapping."""
     instruction = (
         "TASK: Assign integer WEIGHTS to every node in the completed rubric, reflecting each item's "
@@ -338,5 +351,7 @@ def run_weight_llm(llm, system_message, pdf_block, rubric: dict) -> dict:
         f"FULL RUBRIC (ids included):\n{json.dumps(rubric, indent=2, ensure_ascii=False)}\n\n"
         'Respond with JSON ONLY mapping EVERY node id to an integer: {"weights": {"<id>": <int>, ...}}'
     )
-    parsed = parse_json_response(invoke_llm(llm, system_message, _human_message(pdf_block, instruction)))
+    parsed = parse_json_response(
+        invoke_llm(client, system_blocks, [_human_message(pdf_block, instruction)], model)
+    )
     return parsed.get("weights", parsed) if isinstance(parsed, dict) else {}
