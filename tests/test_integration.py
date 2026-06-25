@@ -24,7 +24,7 @@ def _auto_approve(monkeypatch):
 
 def _patch_llm(monkeypatch):
     """Patch out all network/model/asset touchpoints with deterministic fakes."""
-    monkeypatch.setattr(rubric_gen, "build_llm", lambda *a, **k: object())
+    monkeypatch.setattr(rubric_gen, "build_client", lambda *a, **k: object())
     monkeypatch.setattr(rubric_gen, "pdf_to_block", lambda _p: {"type": "file"})
     monkeypatch.setattr(rubric_gen, "load_few_shot", lambda: '{"id": "root", "requirements": "example", "weight": 1, "sub_tasks": [], "task_category": "Code Development"}')
     monkeypatch.setattr(rubric_gen, "run_base_llm", lambda *a, **k: _BASE)

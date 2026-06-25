@@ -176,6 +176,7 @@ def test_run_base_llm_with_fake_client():
         client,
         [{"type": "text", "text": "sys"}],
         {"type": "document"},
+        "This is the structured paper text.",
         "claude-opus-4-8",
     )
     rubric, queue, _ = pb_passes.apply_base(parsed)

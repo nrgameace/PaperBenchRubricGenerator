@@ -23,7 +23,8 @@ except ImportError:
     pass
 
 from pb_input import discover_mineru_dir, discover_pdf, load_content_list
-from pb_passes import (apply_base, apply_expansion, apply_weights, build_llm, build_system_message,
+from pb_mineru import blocks_to_text, slice_section
+from pb_passes import (apply_base, apply_expansion, apply_weights, build_client, build_system_blocks,
                        pdf_to_block, run_base_llm, run_expansion_llm, run_weight_llm)
 from pb_review import RerunPass, pretty_print_nodes, review_pass
 from pb_schema import all_ids, find_node, validate_final, validate_partial
@@ -31,8 +32,8 @@ from pb_state import (PHASE_BASE, PHASE_DONE, PHASE_EXPANSION, PHASE_WEIGHT, det
                       empty_state, load_state, save_state)
 
 HERE = Path(__file__).resolve().parent
-MODEL = "claude-opus-4-8"
-MAX_TOKENS = 8000
+OPUS = "claude-opus-4-8"
+SONNET = "claude-sonnet-4-6"
 FEW_SHOT_RUBRIC_PATH = Path(os.environ.get("FEW_SHOT_RUBRIC_PATH", HERE / "examples" / "example_rubric.json"))
 
 
@@ -76,11 +77,12 @@ def commit(state: dict, output_dir: Path) -> None:
     save_state(output_dir / "rubric_state.json", state["rubric"], state["queue"], state["hints"])
 
 
-def run_base_phase(llm, system_message, pdf_block, state, output_dir) -> None:
+def run_base_phase(client, system_blocks, pdf_block, content_list, state, model, output_dir) -> None:
     """Generate, review, and save the base nodes."""
     print("\n>>> BASE NODE PASS: generating root and top-level nodes...")
+    content_list_text = blocks_to_text(content_list)
     while True:
-        rubric, queue, hints = apply_base(run_base_llm(llm, system_message, pdf_block))
+        rubric, queue, hints = apply_base(run_base_llm(client, system_blocks, pdf_block, content_list_text, model))
         pretty_print_nodes("Generated base nodes", rubric["sub_tasks"])
         try:
             approved = review_pass(rubric, output_dir / "rubric_draft.json", lambda candidate: validate_partial(candidate, queue))
@@ -94,20 +96,21 @@ def run_base_phase(llm, system_message, pdf_block, state, output_dir) -> None:
         return
 
 
-def run_expansion_phase(llm, system_message, pdf_block, state, output_dir) -> None:
+def run_expansion_phase(client, system_blocks, content_list, state, model, output_dir) -> None:
     """Breadth-first expand every queued node, reviewing and saving each pass."""
     while state["queue"]:
         node_id = state["queue"][0]
         target = find_node(state["rubric"], node_id)
         hint = state["hints"].get(node_id, "Expand this node into its sub-tasks based on the paper.")
         print(f"\n>>> EXPANSION PASS: '{node_id}' — {target['requirements'][:70]}")
-        _expand_one(llm, system_message, pdf_block, state, node_id, hint, output_dir)
+        _expand_one(client, system_blocks, content_list, state, node_id, hint, model, output_dir)
 
 
-def _expand_one(llm, system_message, pdf_block, state, node_id, hint, output_dir) -> None:
+def _expand_one(client, system_blocks, content_list, state, node_id, hint, model, output_dir) -> None:
     """Run, review, and save a single node's expansion pass."""
+    section_text = blocks_to_text(slice_section(content_list, hint))
     while True:
-        parsed = run_expansion_llm(llm, system_message, pdf_block, state["rubric"], node_id, hint)
+        parsed = run_expansion_llm(client, system_blocks, section_text, state["rubric"], node_id, hint, model)
         candidate = copy.deepcopy(state["rubric"])
         candidate_hints = dict(state["hints"])
         new_pending = apply_expansion(candidate, node_id, parsed, candidate_hints)
@@ -125,12 +128,13 @@ def _expand_one(llm, system_message, pdf_block, state, node_id, hint, output_dir
         return
 
 
-def run_weight_phase(llm, system_message, pdf_block, state, output_dir) -> dict:
+def run_weight_phase(client, system_blocks, content_list, state, model, output_dir) -> dict:
     """Assign, review, and save integer weights across the whole tree."""
     print("\n>>> WEIGHT PASS: assigning integer weights to every node...")
+    content_list_text = blocks_to_text(content_list)
     while True:
         candidate = copy.deepcopy(state["rubric"])
-        apply_weights(candidate, run_weight_llm(llm, system_message, pdf_block, state["rubric"]))
+        apply_weights(candidate, run_weight_llm(client, system_blocks, content_list_text, state["rubric"], model))
         pretty_print_nodes("Weighted rubric", candidate)
         try:
             approved = review_pass(candidate, output_dir / "rubric_draft.json", validate_final)
@@ -176,18 +180,20 @@ def main() -> None:
         print(f"{final_file} already exists; nothing to do. Delete it or omit --resume to start over.")
         return
 
-    system_message = build_system_message(load_few_shot())
+    client = build_client()
+    system_blocks = build_system_blocks(load_few_shot())
     pdf_block = pdf_to_block(pdf_path)
-    llm = build_llm(MODEL, MAX_TOKENS)
+    mineru_dir = discover_mineru_dir(input_dir)
+    content_list = load_content_list(mineru_dir)
 
     if phase == PHASE_BASE:
-        run_base_phase(llm, system_message, pdf_block, state, output_dir)
+        run_base_phase(client, system_blocks, pdf_block, content_list, state, OPUS, output_dir)
         phase = PHASE_EXPANSION
     if phase == PHASE_EXPANSION:
-        run_expansion_phase(llm, system_message, pdf_block, state, output_dir)
+        run_expansion_phase(client, system_blocks, content_list, state, SONNET, output_dir)
         phase = PHASE_WEIGHT
     if phase == PHASE_WEIGHT:
-        finalize(run_weight_phase(llm, system_message, pdf_block, state, output_dir), output_dir)
+        finalize(run_weight_phase(client, system_blocks, content_list, state, SONNET, output_dir), output_dir)
 
 
 if __name__ == "__main__":

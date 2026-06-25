@@ -309,13 +309,17 @@ def apply_weights(rubric: dict, weights: dict) -> None:
         node["weight"] = int(value) if isinstance(value, (int, float)) and not isinstance(value, bool) and value >= 0 else 1
 
 
-def run_base_llm(client, system_blocks, pdf_block, model) -> dict:
-    """Run the base node pass and return the parsed response."""
+def run_base_llm(client, system_blocks, pdf_block, content_list_text, model) -> dict:
+    """Run the base node pass; sends both the full MinerU text and the PDF for figure analysis."""
     instruction = (
         "TASK: Generate the BASE of the rubric for the attached paper.\n\n"
+        "The structured paper content is provided below as parsed text. "
+        "Use the attached PDF for figure and diagram analysis.\n\n"
+        f"PAPER CONTENT (MinerU structured parse):\n{content_list_text}\n\n"
         "Produce the root node's requirements and the TOP-LEVEL child nodes — the major areas of "
         "work needed to reproduce THIS paper. Most top-level children are expandable (they receive "
-        "their own sub-tasks later); give each a one-sentence expansion_hint.\n\n"
+        "their own sub-tasks later); give each a one-sentence expansion_hint that names the paper "
+        "section or topic it corresponds to (this hint is used to slice the relevant section for expansion).\n\n"
         "Respond with JSON ONLY in exactly this shape:\n"
         '{"root": {"requirements": "<one sentence describing full reproduction of THIS paper>"}, '
         '"children": [ <child objects> ]}\n\n' + _CHILD_SHAPE
@@ -325,26 +329,28 @@ def run_base_llm(client, system_blocks, pdf_block, model) -> dict:
     )
 
 
-def run_expansion_llm(client, system_blocks, pdf_block, rubric: dict, node_id: str, hint: str, model) -> dict:
-    """Run an expansion pass for one node and return the parsed response."""
+def run_expansion_llm(client, system_blocks, section_text, rubric: dict, node_id: str, hint: str, model) -> dict:
+    """Run an expansion pass for one node; sends only the relevant section text (no PDF)."""
     target = find_node(rubric, node_id)
     instruction = (
         "TASK: Expand ONE node of the in-progress rubric into its DIRECT children, grounded in the "
-        "attached paper. Do not repeat or modify any other node.\n\n"
+        "paper. Do not repeat or modify any other node.\n\n"
+        f"RELEVANT PAPER SECTION:\n{section_text}\n\n"
         f"NODE TO EXPAND:\n- requirements: {target['requirements']}\n- expansion hint: {hint}\n\n"
         f"FULL RUBRIC SO FAR (context only):\n{json.dumps(rubric, indent=2, ensure_ascii=False)}\n\n"
         'Respond with JSON ONLY: {"children": [ <child objects> ]}\n\n' + _CHILD_SHAPE
     )
     return parse_json_response(
-        invoke_llm(client, system_blocks, [_human_message(pdf_block, instruction)], model)
+        invoke_llm(client, system_blocks, [_text_message(instruction)], model)
     )
 
 
-def run_weight_llm(client, system_blocks, pdf_block, rubric: dict, model) -> dict:
-    """Run the weight pass and return the id->weight mapping."""
+def run_weight_llm(client, system_blocks, content_list_text, rubric: dict, model) -> dict:
+    """Run the weight pass; sends the full MinerU text only (no PDF)."""
     instruction = (
         "TASK: Assign integer WEIGHTS to every node in the completed rubric, reflecting each item's "
         "importance to reproducing the attached paper.\n\n"
+        f"PAPER CONTENT (MinerU structured parse):\n{content_list_text}\n\n"
         "Within each group of sibling nodes, assign non-negative integers for relative importance "
         "(they need NOT sum to any fixed value; the benchmark normalizes within each group). More "
         "important or more effort-intensive siblings get larger integers. Use 1 for the root.\n\n"
@@ -352,6 +358,6 @@ def run_weight_llm(client, system_blocks, pdf_block, rubric: dict, model) -> dic
         'Respond with JSON ONLY mapping EVERY node id to an integer: {"weights": {"<id>": <int>, ...}}'
     )
     parsed = parse_json_response(
-        invoke_llm(client, system_blocks, [_human_message(pdf_block, instruction)], model)
+        invoke_llm(client, system_blocks, [_text_message(instruction)], model)
     )
     return parsed.get("weights", parsed) if isinstance(parsed, dict) else {}
