@@ -3,12 +3,14 @@
 Generate a [PaperBench](https://github.com/openai/preparedness)-style grading **rubric**
 from a research paper PDF, so you can measure how well a codebase reproduces that paper.
 
-The tool reads a paper, then drives Claude through a sequence of human-reviewed passes to
-build a tree of `TaskNode`s — a hierarchy of precise, verifiable requirements that a faithful
-reproduction of the paper must satisfy. You review and edit the model's output at every step.
+The tool reads a paper and its [MinerU](https://github.com/opendatalab/MinerU) structured
+parse, then drives Claude through a sequence of human-reviewed passes to build a tree of
+`TaskNode`s — a hierarchy of precise, verifiable requirements that a faithful reproduction
+of the paper must satisfy. You review and edit the model's output at every step.
 
-> **Cost:** A full rubric for one paper costs roughly **$9 USD** in Anthropic API usage
-> (Claude Opus, large PDF context re-sent on every pass). Budget accordingly before running.
+> **Cost:** A full rubric for one paper costs roughly **~$4 USD** in Anthropic API usage.
+> Costs are kept low via extended prompt caching (1-hour TTL on the PDF and system preamble)
+> and model tiering (Opus only for the base pass; Sonnet for all expansion and weight passes).
 
 ---
 
@@ -17,14 +19,30 @@ reproduction of the paper must satisfy. You review and edit the model's output a
 The rubric is built as a tree and checkpointed after every approved pass, so a run is fully
 resumable. There are three phases:
 
-1. **Base node pass** — generates the root node and the top-level areas of work.
-2. **Expansion passes** — breadth-first, expands every non-leaf node into its sub-tasks
-   (one reviewed pass per node).
-3. **Weight pass** — assigns an integer weight to every node, reflecting its importance to
-   the paper's core contributions.
+1. **Base pass** — `claude-opus-4-8` receives the full MinerU text plus the raw PDF (for
+   figure analysis). Produces the root node and the top-level areas of work. Each top-level
+   child is tagged as expandable (with an expansion hint naming the relevant paper section)
+   or a leaf.
 
-Each leaf node is tagged with a category (`Code Development`, `Code Execution`, or
-`Result Analysis`) describing what a grader must check.
+2. **Expansion passes** — `claude-sonnet-4-6`, breadth-first. For each queued node, the
+   MinerU content is sliced to the matching section using `difflib` fuzzy heading match, and
+   the model generates children for that node only. Falls back to the full content list when
+   no heading matches (similarity < 0.3). One reviewed pass per node.
+
+3. **Weight pass** — `claude-sonnet-4-6` receives the full MinerU text and the completed
+   tree and assigns an integer weight to every node reflecting its importance to the paper's
+   core contributions.
+
+### Prompt caching
+
+Two blocks are cached with a 1-hour TTL via the Anthropic extended-cache-ttl beta
+(`prompt-caching-2024-07-31,extended-cache-ttl-2025-02-19`):
+
+- **System preamble** — grounding rules and the few-shot format exemplar.
+- **PDF document block** — base64-encoded PDF, sent only in the base pass.
+
+The cache survives the human-review window between phases, so you don't pay to re-send the
+PDF or system prompt on expansion and weight calls.
 
 ### Human-in-the-loop review
 
@@ -33,27 +51,95 @@ prompts you to edit that file as needed. When you press **Enter**, your edits ar
 against the PaperBench `TaskNode` schema:
 
 - If the draft is valid, it is committed and the next pass begins.
-- If it fails validation, you can fix it again (`e`) or re-run the LLM pass from scratch (`r`).
+- Type `rerun` to discard the LLM output and re-run that pass from scratch.
 
-State is saved to `rubric_state.json` after every approved pass.
+State is saved atomically to `rubric_state.json` after every approved pass.
 
 ---
 
-## Project layout
+## Architecture
 
-| File | Purpose |
-| --- | --- |
-| `rubric_gen.py` | Entry point and pipeline orchestration. |
-| `pb_passes.py` | Prompt construction, Claude invocation, JSON parsing, node merging. |
-| `pb_review.py` | Human review loop (edit draft → validate → retry). |
-| `pb_schema.py` | Rubric traversal and validation helpers. |
-| `task_node.py` | Self-contained PaperBench `TaskNode` tree (adapted from OpenAI's frontier-evals). |
-| `pb_state.py` | State persistence and phase derivation for resumable runs. |
-| `examples/example_rubric.json` | Few-shot example rubric (format/depth reference only). |
-| `tests/` | Unit and integration tests (no network required). |
+### Directory layout
 
-This repository is **self-contained** — it does not depend on an external frontier-evals
-checkout. The `TaskNode` class is reproduced locally in `task_node.py` with attribution.
+```
+data/
+  input/<paper>/
+    paper.pdf
+    mineru_out/           ← any folder name; must contain content_list.json at its root
+      content_list.json
+  output/<paper>/
+    rubric_state.json     ← resumable checkpoint (rubric + expansion queue + hints)
+    rubric_draft.json     ← editable draft for the current pass
+    rubric_final.json     ← final validated rubric (written when all phases complete)
+examples/
+  example_rubric.json     ← few-shot format/depth exemplar (different paper)
+tests/
+```
+
+### Module responsibilities
+
+| File | Responsibility |
+|---|---|
+| `rubric_gen.py` | Entry point; CLI parsing; orchestrates all 3 phases; human review loop |
+| `pb_passes.py` | Anthropic SDK calls; prompt construction; JSON parsing; node normalization; tree mutation (`apply_base`, `apply_expansion`, `apply_weights`) |
+| `pb_input.py` | Discovers PDF and MinerU folder from input dir; loads `content_list.json` |
+| `pb_mineru.py` | Converts MinerU blocks to LLM-readable text (`blocks_to_text`); slices content to a section by heading fuzzy-match (`slice_section`) |
+| `pb_schema.py` | Rubric dict traversal and validation (`validate_partial`, `validate_final`, `find_node`, `all_ids`) |
+| `pb_state.py` | State persistence; phase constants (`PHASE_BASE → EXPANSION → WEIGHT → DONE`); atomic write via temp-file rename |
+| `pb_review.py` | Blocks on `input()` for human review; raises `RerunPass` when user types `rerun` |
+| `task_node.py` | Frozen `TaskNode` dataclass (adapted from OpenAI's frontier-evals); leaf/internal validation in `__post_init__` |
+
+### TaskNode rules
+
+- **Leaf nodes**: `task_category` must be one of `Code Development`, `Code Execution`,
+  `Result Analysis`, `Paper Analysis`; `sub_tasks` must be empty.
+- **Internal nodes**: `task_category` must be `None`; `sub_tasks` must be non-empty.
+- All node IDs must be unique within the tree and in kebab-case.
+- `weight` is 0 during base/expansion phases; set to a positive integer by the weight pass.
+
+### MinerU block format
+
+`content_list.json` is a flat list of blocks. Relevant fields:
+
+- `type`: `"text"`, `"image"`, `"table"`, `"equation"`
+- `text_level` (int, text blocks only): present on headings; 1 = top-level section
+- `img_caption`, `table_body`, `table_caption`
+
+Section slicing: `difflib.SequenceMatcher` fuzzy-matches the expansion hint against heading
+text. Falls back to the full list when the best heading score is below 0.3.
+
+---
+
+## Changelog
+
+### v2 — Prompt caching, model tiering, and MinerU integration
+
+The pipeline was refactored from a LangChain-backed single-model flow into a cost-optimized
+multi-model pipeline built on the raw Anthropic SDK:
+
+**LangChain removed.** `ChatAnthropic` replaced with `anthropic.Anthropic` directly.
+`build_client()` attaches the extended-cache-ttl beta header at construction time.
+
+**Extended prompt caching.** System preamble and PDF are each marked
+`cache_control: {type: ephemeral}`. With a 1-hour TTL, the cache outlasts human-review
+pauses between phases, eliminating repeated full-context charges.
+
+**Model tiering.** `claude-opus-4-8` is used only for the base pass where deep paper
+comprehension is needed. All expansion calls and the weight pass use `claude-sonnet-4-6`
+(~5× cheaper per token), which is adequate for mechanical child generation and weight
+assignment.
+
+**MinerU integration.** Two new modules handle structured paper content:
+- `pb_input.py` — discovers the PDF and MinerU output folder from the input directory and
+  loads `content_list.json`.
+- `pb_mineru.py` — converts MinerU blocks to LLM-readable text and slices the content list
+  to the relevant section for each expansion call.
+
+**CLI updated.** The positional `pdf_path` argument is replaced by named `--input` and
+`--output` flags. Output files are written to the `--output` directory rather than alongside
+the input PDF.
+
+These changes together reduce the per-paper cost from ~$9 to ~$4.
 
 ---
 
@@ -61,103 +147,101 @@ checkout. The `TaskNode` class is reproduced locally in `task_node.py` with attr
 
 ### 1. Python environment
 
-Requires **Python 3.14**. This project uses a virtual environment named `env` located in the
-**parent folder** of this repository.
-
-Activate it (from inside the repo):
+Requires **Python 3.11**. Install via pyenv if needed:
 
 ```bash
-source ../env/bin/activate
+pyenv install 3.11.12
 ```
 
-If you need to create it from scratch instead:
+Create and activate a virtual environment inside the repo:
 
 ```bash
-python3.14 -m venv ../env
-source ../env/bin/activate
-pip install -r requirements.txt
-```
-
-To install/refresh dependencies into the existing environment:
-
-```bash
+python -m venv .venv --python ~/.pyenv/versions/3.11.12/bin/python3.11
+source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
 ### 2. API key
 
-Copy the example env file and add your Anthropic API key:
+Create a `.env` file in the repo root:
 
 ```bash
-cp .env.example .env
-# then edit .env and set ANTHROPIC_API_KEY=sk-ant-...
+echo "ANTHROPIC_API_KEY=sk-ant-..." > .env
 ```
 
-`rubric_gen.py` loads `.env` automatically (via `python-dotenv`). Alternatively, export the
-key directly:
+`rubric_gen.py` loads `.env` automatically via `python-dotenv`. Alternatively:
 
 ```bash
 export ANTHROPIC_API_KEY=sk-ant-...
+```
+
+### 3. MinerU
+
+Run [MinerU](https://github.com/opendatalab/MinerU) on your PDF to produce a
+`content_list.json`, then place it under `data/input/<paper>/`:
+
+```
+data/input/my-paper/
+  paper.pdf
+  mineru_out/
+    content_list.json
 ```
 
 ---
 
 ## Usage
 
-Generate a rubric from a paper PDF:
+Generate a rubric:
 
 ```bash
-python rubric_gen.py path/to/paper.pdf
+python rubric_gen.py --input data/input/my-paper --output data/output/my-paper
 ```
 
-The tool will pause after each pass for you to review and edit `rubric_draft.json`. Save your
-edits, return to the terminal, and press **Enter** to continue.
+The tool will pause after each pass for you to review and edit `rubric_draft.json` in the
+output directory. Save your edits, return to the terminal, and press **Enter** to continue.
+Type `rerun` to discard the output and retry that LLM call.
 
 ### Resuming an interrupted run
 
-Every approved pass is checkpointed to `rubric_state.json`. To pick up where you left off:
+Every approved pass is checkpointed atomically to `rubric_state.json`. To pick up where
+you left off:
 
 ```bash
-python rubric_gen.py path/to/paper.pdf --resume
+python rubric_gen.py --input data/input/my-paper --output data/output/my-paper --resume
 ```
 
 Without `--resume`, an existing `rubric_state.json` is overwritten and the run starts fresh.
 
-### Output
-
-When all phases complete, the validated rubric is written to **`rubric_final.json`**.
+### Output files
 
 | File | Description |
-| --- | --- |
-| `rubric_draft.json` | The editable draft for the current pass. |
+|---|---|
+| `rubric_draft.json` | Editable draft for the current pass. |
 | `rubric_state.json` | Resumable checkpoint (rubric + expansion queue + hints). |
-| `rubric_final.json` | The final, validated rubric. |
+| `rubric_final.json` | Final validated rubric (written when all phases complete). |
 
-If `rubric_final.json` already exists, the tool reports it and exits — delete it (or run
-without `--resume`) to start over.
+If `rubric_final.json` already exists and `--resume` is passed, the tool reports it and
+exits — delete it or omit `--resume` to start over.
 
 ---
 
 ## Configuration
 
-- **Model / token budget:** set `MODEL` and `MAX_TOKENS` in `rubric_gen.py`
-  (defaults: `claude-opus-4-8`, `8000`).
-- **Few-shot example:** the example rubric in `examples/example_rubric.json` is used purely as
-  a format and depth reference. Override it by setting `FEW_SHOT_RUBRIC_PATH` to another rubric
-  JSON file (see `.env.example`).
+| Setting | How to set | Default |
+|---|---|---|
+| Few-shot example rubric | `FEW_SHOT_RUBRIC_PATH` env var | `examples/example_rubric.json` |
 
 ---
 
 ## Running the tests
 
-The test suite runs entirely offline (Claude calls are faked):
+The test suite runs entirely offline (Anthropic calls are faked):
 
 ```bash
-source ../env/bin/activate
-pytest
+.venv/bin/pytest tests/
 ```
 
-All tests should pass without an API key or network access.
+All tests pass without an API key or network access.
 
 ---
 
