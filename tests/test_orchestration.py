@@ -73,7 +73,7 @@ def test_expand_subtree_expands_all_levels():
     }
     expanded_order = []
 
-    def fake_run_expansion_llm(client, system_blocks, section_text, rb, node_id, hint, model, feedback=""):
+    def fake_run_expansion_llm(client, system_blocks, section_text, rb, node_id, hint, model, feedback="", tracker=None):
         expanded_order.append(node_id)
         return expansion_responses[node_id]
 
@@ -93,7 +93,7 @@ def test_expand_subtree_forwards_feedback_to_all_calls():
     hints = {"section-a": "hint"}
     feedback_seen = []
 
-    def fake_run_expansion_llm(client, system_blocks, section_text, rb, node_id, hint, model, feedback=""):
+    def fake_run_expansion_llm(client, system_blocks, section_text, rb, node_id, hint, model, feedback="", tracker=None):
         feedback_seen.append(feedback)
         return {"children": [
             {"id": f"leaf-{node_id}", "requirements": "x",
@@ -113,7 +113,7 @@ def test_expand_subtree_no_feedback_passes_empty_string():
     hints = {"section-a": "hint"}
     feedback_seen = []
 
-    def fake_run_expansion_llm(client, system_blocks, section_text, rb, node_id, hint, model, feedback=""):
+    def fake_run_expansion_llm(client, system_blocks, section_text, rb, node_id, hint, model, feedback="", tracker=None):
         feedback_seen.append(feedback)
         return {"children": [
             {"id": "leaf", "requirements": "x", "expandable": False, "task_category": "Code Development"}
@@ -179,7 +179,7 @@ def test_expansion_phase_passes_feedback_on_rerun(tmp_path):
 
     subtree_calls = []
 
-    def fake_expand_subtree(client, system_blocks, content_list, rubric, node_id, hints, model, feedback=""):
+    def fake_expand_subtree(client, system_blocks, content_list, rubric, node_id, hints, model, feedback="", tracker=None):
         subtree_calls.append((node_id, feedback))
 
     with patch("rubric_gen._expand_subtree", side_effect=fake_expand_subtree), \

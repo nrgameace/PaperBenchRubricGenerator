@@ -22,6 +22,7 @@ try:
 except ImportError:
     pass
 
+from pb_cost import CostTracker
 from pb_input import discover_mineru_dir, discover_pdf, load_content_list
 from pb_mineru import blocks_to_text, slice_section
 from pb_passes import (apply_base, apply_expansion, apply_weights, build_client, build_system_blocks,
@@ -34,7 +35,7 @@ from pb_state import (PHASE_BASE, PHASE_DONE, PHASE_EXPANSION, PHASE_WEIGHT, det
 HERE = Path(__file__).resolve().parent
 OPUS = "claude-opus-4-8"
 SONNET = "claude-sonnet-4-6"
-FEW_SHOT_RUBRIC_PATH = Path(os.environ.get("FEW_SHOT_RUBRIC_PATH", HERE / "examples" / "example_rubric.json"))
+FEW_SHOT_RUBRIC_PATH = Path(os.environ.get("FEW_SHOT_RUBRIC_PATH", HERE.parent / "examples" / "example_rubric.json"))
 
 
 def parse_args():
@@ -77,13 +78,13 @@ def commit(state: dict, output_dir: Path) -> None:
     save_state(output_dir / "rubric_state.json", state["rubric"], state["queue"], state["hints"])
 
 
-def run_base_phase(client, system_blocks, pdf_block, content_list, state, model, output_dir) -> None:
+def run_base_phase(client, system_blocks, pdf_block, content_list, state, model, output_dir, tracker=None) -> None:
     """Generate, review, and save the base nodes."""
     print("\n>>> BASE NODE PASS: generating root and top-level nodes...")
     content_list_text = blocks_to_text(content_list)
     feedback = ""
     while True:
-        rubric, queue, hints = apply_base(run_base_llm(client, system_blocks, pdf_block, content_list_text, model))
+        rubric, queue, hints = apply_base(run_base_llm(client, system_blocks, pdf_block, content_list_text, model, tracker=tracker))
         pretty_print_nodes("Generated base nodes", rubric["sub_tasks"])
         try:
             approved = review_pass(rubric, output_dir / "rubric_draft.json", lambda candidate: validate_partial(candidate, queue))
@@ -98,7 +99,7 @@ def run_base_phase(client, system_blocks, pdf_block, content_list, state, model,
         return
 
 
-def _expand_subtree(client, system_blocks, content_list, rubric, node_id, hints, model, feedback: str = "") -> None:
+def _expand_subtree(client, system_blocks, content_list, rubric, node_id, hints, model, feedback: str = "", tracker=None) -> None:
     """Fully expand node_id and all its expandable descendants in-place (BFS, no review pause)."""
     local_queue = [node_id]
     while local_queue:
@@ -106,12 +107,12 @@ def _expand_subtree(client, system_blocks, content_list, rubric, node_id, hints,
         hint = hints.get(current_id, "Expand this node into its sub-tasks based on the paper.")
         section_text = blocks_to_text(slice_section(content_list, hint))
         print(f"  Expanding '{current_id}'...")
-        parsed = run_expansion_llm(client, system_blocks, section_text, rubric, current_id, hint, model, feedback=feedback)
+        parsed = run_expansion_llm(client, system_blocks, section_text, rubric, current_id, hint, model, feedback=feedback, tracker=tracker)
         new_pending = apply_expansion(rubric, current_id, parsed, hints)
         local_queue.extend(new_pending)
 
 
-def run_expansion_phase(client, system_blocks, content_list, state, model, output_dir) -> None:
+def run_expansion_phase(client, system_blocks, content_list, state, model, output_dir, tracker=None) -> None:
     """Expand each top-level node's full subtree, then review once before moving to the next."""
     while state["queue"]:
         node_id = state["queue"][0]
@@ -121,7 +122,7 @@ def run_expansion_phase(client, system_blocks, content_list, state, model, outpu
         while True:
             candidate = copy.deepcopy(state["rubric"])
             candidate_hints = dict(state["hints"])
-            _expand_subtree(client, system_blocks, content_list, candidate, node_id, candidate_hints, model, feedback)
+            _expand_subtree(client, system_blocks, content_list, candidate, node_id, candidate_hints, model, feedback, tracker=tracker)
             remaining_queue = state["queue"][1:]
             pretty_print_nodes(f"Subtree '{node_id}' (fully expanded)", [find_node(candidate, node_id)])
             try:
@@ -139,14 +140,14 @@ def run_expansion_phase(client, system_blocks, content_list, state, model, outpu
             break
 
 
-def run_weight_phase(client, system_blocks, content_list, state, model, output_dir) -> dict:
+def run_weight_phase(client, system_blocks, content_list, state, model, output_dir, tracker=None) -> dict:
     """Assign, review, and save integer weights across the whole tree."""
     print("\n>>> WEIGHT PASS: assigning integer weights to every node...")
     content_list_text = blocks_to_text(content_list)
     feedback = ""
     while True:
         candidate = copy.deepcopy(state["rubric"])
-        apply_weights(candidate, run_weight_llm(client, system_blocks, content_list_text, state["rubric"], model))
+        apply_weights(candidate, run_weight_llm(client, system_blocks, content_list_text, state["rubric"], model, tracker=tracker))
         pretty_print_nodes("Weighted rubric", candidate)
         try:
             approved = review_pass(candidate, output_dir / "rubric_draft.json", validate_final)
@@ -198,15 +199,17 @@ def main() -> None:
     pdf_block = pdf_to_block(pdf_path)
     mineru_dir = discover_mineru_dir(input_dir)
     content_list = load_content_list(mineru_dir)
+    tracker = CostTracker()
 
     if phase == PHASE_BASE:
-        run_base_phase(client, system_blocks, pdf_block, content_list, state, OPUS, output_dir)
+        run_base_phase(client, system_blocks, pdf_block, content_list, state, OPUS, output_dir, tracker)
         phase = PHASE_EXPANSION
     if phase == PHASE_EXPANSION:
-        run_expansion_phase(client, system_blocks, content_list, state, SONNET, output_dir)
+        run_expansion_phase(client, system_blocks, content_list, state, SONNET, output_dir, tracker)
         phase = PHASE_WEIGHT
     if phase == PHASE_WEIGHT:
-        finalize(run_weight_phase(client, system_blocks, content_list, state, SONNET, output_dir), output_dir)
+        finalize(run_weight_phase(client, system_blocks, content_list, state, SONNET, output_dir, tracker), output_dir)
+    tracker.print_report()
 
 
 if __name__ == "__main__":

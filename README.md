@@ -24,10 +24,11 @@ resumable. There are three phases:
    child is tagged as expandable (with an expansion hint naming the relevant paper section)
    or a leaf.
 
-2. **Expansion passes** — `claude-sonnet-4-6`, breadth-first. For each queued node, the
-   MinerU content is sliced to the matching section using `difflib` fuzzy heading match, and
-   the model generates children for that node only. Falls back to the full content list when
-   no heading matches (similarity < 0.3). One reviewed pass per node.
+2. **Expansion passes** — `claude-sonnet-4-6`, breadth-first. For each top-level node, the
+   tool fully expands its entire subtree (all depths) before pausing for review — **one review
+   per top-level section**, not one per node. The MinerU content is sliced to the matching
+   section using `difflib` fuzzy heading match; falls back to the full content list when no
+   heading matches (similarity < 0.3).
 
 3. **Weight pass** — `claude-sonnet-4-6` receives the full MinerU text and the completed
    tree and assigns an integer weight to every node reflecting its importance to the paper's
@@ -47,11 +48,12 @@ PDF or system prompt on expansion and weight calls.
 ### Human-in-the-loop review
 
 After each pass the candidate rubric is written to `rubric_draft.json`. The tool pauses and
-prompts you to edit that file as needed. When you press **Enter**, your edits are validated
-against the PaperBench `TaskNode` schema:
+prompts you to edit that file as needed:
 
-- If the draft is valid, it is committed and the next pass begins.
-- Type `rerun` to discard the LLM output and re-run that pass from scratch.
+- **Press Enter** — your edits are validated against the PaperBench `TaskNode` schema. If
+  valid, the draft is committed and the next pass begins.
+- **Type any text + Enter** — your text is forwarded to the LLM as feedback and that pass
+  reruns with the extra context. State is NOT checkpointed until you press Enter with no text.
 
 State is saved atomically to `rubric_state.json` after every approved pass.
 
@@ -80,13 +82,14 @@ tests/
 
 | File | Responsibility |
 |---|---|
-| `rubric_gen.py` | Entry point; CLI parsing; orchestrates all 3 phases; human review loop |
-| `pb_passes.py` | Anthropic SDK calls; prompt construction; JSON parsing; node normalization; tree mutation (`apply_base`, `apply_expansion`, `apply_weights`) |
+| `rubric_gen.py` | Entry point; CLI parsing; orchestrates all 3 phases; human review loop; prints cost report |
+| `pb_passes.py` | Anthropic SDK calls; prompt construction; JSON parsing; node normalization; tree mutation (`apply_base`, `apply_expansion`, `apply_weights`); optional `feedback` and `tracker` params on all LLM calls |
+| `pb_cost.py` | `CostTracker` — accumulates token usage (input, output, cache write, cache read) per model; computes and prints a formatted cost report |
 | `pb_input.py` | Discovers PDF and MinerU folder from input dir; loads `content_list.json` |
 | `pb_mineru.py` | Converts MinerU blocks to LLM-readable text (`blocks_to_text`); slices content to a section by heading fuzzy-match (`slice_section`) |
 | `pb_schema.py` | Rubric dict traversal and validation (`validate_partial`, `validate_final`, `find_node`, `all_ids`) |
 | `pb_state.py` | State persistence; phase constants (`PHASE_BASE → EXPANSION → WEIGHT → DONE`); atomic write via temp-file rename |
-| `pb_review.py` | Blocks on `input()` for human review; raises `RerunPass` when user types `rerun` |
+| `pb_review.py` | Blocks on `input()` for human review; raises `RerunPass(feedback)` when user types non-empty text |
 | `task_node.py` | Frozen `TaskNode` dataclass (adapted from OpenAI's frontier-evals); leaf/internal validation in `__post_init__` |
 
 ### TaskNode rules
@@ -111,6 +114,23 @@ text. Falls back to the full list when the best heading score is below 0.3.
 ---
 
 ## Changelog
+
+### v3 — Per-subtree review, typed feedback, and cost reporting
+
+**Per-subtree expansion review.** Phase 2 now fully expands an entire top-level node's
+subtree (all depths, BFS) before pausing for review. Previously the tool reviewed after each
+individual node expansion — for a paper with 8 top-level sections each going 3 levels deep,
+this means 8 review prompts instead of ~24.
+
+**Typed feedback on rerun.** Instead of a silent rerun, any text you type at a review prompt
+is forwarded to the LLM as extra context when the pass reruns. This replaces the old `rerun`
+keyword.
+
+**Cost reporting.** A new `pb_cost.py` module adds `CostTracker`, which is threaded through
+every LLM call in the pipeline. At the end of each run, a formatted report is printed showing
+input, output, cache write, and cache read token counts per model along with the estimated
+total cost. Pricing constants are embedded in `pb_cost.py` and reflect the 1-hour extended
+cache TTL rates.
 
 ### v2 — Prompt caching, model tiering, and MinerU integration
 
@@ -199,7 +219,11 @@ python rubric_gen.py --input data/input/my-paper --output data/output/my-paper
 
 The tool will pause after each pass for you to review and edit `rubric_draft.json` in the
 output directory. Save your edits, return to the terminal, and press **Enter** to continue.
-Type `rerun` to discard the output and retry that LLM call.
+Type any feedback text and press **Enter** to discard the output and re-run that pass with
+your feedback forwarded to the model.
+
+At the end of the run, a cost report is printed showing token counts and estimated USD cost
+broken down by model.
 
 ### Resuming an interrupted run
 

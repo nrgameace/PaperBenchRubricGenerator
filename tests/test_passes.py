@@ -1,5 +1,7 @@
 """Tests for parsing, node normalization, merging, and weight application (no network)."""
 
+from types import SimpleNamespace
+
 import pytest
 
 import pb_passes
@@ -150,6 +152,10 @@ class _FakeBlock:
 class _FakeResponse:
     def __init__(self, text):
         self.content = [_FakeBlock(text)]
+        self.usage = SimpleNamespace(
+            input_tokens=10, output_tokens=5,
+            cache_creation_input_tokens=0, cache_read_input_tokens=0,
+        )
 
 
 class _FakeMessages:
@@ -224,6 +230,21 @@ def test_run_expansion_llm_no_feedback_block_when_empty():
     )
     instruction = client.messages.calls[0]["messages"][0]["content"][0]["text"]
     assert "USER FEEDBACK" not in instruction
+
+
+def test_invoke_llm_records_usage_when_tracker_provided():
+    from pb_cost import CostTracker
+    tracker = CostTracker()
+    client = _FakeClient('{"a": 1}')
+    pb_passes.invoke_llm(client, [], [{"role": "user", "content": []}], "claude-opus-4-8", tracker=tracker)
+    assert tracker.totals_for("claude-opus-4-8")["input"] == 10
+    assert tracker.totals_for("claude-opus-4-8")["output"] == 5
+
+
+def test_invoke_llm_no_tracker_still_returns_text():
+    client = _FakeClient("hello")
+    result = pb_passes.invoke_llm(client, [], [{"role": "user", "content": []}], "claude-opus-4-8")
+    assert result == "hello"
 
 
 def test_invoke_llm_wraps_errors():

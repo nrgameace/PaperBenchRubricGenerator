@@ -162,7 +162,7 @@ def _text_message(instruction: str) -> dict:
     return {"role": "user", "content": [{"type": "text", "text": instruction}]}
 
 
-def invoke_llm(client, system_blocks, messages, model, max_tokens=8000) -> str:
+def invoke_llm(client, system_blocks, messages, model, max_tokens=8000, tracker=None) -> str:
     """Invoke the model and return its text. Raises RuntimeError on API failure."""
     try:
         response = client.messages.create(
@@ -173,6 +173,8 @@ def invoke_llm(client, system_blocks, messages, model, max_tokens=8000) -> str:
         )
     except Exception as exc:
         raise RuntimeError(f"Anthropic API call failed: {exc}") from exc
+    if tracker is not None:
+        tracker.record(model, response.usage)
     return response.content[0].text
 
 
@@ -309,7 +311,7 @@ def apply_weights(rubric: dict, weights: dict) -> None:
         node["weight"] = int(value) if isinstance(value, (int, float)) and not isinstance(value, bool) and value >= 0 else 1
 
 
-def run_base_llm(client, system_blocks, pdf_block, content_list_text, model) -> dict:
+def run_base_llm(client, system_blocks, pdf_block, content_list_text, model, tracker=None) -> dict:
     """Run the base node pass; sends both the full MinerU text and the PDF for figure analysis."""
     instruction = (
         "TASK: Generate the BASE of the rubric for the attached paper.\n\n"
@@ -325,11 +327,11 @@ def run_base_llm(client, system_blocks, pdf_block, content_list_text, model) -> 
         '"children": [ <child objects> ]}\n\n' + _CHILD_SHAPE
     )
     return parse_json_response(
-        invoke_llm(client, system_blocks, [_human_message(pdf_block, instruction)], model)
+        invoke_llm(client, system_blocks, [_human_message(pdf_block, instruction)], model, tracker=tracker)
     )
 
 
-def run_expansion_llm(client, system_blocks, section_text, rubric: dict, node_id: str, hint: str, model, feedback: str = "") -> dict:
+def run_expansion_llm(client, system_blocks, section_text, rubric: dict, node_id: str, hint: str, model, feedback: str = "", tracker=None) -> dict:
     """Run an expansion pass for one node; sends only the relevant section text (no PDF)."""
     target = find_node(rubric, node_id)
     instruction = (
@@ -343,11 +345,11 @@ def run_expansion_llm(client, system_blocks, section_text, rubric: dict, node_id
     if feedback:
         instruction += f"\n\nUSER FEEDBACK (incorporate this when generating children):\n{feedback}"
     return parse_json_response(
-        invoke_llm(client, system_blocks, [_text_message(instruction)], model)
+        invoke_llm(client, system_blocks, [_text_message(instruction)], model, tracker=tracker)
     )
 
 
-def run_weight_llm(client, system_blocks, content_list_text, rubric: dict, model) -> dict:
+def run_weight_llm(client, system_blocks, content_list_text, rubric: dict, model, tracker=None) -> dict:
     """Run the weight pass; sends the full MinerU text only (no PDF)."""
     instruction = (
         "TASK: Assign integer WEIGHTS to every node in the completed rubric, reflecting each item's "
@@ -360,6 +362,6 @@ def run_weight_llm(client, system_blocks, content_list_text, rubric: dict, model
         'Respond with JSON ONLY mapping EVERY node id to an integer: {"weights": {"<id>": <int>, ...}}'
     )
     parsed = parse_json_response(
-        invoke_llm(client, system_blocks, [_text_message(instruction)], model)
+        invoke_llm(client, system_blocks, [_text_message(instruction)], model, tracker=tracker)
     )
     return parsed.get("weights", parsed) if isinstance(parsed, dict) else {}
