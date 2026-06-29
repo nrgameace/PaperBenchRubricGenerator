@@ -329,7 +329,7 @@ def run_base_llm(client, system_blocks, pdf_block, content_list_text, model) -> 
     )
 
 
-def run_expansion_llm(client, system_blocks, section_text, rubric: dict, node_id: str, hint: str, model) -> dict:
+def run_expansion_llm(client, system_blocks, section_text, rubric: dict, node_id: str, hint: str, model, feedback: str = "") -> dict:
     """Run an expansion pass for one node; sends only the relevant section text (no PDF)."""
     target = find_node(rubric, node_id)
     instruction = (
@@ -340,6 +340,8 @@ def run_expansion_llm(client, system_blocks, section_text, rubric: dict, node_id
         f"FULL RUBRIC SO FAR (context only):\n{json.dumps(rubric, indent=2, ensure_ascii=False)}\n\n"
         'Respond with JSON ONLY: {"children": [ <child objects> ]}\n\n' + _CHILD_SHAPE
     )
+    if feedback:
+        instruction += f"\n\nUSER FEEDBACK (incorporate this when generating children):\n{feedback}"
     return parse_json_response(
         invoke_llm(client, system_blocks, [_text_message(instruction)], model)
     )

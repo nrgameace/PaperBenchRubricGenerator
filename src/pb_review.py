@@ -4,7 +4,11 @@ import json
 
 
 class RerunPass(Exception):
-    """Raised when the user chooses to re-run the LLM pass instead of editing the draft."""
+    """Raised when the user provides feedback to re-run the LLM pass with extra context."""
+
+    def __init__(self, feedback: str = ""):
+        self.feedback = feedback
+        super().__init__(feedback)
 
 
 def pretty_print_nodes(title: str, nodes) -> None:
@@ -26,20 +30,20 @@ def _read_draft(path):
         return json.load(handle)
 
 
-def _prompt_retry_choice(prompt_fn) -> str:
-    """Ask whether to re-run the LLM pass ('r') or edit the file again ('e')."""
-    while True:
-        choice = prompt_fn("Validation failed. [r]e-run the LLM pass or [e]dit the file again? ").strip().lower()
-        if choice in ("r", "e"):
-            return choice
-        print("Please enter 'r' or 'e'.")
-
-
 def review_pass(rubric, draft_path, validate_fn, input_fn=input) -> dict:
-    """Write the draft, wait for edits, validate, and loop; return approved rubric or raise RerunPass."""
+    """Write the draft, wait for human input, validate, and loop.
+
+    Empty Enter → read the draft (which may have been edited), validate, return if valid.
+    Non-empty typed text → raise RerunPass(feedback) to regenerate with that feedback.
+    """
     _write_draft(draft_path, rubric)
     while True:
-        input_fn(f"Edit {draft_path} as needed, then press Enter to continue...")
+        response = input_fn(
+            f"Edit {draft_path} as needed, then press Enter to approve"
+            " (or type feedback to regenerate): "
+        ).strip()
+        if response:
+            raise RerunPass(response)
         try:
             edited = _read_draft(draft_path)
         except json.JSONDecodeError as exc:
@@ -49,7 +53,5 @@ def review_pass(rubric, draft_path, validate_fn, input_fn=input) -> dict:
             validate_fn(edited)
         except Exception as exc:
             print(f"Schema validation failed: {exc}")
-            if _prompt_retry_choice(input_fn) == "r":
-                raise RerunPass()
             continue
         return edited

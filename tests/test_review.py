@@ -42,7 +42,7 @@ def test_review_pass_picks_up_edits(tmp_path):
     assert result == {"id": "edited"}
 
 
-def test_review_pass_reedit_loop_then_success(tmp_path):
+def test_review_pass_validation_failure_loops_until_valid(tmp_path):
     draft = tmp_path / "draft.json"
     calls = {"n": 0}
     validators = [ValueError("nope"), None]
@@ -53,15 +53,36 @@ def test_review_pass_reedit_loop_then_success(tmp_path):
         if isinstance(result, Exception):
             raise result
 
-    # press Enter, choose 'e' to re-edit, press Enter again -> second validation passes
-    result = review_pass({"id": "root"}, draft, validate, input_fn=_scripted_input(["", "e", ""]))
+    # press Enter twice — first attempt fails validation, second passes
+    result = review_pass({"id": "root"}, draft, validate, input_fn=_scripted_input(["", ""]))
     assert result == {"id": "root"}
 
 
-def test_review_pass_rerun_choice_raises(tmp_path):
+def test_review_pass_typed_feedback_raises_rerun_with_feedback(tmp_path):
     draft = tmp_path / "draft.json"
+    with pytest.raises(RerunPass) as exc_info:
+        review_pass({"id": "root"}, draft, _ok, input_fn=_scripted_input(["add more detail"]))
+    assert exc_info.value.feedback == "add more detail"
+
+
+def test_review_pass_typed_feedback_raises_immediately_before_validation(tmp_path):
+    draft = tmp_path / "draft.json"
+    validated = {"called": False}
+
+    def validate(_rubric):
+        validated["called"] = True
+
     with pytest.raises(RerunPass):
-        review_pass({"id": "root"}, draft, _always_fail, input_fn=_scripted_input(["", "r"]))
+        review_pass({"id": "root"}, draft, validate, input_fn=_scripted_input(["some feedback"]))
+    assert not validated["called"]
+
+
+def test_review_pass_rerun_after_validation_failure(tmp_path):
+    draft = tmp_path / "draft.json"
+    # validation fails, then user types feedback -> RerunPass with that text
+    with pytest.raises(RerunPass) as exc_info:
+        review_pass({"id": "root"}, draft, _always_fail, input_fn=_scripted_input(["", "my correction"]))
+    assert exc_info.value.feedback == "my correction"
 
 
 def test_review_pass_handles_invalid_json_then_recovers(tmp_path):

@@ -184,6 +184,48 @@ def test_run_base_llm_with_fake_client():
     assert client.messages.calls
 
 
+def _target_rubric():
+    return {
+        "id": "root", "requirements": "r", "weight": 0, "task_category": None,
+        "finegrained_task_category": None,
+        "sub_tasks": [{"id": "target", "requirements": "expand me", "weight": 0,
+                       "sub_tasks": [], "task_category": None, "finegrained_task_category": None}]
+    }
+
+
+def test_run_expansion_llm_appends_feedback_when_provided():
+    client = _FakeClient('{"children": []}')
+    pb_passes.run_expansion_llm(
+        client,
+        [{"type": "text", "text": "sys"}],
+        "section text",
+        _target_rubric(),
+        "target",
+        "expansion hint",
+        "claude-sonnet-4-6",
+        feedback="check table 3",
+    )
+    instruction = client.messages.calls[0]["messages"][0]["content"][0]["text"]
+    assert "USER FEEDBACK" in instruction
+    assert "check table 3" in instruction
+
+
+def test_run_expansion_llm_no_feedback_block_when_empty():
+    client = _FakeClient('{"children": []}')
+    pb_passes.run_expansion_llm(
+        client,
+        [{"type": "text", "text": "sys"}],
+        "section text",
+        _target_rubric(),
+        "target",
+        "expansion hint",
+        "claude-sonnet-4-6",
+        feedback="",
+    )
+    instruction = client.messages.calls[0]["messages"][0]["content"][0]["text"]
+    assert "USER FEEDBACK" not in instruction
+
+
 def test_invoke_llm_wraps_errors():
     class _BoomMessages:
         def create(self, **kwargs):
