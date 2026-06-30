@@ -192,3 +192,98 @@ def test_expansion_phase_passes_feedback_on_rerun(tmp_path):
     # node-a expanded twice: once with empty feedback, once with "needs more detail"
     node_a_calls = [(nid, fb) for nid, fb in subtree_calls if nid == "node-a"]
     assert node_a_calls == [("node-a", ""), ("node-a", "needs more detail")]
+
+
+# ── _resolve_invalid_weights tests ───────────────────────────────────────────
+
+def _weighted_rubric():
+    return {
+        "id": "root", "requirements": "r", "weight": 0,
+        "task_category": None, "finegrained_task_category": None,
+        "sub_tasks": [
+            {"id": "a", "requirements": "do a", "weight": 0, "sub_tasks": [],
+             "task_category": "Code Development", "finegrained_task_category": None},
+        ],
+    }
+
+
+def test_resolve_invalid_weights_returns_immediately_when_all_valid():
+    weights = {"root": 1, "a": 2}
+    with patch("rubric_gen.find_invalid_weights", return_value=[]):
+        result = rubric_gen._resolve_invalid_weights(None, [], "", _weighted_rubric(), "model", weights)
+    assert result == weights
+
+
+def test_resolve_invalid_weights_applies_manual_override_and_terminates():
+    invalid_once = [("a", "do a", None)]
+    with patch("rubric_gen.find_invalid_weights", side_effect=[invalid_once, []]), \
+         patch("rubric_gen.collect_weight_corrections", return_value=({"a": 5}, [])):
+        result = rubric_gen._resolve_invalid_weights(None, [], "", _weighted_rubric(), "model", {"root": 1})
+    assert result["a"] == 5
+
+
+def test_resolve_invalid_weights_calls_llm_for_regen_ids_and_merges():
+    invalid_once = [("a", "do a", None)]
+    with patch("rubric_gen.find_invalid_weights", side_effect=[invalid_once, []]), \
+         patch("rubric_gen.collect_weight_corrections", return_value=({}, ["a"])), \
+         patch("rubric_gen.run_weight_llm", return_value={"a": 3}) as mock_llm:
+        result = rubric_gen._resolve_invalid_weights(None, [], "text", _weighted_rubric(), "model", {"root": 1})
+    assert result["a"] == 3
+    assert mock_llm.called
+    call_kwargs = mock_llm.call_args[1]
+    assert call_kwargs.get("node_ids") == ["a"]
+
+
+def test_resolve_invalid_weights_loops_on_persistent_invalidity():
+    invalid = [("a", "do a", None)]
+    with patch("rubric_gen.find_invalid_weights", side_effect=[invalid, invalid, []]), \
+         patch("rubric_gen.collect_weight_corrections", return_value=({}, ["a"])), \
+         patch("rubric_gen.run_weight_llm", return_value={"a": 4}):
+        result = rubric_gen._resolve_invalid_weights(None, [], "", _weighted_rubric(), "model", {})
+    assert result["a"] == 4
+
+
+# ── run_weight_phase feedback bug fix test ───────────────────────────────────
+
+def _minimal_weighted_state():
+    return {
+        "rubric": {
+            "id": "root", "requirements": "r", "weight": 0,
+            "task_category": None, "finegrained_task_category": None,
+            "sub_tasks": [
+                {"id": "leaf", "requirements": "do x", "weight": 0, "sub_tasks": [],
+                 "task_category": "Code Development", "finegrained_task_category": None},
+            ],
+        },
+        "queue": [],
+        "hints": {},
+    }
+
+
+def test_run_weight_phase_passes_feedback_to_llm_on_retry(tmp_path):
+    from pb_review import RerunPass
+    state = _minimal_weighted_state()
+    review_calls = {"n": 0}
+    llm_feedback_args = []
+
+    def fake_review(rubric, draft_path, validate_fn):
+        review_calls["n"] += 1
+        if review_calls["n"] == 1:
+            raise RerunPass("check table 5")
+        return rubric
+
+    def fake_run_weight_llm(*args, feedback=None, **kwargs):
+        llm_feedback_args.append(feedback)
+        return {"root": 1, "leaf": 2}
+
+    with patch("rubric_gen.run_weight_llm", side_effect=fake_run_weight_llm), \
+         patch("rubric_gen._resolve_invalid_weights", side_effect=lambda *a, **k: a[5]), \
+         patch("rubric_gen.apply_weights"), \
+         patch("rubric_gen.review_pass", side_effect=fake_review), \
+         patch("rubric_gen.pretty_print_nodes"), \
+         patch("rubric_gen.commit"), \
+         patch("rubric_gen.blocks_to_text", return_value=""):
+        rubric_gen.run_weight_phase(None, [], [], state, "model", tmp_path)
+
+    assert llm_feedback_args[0] is None
+    assert llm_feedback_args[1] == "check table 5"

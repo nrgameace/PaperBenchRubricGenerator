@@ -1,5 +1,6 @@
 """Tests for parsing, node normalization, merging, and weight application (no network)."""
 
+import copy
 from types import SimpleNamespace
 
 import pytest
@@ -122,26 +123,109 @@ def test_apply_expansion_missing_node_raises():
         pb_passes.apply_expansion({"id": "root", "sub_tasks": []}, "ghost", {"children": []}, {})
 
 
-def test_apply_weights_sets_integers_and_defaults():
-    rubric = {"id": "root", "requirements": "r", "weight": 0, "task_category": None, "finegrained_task_category": None,
-              "sub_tasks": [{"id": "a", "requirements": "x", "weight": 0, "sub_tasks": [],
-                             "task_category": "Code Development", "finegrained_task_category": None},
-                            {"id": "b", "requirements": "y", "weight": 0, "sub_tasks": [],
-                             "task_category": "Code Development", "finegrained_task_category": None}]}
-    pb_passes.apply_weights(rubric, {"root": 1, "a": 3})  # "b" omitted -> default 1
+def _two_leaf_rubric():
+    return {
+        "id": "root", "requirements": "r", "weight": 0, "task_category": None,
+        "finegrained_task_category": None,
+        "sub_tasks": [
+            {"id": "a", "requirements": "do a", "weight": 0, "sub_tasks": [],
+             "task_category": "Code Development", "finegrained_task_category": None},
+            {"id": "b", "requirements": "do b", "weight": 0, "sub_tasks": [],
+             "task_category": "Code Development", "finegrained_task_category": None},
+        ],
+    }
+
+
+def test_apply_weights_sets_valid_weights():
+    rubric = _two_leaf_rubric()
+    pb_passes.apply_weights(rubric, {"root": 1, "a": 3, "b": 2})
     assert find_node(rubric, "root")["weight"] == 1
     assert find_node(rubric, "a")["weight"] == 3
-    assert find_node(rubric, "b")["weight"] == 1
+    assert find_node(rubric, "b")["weight"] == 2
     validate_final(rubric)
 
 
-def test_apply_weights_rejects_negative_and_bool():
-    rubric = {"id": "root", "requirements": "r", "weight": 0, "task_category": None, "finegrained_task_category": None,
-              "sub_tasks": [{"id": "a", "requirements": "x", "weight": 0, "sub_tasks": [],
-                             "task_category": "Code Development", "finegrained_task_category": None}]}
-    pb_passes.apply_weights(rubric, {"root": -5, "a": True})
-    assert find_node(rubric, "root")["weight"] == 1
-    assert find_node(rubric, "a")["weight"] == 1
+def test_apply_weights_raises_on_negative_weight():
+    with pytest.raises(ValueError, match="invalid weight"):
+        pb_passes.apply_weights(_two_leaf_rubric(), {"root": -5, "a": 1, "b": 1})
+
+
+def test_apply_weights_raises_on_missing_weight():
+    with pytest.raises(ValueError, match="invalid weight"):
+        pb_passes.apply_weights(_two_leaf_rubric(), {"root": 1, "a": 3})
+
+
+def test_apply_weights_raises_on_boolean_weight():
+    with pytest.raises(ValueError, match="invalid weight"):
+        pb_passes.apply_weights(_two_leaf_rubric(), {"root": True, "a": 1, "b": 1})
+
+
+# ── find_invalid_weights tests ────────────────────────────────────────────────
+
+def test_find_invalid_weights_empty_when_all_valid():
+    assert pb_passes.find_invalid_weights(_two_leaf_rubric(), {"root": 1, "a": 3, "b": 2}) == []
+
+
+def test_find_invalid_weights_detects_missing():
+    invalid = pb_passes.find_invalid_weights(_two_leaf_rubric(), {"root": 1, "a": 3})
+    assert [(nid, raw) for nid, _, raw in invalid] == [("b", None)]
+
+
+def test_find_invalid_weights_detects_negative():
+    invalid = pb_passes.find_invalid_weights(_two_leaf_rubric(), {"root": 1, "a": -3, "b": 2})
+    assert [nid for nid, _, _ in invalid] == ["a"]
+    assert invalid[0][2] == -3
+
+
+def test_find_invalid_weights_detects_boolean():
+    invalid = pb_passes.find_invalid_weights(_two_leaf_rubric(), {"root": 1, "a": True, "b": 2})
+    assert [nid for nid, _, _ in invalid] == ["a"]
+
+
+def test_find_invalid_weights_detects_non_numeric_string():
+    invalid = pb_passes.find_invalid_weights(_two_leaf_rubric(), {"root": 1, "a": "heavy", "b": 2})
+    assert [nid for nid, _, _ in invalid] == ["a"]
+
+
+def test_find_invalid_weights_does_not_mutate_rubric():
+    rubric = _two_leaf_rubric()
+    before = copy.deepcopy(rubric)
+    pb_passes.find_invalid_weights(rubric, {})
+    assert rubric == before
+
+
+def test_find_invalid_weights_includes_requirements_in_tuple():
+    invalid = pb_passes.find_invalid_weights(_two_leaf_rubric(), {"root": 1, "a": 3})
+    assert invalid[0][1] == "do b"
+
+
+# ── run_weight_llm new param tests ────────────────────────────────────────────
+
+def _weight_instruction(client):
+    """Extract the instruction text from the first run_weight_llm call."""
+    return client.messages.calls[0]["messages"][0]["content"][0]["text"]
+
+
+def test_run_weight_llm_targeted_node_ids_narrows_instruction():
+    client = _FakeClient('{"weights": {"a": 3}}')
+    pb_passes.run_weight_llm(client, [], "text", _two_leaf_rubric(), "model", node_ids=["a"])
+    instruction = _weight_instruction(client)
+    assert "a" in instruction
+    assert "EVERY node" not in instruction
+
+
+def test_run_weight_llm_feedback_appended():
+    client = _FakeClient('{"weights": {"root": 1, "a": 3, "b": 2}}')
+    pb_passes.run_weight_llm(client, [], "text", _two_leaf_rubric(), "model", feedback="recheck table 3")
+    instruction = _weight_instruction(client)
+    assert "USER FEEDBACK" in instruction
+    assert "recheck table 3" in instruction
+
+
+def test_run_weight_llm_no_feedback_block_when_none():
+    client = _FakeClient('{"weights": {"root": 1, "a": 3, "b": 2}}')
+    pb_passes.run_weight_llm(client, [], "text", _two_leaf_rubric(), "model")
+    assert "USER FEEDBACK" not in _weight_instruction(client)
 
 
 class _FakeBlock:

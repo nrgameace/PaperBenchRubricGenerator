@@ -18,6 +18,39 @@ def pretty_print_nodes(title: str, nodes) -> None:
     print("=== end ===\n")
 
 
+def collect_weight_corrections(invalid_nodes, input_fn=input):
+    """Interactively collect corrections for invalid LLM-assigned weights.
+
+    For each (node_id, requirements, raw_value) tuple: Enter → regen list, integer → manual override.
+    Returns (manual_overrides: dict[str, int], regen_ids: list[str]).
+    """
+    manual_overrides = {}
+    regen_ids = []
+    print(f"\n=== INVALID WEIGHTS: {len(invalid_nodes)} node(s) need correction ===")
+    for node_id, requirements, raw_value in invalid_nodes:
+        raw_display = repr(raw_value) if raw_value is not None else "missing"
+        print(f"\n  Node:         {node_id}")
+        print(f"  Requirements: {requirements[:120]}")
+        print(f"  LLM returned: {raw_display}")
+        while True:
+            response = input_fn("  Enter an integer weight, or press Enter to let the LLM retry: ").strip()
+            if not response:
+                regen_ids.append(node_id)
+                break
+            try:
+                weight = int(response)
+            except ValueError:
+                print("  Not a valid integer. Try again.")
+                continue
+            if weight < 0:
+                print("  Weight must be >= 0. Try again.")
+                continue
+            manual_overrides[node_id] = weight
+            break
+    print("=== end weight correction ===\n")
+    return manual_overrides, regen_ids
+
+
 def _write_draft(path, rubric) -> None:
     """Write the current rubric to the editable draft file."""
     with open(path, "w", encoding="utf-8") as handle:

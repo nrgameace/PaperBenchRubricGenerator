@@ -26,8 +26,8 @@ from pb_cost import CostTracker
 from pb_input import discover_mineru_dir, discover_pdf, load_content_list
 from pb_mineru import blocks_to_text, slice_section
 from pb_passes import (apply_base, apply_expansion, apply_weights, build_client, build_system_blocks,
-                       pdf_to_block, run_base_llm, run_expansion_llm, run_weight_llm)
-from pb_review import RerunPass, pretty_print_nodes, review_pass
+                       find_invalid_weights, pdf_to_block, run_base_llm, run_expansion_llm, run_weight_llm)
+from pb_review import RerunPass, collect_weight_corrections, pretty_print_nodes, review_pass
 from pb_schema import all_ids, find_node, validate_final, validate_partial
 from pb_state import (PHASE_BASE, PHASE_DONE, PHASE_EXPANSION, PHASE_WEIGHT, determine_phase,
                       empty_state, load_state, save_state)
@@ -140,6 +140,25 @@ def run_expansion_phase(client, system_blocks, content_list, state, model, outpu
             break
 
 
+def _resolve_invalid_weights(client, system_blocks, content_list_text, rubric, model, weights, tracker=None, input_fn=input):
+    """Loop until all weights in the dict are valid for rubric.
+
+    On each iteration: detect invalids, collect user corrections, apply manual overrides,
+    call LLM for regen_ids (merging only those keys back), then recheck.
+    """
+    while True:
+        invalid = find_invalid_weights(rubric, weights)
+        if not invalid:
+            return weights
+        manual_overrides, regen_ids = collect_weight_corrections(invalid, input_fn=input_fn)
+        weights.update(manual_overrides)
+        if regen_ids:
+            retry = run_weight_llm(client, system_blocks, content_list_text, rubric, model, tracker=tracker, node_ids=regen_ids)
+            for node_id in regen_ids:
+                if node_id in retry:
+                    weights[node_id] = retry[node_id]
+
+
 def run_weight_phase(client, system_blocks, content_list, state, model, output_dir, tracker=None) -> dict:
     """Assign, review, and save integer weights across the whole tree."""
     print("\n>>> WEIGHT PASS: assigning integer weights to every node...")
@@ -147,7 +166,9 @@ def run_weight_phase(client, system_blocks, content_list, state, model, output_d
     feedback = ""
     while True:
         candidate = copy.deepcopy(state["rubric"])
-        apply_weights(candidate, run_weight_llm(client, system_blocks, content_list_text, state["rubric"], model, tracker=tracker))
+        weights = run_weight_llm(client, system_blocks, content_list_text, state["rubric"], model, tracker=tracker, feedback=feedback or None)
+        weights = _resolve_invalid_weights(client, system_blocks, content_list_text, candidate, model, weights, tracker=tracker)
+        apply_weights(candidate, weights)
         pretty_print_nodes("Weighted rubric", candidate)
         try:
             approved = review_pass(candidate, output_dir / "rubric_draft.json", validate_final)

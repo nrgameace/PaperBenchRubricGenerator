@@ -304,11 +304,44 @@ def apply_expansion(rubric: dict, node_id: str, parsed, hints: dict) -> list:
 
 
 def apply_weights(rubric: dict, weights: dict) -> None:
-    """Set an integer weight on every node from an id->weight mapping (default 1 when missing)."""
+    """Set an integer weight on every node from an id->weight mapping.
+
+    Raises ValueError for any node whose weight is missing or invalid.
+    Callers must resolve all invalids (via find_invalid_weights) before calling this.
+    """
     weights = weights or {}
     for node in iter_nodes(rubric):
-        value = weights.get(node["id"])
-        node["weight"] = int(value) if isinstance(value, (int, float)) and not isinstance(value, bool) and value >= 0 else 1
+        node_id = node["id"]
+        value = weights.get(node_id)
+        if (
+            value is None
+            or isinstance(value, bool)
+            or not isinstance(value, (int, float))
+            or value < 0
+        ):
+            raise ValueError(f"Node '{node_id}' has an invalid weight: {value!r}.")
+        node["weight"] = int(value)
+
+
+def find_invalid_weights(rubric: dict, raw_weights: dict) -> list:
+    """Return (node_id, requirements, raw_value) tuples for nodes with invalid weights.
+
+    Invalid means missing, boolean, non-numeric, or negative. Does not mutate the rubric.
+    """
+    raw_weights = raw_weights or {}
+    invalid = []
+    for node in iter_nodes(rubric):
+        node_id = node["id"]
+        value = raw_weights.get(node_id)
+        is_valid = (
+            value is not None
+            and isinstance(value, (int, float))
+            and not isinstance(value, bool)
+            and value >= 0
+        )
+        if not is_valid:
+            invalid.append((node_id, node.get("requirements", ""), value))
+    return invalid
 
 
 def run_base_llm(client, system_blocks, pdf_block, content_list_text, model, tracker=None) -> dict:
@@ -349,18 +382,39 @@ def run_expansion_llm(client, system_blocks, section_text, rubric: dict, node_id
     )
 
 
-def run_weight_llm(client, system_blocks, content_list_text, rubric: dict, model, tracker=None) -> dict:
-    """Run the weight pass; sends the full MinerU text only (no PDF)."""
+def run_weight_llm(client, system_blocks, content_list_text, rubric: dict, model, tracker=None, feedback=None, node_ids=None) -> dict:
+    """Run the weight pass; sends the full MinerU text only (no PDF).
+
+    When node_ids is set, the instruction targets only those ids (full rubric still sent for context).
+    When feedback is provided, a USER FEEDBACK block is appended.
+    """
+    if node_ids:
+        id_list = ", ".join(f'"{nid}"' for nid in node_ids)
+        task_line = (
+            f"TASK: Assign integer WEIGHTS to these specific node IDs only: [{id_list}]. "
+            "The full rubric is provided for context but only return weights for those IDs.\n\n"
+        )
+        response_shape = (
+            'Respond with JSON ONLY mapping those node ids to integers: '
+            '{"weights": {' + ", ".join(f'"{nid}": <int>' for nid in node_ids) + '}}'
+        )
+    else:
+        task_line = (
+            "TASK: Assign integer WEIGHTS to every node in the completed rubric, reflecting each item's "
+            "importance to reproducing the attached paper.\n\n"
+        )
+        response_shape = 'Respond with JSON ONLY mapping EVERY node id to an integer: {"weights": {"<id>": <int>, ...}}'
     instruction = (
-        "TASK: Assign integer WEIGHTS to every node in the completed rubric, reflecting each item's "
-        "importance to reproducing the attached paper.\n\n"
-        f"PAPER CONTENT (MinerU structured parse):\n{content_list_text}\n\n"
+        task_line
+        + f"PAPER CONTENT (MinerU structured parse):\n{content_list_text}\n\n"
         "Within each group of sibling nodes, assign non-negative integers for relative importance "
         "(they need NOT sum to any fixed value; the benchmark normalizes within each group). More "
         "important or more effort-intensive siblings get larger integers. Use 1 for the root.\n\n"
         f"FULL RUBRIC (ids included):\n{json.dumps(rubric, indent=2, ensure_ascii=False)}\n\n"
-        'Respond with JSON ONLY mapping EVERY node id to an integer: {"weights": {"<id>": <int>, ...}}'
+        + response_shape
     )
+    if feedback:
+        instruction += f"\n\nUSER FEEDBACK (incorporate this when assigning weights):\n{feedback}"
     parsed = parse_json_response(
         invoke_llm(client, system_blocks, [_text_message(instruction)], model, tracker=tracker)
     )

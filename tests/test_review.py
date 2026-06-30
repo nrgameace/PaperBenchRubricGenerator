@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from pb_review import RerunPass, review_pass
+from pb_review import RerunPass, collect_weight_corrections, review_pass
 
 
 def _ok(_rubric):
@@ -99,3 +99,46 @@ def test_review_pass_handles_invalid_json_then_recovers(tmp_path):
 
     result = review_pass({"id": "root"}, draft, _ok, input_fn=maybe_break_json)
     assert result == {"id": "fixed"}
+
+
+# ── collect_weight_corrections tests ─────────────────────────────────────────
+
+def test_collect_weight_corrections_enter_sends_to_regen():
+    invalid = [("node-a", "some requirement", None)]
+    overrides, regen = collect_weight_corrections(invalid, input_fn=_scripted_input([""]))
+    assert overrides == {} and regen == ["node-a"]
+
+
+def test_collect_weight_corrections_integer_becomes_manual_override():
+    invalid = [("node-a", "some requirement", -3)]
+    overrides, regen = collect_weight_corrections(invalid, input_fn=_scripted_input(["5"]))
+    assert overrides == {"node-a": 5} and regen == []
+
+
+def test_collect_weight_corrections_zero_is_valid():
+    invalid = [("node-a", "req", None)]
+    overrides, regen = collect_weight_corrections(invalid, input_fn=_scripted_input(["0"]))
+    assert overrides == {"node-a": 0} and regen == []
+
+
+def test_collect_weight_corrections_negative_integer_loops_until_valid():
+    invalid = [("node-a", "req", None)]
+    overrides, _ = collect_weight_corrections(invalid, input_fn=_scripted_input(["-1", "2"]))
+    assert overrides == {"node-a": 2}
+
+
+def test_collect_weight_corrections_non_integer_loops_until_valid():
+    invalid = [("node-a", "req", None)]
+    overrides, _ = collect_weight_corrections(invalid, input_fn=_scripted_input(["abc", "3"]))
+    assert overrides == {"node-a": 3}
+
+
+def test_collect_weight_corrections_multiple_nodes_mixed():
+    invalid = [("a", "req a", None), ("b", "req b", -2), ("c", "req c", "bad")]
+    overrides, regen = collect_weight_corrections(invalid, input_fn=_scripted_input(["", "4", ""]))
+    assert overrides == {"b": 4} and regen == ["a", "c"]
+
+
+def test_collect_weight_corrections_empty_list_returns_empty():
+    overrides, regen = collect_weight_corrections([], input_fn=_scripted_input([]))
+    assert overrides == {} and regen == []

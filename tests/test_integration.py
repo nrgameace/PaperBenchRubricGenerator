@@ -29,7 +29,11 @@ def _patch_llm(monkeypatch):
     monkeypatch.setattr(rubric_gen, "load_few_shot", lambda: '{"id": "root", "requirements": "example", "weight": 1, "sub_tasks": [], "task_category": "Code Development"}')
     monkeypatch.setattr(rubric_gen, "run_base_llm", lambda *a, **k: _BASE)
     monkeypatch.setattr(rubric_gen, "run_expansion_llm", lambda *a, **k: _EXPANSION)
-    monkeypatch.setattr(rubric_gen, "run_weight_llm", lambda *a, **k: {})
+    def _fake_weight_llm(*args, **kwargs):
+        from pb_schema import iter_nodes
+        rubric = args[3]
+        return {node["id"]: 1 for node in iter_nodes(rubric)}
+    monkeypatch.setattr(rubric_gen, "run_weight_llm", _fake_weight_llm)
 
 
 def _make_input_dir(tmp_path):

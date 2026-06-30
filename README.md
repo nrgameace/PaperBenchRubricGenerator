@@ -32,7 +32,10 @@ resumable. There are three phases:
 
 3. **Weight pass** — `claude-sonnet-4-6` receives the full MinerU text and the completed
    tree and assigns an integer weight to every node reflecting its importance to the paper's
-   core contributions.
+   core contributions. After the LLM responds, any invalid weights (negative, non-numeric,
+   boolean, or missing) trigger an interactive correction loop — you are prompted per-node
+   to either enter a weight manually or queue the node for an LLM retry. The retry cycle
+   repeats until all weights are valid, then the normal review prompt appears.
 
 ### Prompt caching
 
@@ -83,13 +86,13 @@ tests/
 | File | Responsibility |
 |---|---|
 | `rubric_gen.py` | Entry point; CLI parsing; orchestrates all 3 phases; human review loop; prints cost report |
-| `pb_passes.py` | Anthropic SDK calls; prompt construction; JSON parsing; node normalization; tree mutation (`apply_base`, `apply_expansion`, `apply_weights`); optional `feedback` and `tracker` params on all LLM calls |
+| `pb_passes.py` | Anthropic SDK calls; prompt construction; JSON parsing; node normalization; tree mutation (`apply_base`, `apply_expansion`, `apply_weights`); weight validation (`find_invalid_weights`); optional `feedback`, `node_ids`, and `tracker` params on weight LLM calls |
 | `pb_cost.py` | `CostTracker` — accumulates token usage (input, output, cache write, cache read) per model; computes and prints a formatted cost report |
 | `pb_input.py` | Discovers PDF and MinerU folder from input dir; loads `content_list.json` |
 | `pb_mineru.py` | Converts MinerU blocks to LLM-readable text (`blocks_to_text`); slices content to a section by heading fuzzy-match (`slice_section`) |
 | `pb_schema.py` | Rubric dict traversal and validation (`validate_partial`, `validate_final`, `find_node`, `all_ids`) |
 | `pb_state.py` | State persistence; phase constants (`PHASE_BASE → EXPANSION → WEIGHT → DONE`); atomic write via temp-file rename |
-| `pb_review.py` | Blocks on `input()` for human review; raises `RerunPass(feedback)` when user types non-empty text |
+| `pb_review.py` | Blocks on `input()` for human review; raises `RerunPass(feedback)` when user types non-empty text; `collect_weight_corrections` handles interactive per-node weight correction |
 | `task_node.py` | Frozen `TaskNode` dataclass (adapted from OpenAI's frontier-evals); leaf/internal validation in `__post_init__` |
 
 ### TaskNode rules
@@ -98,7 +101,7 @@ tests/
   `Result Analysis`, `Paper Analysis`; `sub_tasks` must be empty.
 - **Internal nodes**: `task_category` must be `None`; `sub_tasks` must be non-empty.
 - All node IDs must be unique within the tree and in kebab-case.
-- `weight` is 0 during base/expansion phases; set to a positive integer by the weight pass.
+- `weight` is 0 during base/expansion phases; set to a non-negative integer by the weight pass.
 
 ### MinerU block format
 
@@ -114,6 +117,24 @@ text. Falls back to the full list when the best heading score is below 0.3.
 ---
 
 ## Changelog
+
+### v4 — Interactive weight correction loop
+
+**Invalid weight detection.** After the weight LLM responds, `find_invalid_weights` scans
+every node for invalid values (negative, non-numeric, boolean, or missing from the response).
+Previously these silently fell back to 1 with no indication to the user.
+
+**Per-node interactive correction.** For each invalid weight you are prompted at the terminal:
+press **Enter** to queue the node for an LLM retry, or type an integer to set the weight
+directly. The correction loop collects all your choices before making any LLM call.
+
+**Targeted LLM retry.** Nodes queued for regeneration are sent back to the model in a single
+targeted call that names only those node IDs (the full rubric is still sent for context).
+The retry cycle repeats until all weights are valid, then the normal draft-review prompt appears.
+
+**Feedback forwarded on weight rerun.** Typing feedback at the weight review prompt now
+correctly forwards that text to the LLM on the next attempt (previously the feedback was
+captured but silently dropped).
 
 ### v3 — Per-subtree review, typed feedback, and cost reporting
 
