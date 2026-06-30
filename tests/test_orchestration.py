@@ -1,6 +1,7 @@
 """Tests for the orchestrator's pure helpers (queue reconciliation, hint pruning)."""
 
 import copy
+import sys
 from pathlib import Path
 from unittest.mock import MagicMock, call, patch
 
@@ -287,3 +288,73 @@ def test_run_weight_phase_passes_feedback_to_llm_on_retry(tmp_path):
 
     assert llm_feedback_args[0] is None
     assert llm_feedback_args[1] == "check table 5"
+
+
+# ── --review flag / agentic mode tests ───────────────────────────────────────
+
+def test_parse_args_review_flag_true_when_present(monkeypatch):
+    monkeypatch.setattr(sys, "argv", ["rubric_gen", "--input", "in", "--output", "out", "--review"])
+    args = rubric_gen.parse_args()
+    assert args.review is True
+
+
+def test_parse_args_review_flag_false_when_omitted(monkeypatch):
+    monkeypatch.setattr(sys, "argv", ["rubric_gen", "--input", "in", "--output", "out"])
+    args = rubric_gen.parse_args()
+    assert args.review is False
+
+
+def test_resolve_invalid_weights_agentic_auto_queues_all_for_regen():
+    invalid = [("a", "do a", None), ("b", "do b", -1)]
+    with patch("rubric_gen.find_invalid_weights", side_effect=[invalid, []]), \
+         patch("rubric_gen.collect_weight_corrections") as mock_collect, \
+         patch("rubric_gen.run_weight_llm", return_value={"a": 1, "b": 2}):
+        result = rubric_gen._resolve_invalid_weights(
+            None, [], "", _weighted_rubric(), "model", {}, human_review=False
+        )
+    mock_collect.assert_not_called()
+    assert result["a"] == 1 and result["b"] == 2
+
+
+def test_run_base_phase_agentic_skips_review(tmp_path):
+    state = {"rubric": {}, "queue": [], "hints": {}}
+    fake_rubric = {"id": "root", "sub_tasks": [], "requirements": "r"}
+
+    with patch("rubric_gen.run_base_llm", return_value={"root": {"requirements": "r"}, "children": []}), \
+         patch("rubric_gen.apply_base", return_value=(fake_rubric, [], {})), \
+         patch("rubric_gen.review_pass") as mock_review, \
+         patch("rubric_gen.pretty_print_nodes"), \
+         patch("rubric_gen.commit"), \
+         patch("rubric_gen.reconcile_queue", return_value=[]), \
+         patch("rubric_gen.blocks_to_text", return_value=""):
+        rubric_gen.run_base_phase(None, [], None, [], state, "model", tmp_path, human_review=False)
+
+    mock_review.assert_not_called()
+
+
+def test_run_expansion_phase_agentic_skips_review(tmp_path):
+    state = _two_node_state()
+
+    with patch("rubric_gen._expand_subtree"), \
+         patch("rubric_gen.review_pass") as mock_review, \
+         patch("rubric_gen.pretty_print_nodes"), \
+         patch("rubric_gen.commit"), \
+         patch("rubric_gen.reconcile_queue", side_effect=lambda _rubric, q: q):
+        rubric_gen.run_expansion_phase(None, [], [], state, "model", tmp_path, human_review=False)
+
+    mock_review.assert_not_called()
+
+
+def test_run_weight_phase_agentic_skips_review(tmp_path):
+    state = _minimal_weighted_state()
+
+    with patch("rubric_gen.run_weight_llm", return_value={"root": 1, "leaf": 2}), \
+         patch("rubric_gen._resolve_invalid_weights", side_effect=lambda *a, **k: a[5]), \
+         patch("rubric_gen.apply_weights"), \
+         patch("rubric_gen.review_pass") as mock_review, \
+         patch("rubric_gen.pretty_print_nodes"), \
+         patch("rubric_gen.commit"), \
+         patch("rubric_gen.blocks_to_text", return_value=""):
+        rubric_gen.run_weight_phase(None, [], [], state, "model", tmp_path, human_review=False)
+
+    mock_review.assert_not_called()

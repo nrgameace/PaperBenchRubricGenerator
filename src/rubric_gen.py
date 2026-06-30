@@ -44,6 +44,7 @@ def parse_args():
     parser.add_argument("--input", required=True, help="Path to the input directory (contains PDF and MinerU folder).")
     parser.add_argument("--output", required=True, help="Path to the output directory (receives state and final rubric).")
     parser.add_argument("--resume", action="store_true", help="Resume from an existing rubric_state.json in the output dir.")
+    parser.add_argument("--review", action="store_true", help="Enable human-in-the-loop review after each pass.")
     return parser.parse_args()
 
 
@@ -78,7 +79,7 @@ def commit(state: dict, output_dir: Path) -> None:
     save_state(output_dir / "rubric_state.json", state["rubric"], state["queue"], state["hints"])
 
 
-def run_base_phase(client, system_blocks, pdf_block, content_list, state, model, output_dir, tracker=None) -> None:
+def run_base_phase(client, system_blocks, pdf_block, content_list, state, model, output_dir, tracker=None, human_review=True) -> None:
     """Generate, review, and save the base nodes."""
     print("\n>>> BASE NODE PASS: generating root and top-level nodes...")
     content_list_text = blocks_to_text(content_list)
@@ -86,12 +87,15 @@ def run_base_phase(client, system_blocks, pdf_block, content_list, state, model,
     while True:
         rubric, queue, hints = apply_base(run_base_llm(client, system_blocks, pdf_block, content_list_text, model, tracker=tracker))
         pretty_print_nodes("Generated base nodes", rubric["sub_tasks"])
-        try:
-            approved = review_pass(rubric, output_dir / "rubric_draft.json", lambda candidate: validate_partial(candidate, queue))
-        except RerunPass as e:
-            feedback = e.feedback
-            print("Re-running base pass...")
-            continue
+        if human_review:
+            try:
+                approved = review_pass(rubric, output_dir / "rubric_draft.json", lambda candidate: validate_partial(candidate, queue))
+            except RerunPass as e:
+                feedback = e.feedback
+                print("Re-running base pass...")
+                continue
+        else:
+            approved = rubric
         state["rubric"], state["hints"] = approved, hints
         state["queue"] = reconcile_queue(approved, queue)
         prune_hints(state)
@@ -112,7 +116,7 @@ def _expand_subtree(client, system_blocks, content_list, rubric, node_id, hints,
         local_queue.extend(new_pending)
 
 
-def run_expansion_phase(client, system_blocks, content_list, state, model, output_dir, tracker=None) -> None:
+def run_expansion_phase(client, system_blocks, content_list, state, model, output_dir, tracker=None, human_review=True) -> None:
     """Expand each top-level node's full subtree, then review once before moving to the next."""
     while state["queue"]:
         node_id = state["queue"][0]
@@ -125,13 +129,16 @@ def run_expansion_phase(client, system_blocks, content_list, state, model, outpu
             _expand_subtree(client, system_blocks, content_list, candidate, node_id, candidate_hints, model, feedback, tracker=tracker)
             remaining_queue = state["queue"][1:]
             pretty_print_nodes(f"Subtree '{node_id}' (fully expanded)", [find_node(candidate, node_id)])
-            try:
-                approved = review_pass(candidate, output_dir / "rubric_draft.json",
-                                       lambda c: validate_partial(c, remaining_queue))
-            except RerunPass as e:
-                feedback = e.feedback
-                print(f"Re-running subtree expansion with feedback...")
-                continue
+            if human_review:
+                try:
+                    approved = review_pass(candidate, output_dir / "rubric_draft.json",
+                                           lambda c: validate_partial(c, remaining_queue))
+                except RerunPass as e:
+                    feedback = e.feedback
+                    print(f"Re-running subtree expansion with feedback...")
+                    continue
+            else:
+                approved = candidate
             state["rubric"] = approved
             state["hints"] = candidate_hints
             state["queue"] = reconcile_queue(approved, remaining_queue)
@@ -140,18 +147,17 @@ def run_expansion_phase(client, system_blocks, content_list, state, model, outpu
             break
 
 
-def _resolve_invalid_weights(client, system_blocks, content_list_text, rubric, model, weights, tracker=None, input_fn=input):
-    """Loop until all weights in the dict are valid for rubric.
-
-    On each iteration: detect invalids, collect user corrections, apply manual overrides,
-    call LLM for regen_ids (merging only those keys back), then recheck.
-    """
+def _resolve_invalid_weights(client, system_blocks, content_list_text, rubric, model, weights, tracker=None, input_fn=input, human_review=True):
+    """Loop until all weights in the dict are valid for rubric."""
     while True:
         invalid = find_invalid_weights(rubric, weights)
         if not invalid:
             return weights
-        manual_overrides, regen_ids = collect_weight_corrections(invalid, input_fn=input_fn)
-        weights.update(manual_overrides)
+        if human_review:
+            manual_overrides, regen_ids = collect_weight_corrections(invalid, input_fn=input_fn)
+            weights.update(manual_overrides)
+        else:
+            regen_ids = [node_id for node_id, _, _ in invalid]
         if regen_ids:
             retry = run_weight_llm(client, system_blocks, content_list_text, rubric, model, tracker=tracker, node_ids=regen_ids)
             for node_id in regen_ids:
@@ -159,7 +165,7 @@ def _resolve_invalid_weights(client, system_blocks, content_list_text, rubric, m
                     weights[node_id] = retry[node_id]
 
 
-def run_weight_phase(client, system_blocks, content_list, state, model, output_dir, tracker=None) -> dict:
+def run_weight_phase(client, system_blocks, content_list, state, model, output_dir, tracker=None, human_review=True) -> dict:
     """Assign, review, and save integer weights across the whole tree."""
     print("\n>>> WEIGHT PASS: assigning integer weights to every node...")
     content_list_text = blocks_to_text(content_list)
@@ -167,15 +173,18 @@ def run_weight_phase(client, system_blocks, content_list, state, model, output_d
     while True:
         candidate = copy.deepcopy(state["rubric"])
         weights = run_weight_llm(client, system_blocks, content_list_text, state["rubric"], model, tracker=tracker, feedback=feedback or None)
-        weights = _resolve_invalid_weights(client, system_blocks, content_list_text, candidate, model, weights, tracker=tracker)
+        weights = _resolve_invalid_weights(client, system_blocks, content_list_text, candidate, model, weights, tracker=tracker, human_review=human_review)
         apply_weights(candidate, weights)
         pretty_print_nodes("Weighted rubric", candidate)
-        try:
-            approved = review_pass(candidate, output_dir / "rubric_draft.json", validate_final)
-        except RerunPass as e:
-            feedback = e.feedback
-            print("Re-running weight pass...")
-            continue
+        if human_review:
+            try:
+                approved = review_pass(candidate, output_dir / "rubric_draft.json", validate_final)
+            except RerunPass as e:
+                feedback = e.feedback
+                print("Re-running weight pass...")
+                continue
+        else:
+            approved = candidate
         state["rubric"], state["queue"] = approved, []
         commit(state, output_dir)
         return approved
@@ -221,15 +230,16 @@ def main() -> None:
     mineru_dir = discover_mineru_dir(input_dir)
     content_list = load_content_list(mineru_dir)
     tracker = CostTracker()
+    human_review = args.review
 
     if phase == PHASE_BASE:
-        run_base_phase(client, system_blocks, pdf_block, content_list, state, OPUS, output_dir, tracker)
+        run_base_phase(client, system_blocks, pdf_block, content_list, state, OPUS, output_dir, tracker, human_review=human_review)
         phase = PHASE_EXPANSION
     if phase == PHASE_EXPANSION:
-        run_expansion_phase(client, system_blocks, content_list, state, SONNET, output_dir, tracker)
+        run_expansion_phase(client, system_blocks, content_list, state, SONNET, output_dir, tracker, human_review=human_review)
         phase = PHASE_WEIGHT
     if phase == PHASE_WEIGHT:
-        finalize(run_weight_phase(client, system_blocks, content_list, state, SONNET, output_dir, tracker), output_dir)
+        finalize(run_weight_phase(client, system_blocks, content_list, state, SONNET, output_dir, tracker, human_review=human_review), output_dir)
     tracker.print_report()
 
 

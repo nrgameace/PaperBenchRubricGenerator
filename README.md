@@ -12,6 +12,9 @@ of the paper must satisfy. You review and edit the model's output at every step.
 > Costs are kept low via extended prompt caching (1-hour TTL on the PDF and system preamble)
 > and model tiering (Opus only for the base pass; Sonnet for all expansion and weight passes).
 
+The pipeline supports two modes: **agentic** (default — no prompts, runs end-to-end unattended) and
+**human-in-the-loop** (`--review` flag — pauses after each pass for editing and feedback).
+
 ---
 
 ## How it works
@@ -32,10 +35,10 @@ resumable. There are three phases:
 
 3. **Weight pass** — `claude-sonnet-4-6` receives the full MinerU text and the completed
    tree and assigns an integer weight to every node reflecting its importance to the paper's
-   core contributions. After the LLM responds, any invalid weights (negative, non-numeric,
-   boolean, or missing) trigger an interactive correction loop — you are prompted per-node
-   to either enter a weight manually or queue the node for an LLM retry. The retry cycle
-   repeats until all weights are valid, then the normal review prompt appears.
+   core contributions. Any invalid weights (negative, non-numeric, boolean, or missing) are
+   corrected before the pass completes: in `--review` mode you are prompted per-node to enter
+   a weight manually or queue it for an LLM retry; in agentic mode all invalid nodes are
+   automatically re-queued. The retry cycle repeats until all weights are valid.
 
 ### Prompt caching
 
@@ -48,7 +51,7 @@ Two blocks are cached with a 1-hour TTL via the Anthropic extended-cache-ttl bet
 The cache survives the human-review window between phases, so you don't pay to re-send the
 PDF or system prompt on expansion and weight calls.
 
-### Human-in-the-loop review
+### Human-in-the-loop review (`--review` only)
 
 After each pass the candidate rubric is written to `rubric_draft.json`. The tool pauses and
 prompts you to edit that file as needed:
@@ -59,6 +62,12 @@ prompts you to edit that file as needed:
   reruns with the extra context. State is NOT checkpointed until you press Enter with no text.
 
 State is saved atomically to `rubric_state.json` after every approved pass.
+
+### Agentic mode (default)
+
+Without `--review` the pipeline runs end-to-end without any prompts. Each pass accepts the
+first LLM output directly. Invalid weights are silently re-queued for an LLM retry until all
+are valid. State is still checkpointed after each phase so a run is resumable with `--resume`.
 
 ---
 
@@ -85,7 +94,7 @@ tests/
 
 | File | Responsibility |
 |---|---|
-| `rubric_gen.py` | Entry point; CLI parsing; orchestrates all 3 phases; human review loop; prints cost report |
+| `rubric_gen.py` | Entry point; CLI parsing (`--review`, `--resume`); orchestrates all 3 phases; `human_review` flag threaded through phase functions; `_resolve_invalid_weights` correction loop; prints cost report |
 | `pb_passes.py` | Anthropic SDK calls; prompt construction; JSON parsing; node normalization; tree mutation (`apply_base`, `apply_expansion`, `apply_weights`); weight validation (`find_invalid_weights`); optional `feedback`, `node_ids`, and `tracker` params on weight LLM calls |
 | `pb_cost.py` | `CostTracker` — accumulates token usage (input, output, cache write, cache read) per model; computes and prints a formatted cost report |
 | `pb_input.py` | Discovers PDF and MinerU folder from input dir; loads `content_list.json` |
@@ -117,6 +126,21 @@ text. Falls back to the full list when the best heading score is below 0.3.
 ---
 
 ## Changelog
+
+### v5 — Agentic mode and `--review` flag
+
+**`--review` flag.** Human-in-the-loop review is now opt-in. Pass `--review` to get the
+existing interactive behavior (edit `rubric_draft.json`, provide feedback, manual weight
+correction). Omitting `--review` runs the pipeline end-to-end without any prompts.
+
+**Fully agentic default.** Without `--review`, all three phases accept the first LLM output
+directly and proceed immediately. Invalid weights are silently re-queued for an LLM retry
+until all nodes have valid weights. State is still checkpointed after each phase.
+
+**`human_review` parameter.** The boolean is threaded through `run_base_phase`,
+`run_expansion_phase`, `run_weight_phase`, and `_resolve_invalid_weights` via a single
+`human_review` keyword argument — no new modules, just `if human_review:` guards around
+the existing review and correction calls.
 
 ### v4 — Interactive weight correction loop
 
@@ -232,16 +256,21 @@ data/input/my-paper/
 
 ## Usage
 
-Generate a rubric:
+Generate a rubric (agentic, no prompts):
 
 ```bash
 python rubric_gen.py --input data/input/my-paper --output data/output/my-paper
 ```
 
-The tool will pause after each pass for you to review and edit `rubric_draft.json` in the
-output directory. Save your edits, return to the terminal, and press **Enter** to continue.
-Type any feedback text and press **Enter** to discard the output and re-run that pass with
-your feedback forwarded to the model.
+Generate a rubric with human review after each pass:
+
+```bash
+python rubric_gen.py --input data/input/my-paper --output data/output/my-paper --review
+```
+
+In `--review` mode the tool pauses after each pass for you to edit `rubric_draft.json`.
+Press **Enter** to approve (with or without edits), or type feedback and press **Enter** to
+discard the output and re-run that pass with your feedback forwarded to the model.
 
 At the end of the run, a cost report is printed showing token counts and estimated USD cost
 broken down by model.

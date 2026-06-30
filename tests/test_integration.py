@@ -52,7 +52,7 @@ def test_full_pipeline_produces_valid_final(tmp_path, monkeypatch):
     output_dir = tmp_path / "output"
     _patch_llm(monkeypatch)
     _auto_approve(monkeypatch)
-    monkeypatch.setattr(sys, "argv", ["rubric_gen", "--input", str(input_dir), "--output", str(output_dir)])
+    monkeypatch.setattr(sys, "argv", ["rubric_gen", "--input", str(input_dir), "--output", str(output_dir), "--review"])
 
     rubric_gen.main()
 
@@ -62,6 +62,20 @@ def test_full_pipeline_produces_valid_final(tmp_path, monkeypatch):
     leaf_categories = {n["task_category"] for n in _walk(final) if not n["sub_tasks"]}
     assert leaf_categories <= {"Code Development", "Code Execution", "Result Analysis"}
     assert (output_dir / "rubric_state.json").exists()
+
+
+def test_full_pipeline_agentic_produces_valid_final(tmp_path, monkeypatch):
+    input_dir = _make_input_dir(tmp_path)
+    output_dir = tmp_path / "output"
+    _patch_llm(monkeypatch)
+    # No --review flag: fully agentic, no review_pass calls expected
+    monkeypatch.setattr(sys, "argv", ["rubric_gen", "--input", str(input_dir), "--output", str(output_dir)])
+
+    rubric_gen.main()
+
+    final = json.loads((output_dir / "rubric_final.json").read_text())
+    validate_final(final)
+    assert final["id"] == "root"
 
 
 def test_rerun_with_final_present_short_circuits(tmp_path, monkeypatch, capsys):
