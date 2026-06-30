@@ -199,6 +199,92 @@ def test_find_invalid_weights_includes_requirements_in_tuple():
     assert invalid[0][1] == "do b"
 
 
+# ── run_weight_llm_branch tests ──────────────────────────────────────────────
+
+def _branch_rubric():
+    return {
+        "id": "root", "requirements": "r", "weight": 0, "task_category": None,
+        "finegrained_task_category": None,
+        "sub_tasks": [
+            {
+                "id": "section-a", "requirements": "section a", "weight": 0,
+                "task_category": None, "finegrained_task_category": None,
+                "sub_tasks": [
+                    {"id": "leaf-a1", "requirements": "do a1", "weight": 0, "sub_tasks": [],
+                     "task_category": "Code Development", "finegrained_task_category": None},
+                    {"id": "leaf-a2", "requirements": "do a2", "weight": 0, "sub_tasks": [],
+                     "task_category": "Code Execution", "finegrained_task_category": None},
+                ],
+            },
+            {
+                "id": "section-b", "requirements": "section b", "weight": 0,
+                "task_category": None, "finegrained_task_category": None,
+                "sub_tasks": [
+                    {"id": "leaf-b1", "requirements": "do b1", "weight": 0, "sub_tasks": [],
+                     "task_category": "Code Development", "finegrained_task_category": None},
+                ],
+            },
+        ],
+    }
+
+
+def test_run_weight_llm_branch_targets_subtree_ids():
+    rubric = _branch_rubric()
+    branch_node = rubric["sub_tasks"][0]
+    client = _FakeClient('{"weights": {"section-a": 3, "leaf-a1": 2, "leaf-a2": 1}}')
+    pb_passes.run_weight_llm_branch(client, [], "text", rubric, branch_node, "model")
+    instruction = client.messages.calls[0]["messages"][0]["content"][0]["text"]
+    assert "section-a" in instruction
+    assert "leaf-a1" in instruction
+    assert "leaf-a2" in instruction
+    assert "EVERY node" not in instruction
+
+
+def test_run_weight_llm_branch_includes_full_rubric_for_context():
+    rubric = _branch_rubric()
+    branch_node = rubric["sub_tasks"][0]
+    client = _FakeClient('{"weights": {"section-a": 3, "leaf-a1": 2, "leaf-a2": 1}}')
+    pb_passes.run_weight_llm_branch(client, [], "text", rubric, branch_node, "model")
+    instruction = client.messages.calls[0]["messages"][0]["content"][0]["text"]
+    assert "section-b" in instruction
+
+
+def test_run_weight_llm_branch_returns_partial_weights():
+    rubric = _branch_rubric()
+    branch_node = rubric["sub_tasks"][0]
+    client = _FakeClient('{"weights": {"section-a": 3, "leaf-a1": 2, "leaf-a2": 1}}')
+    result = pb_passes.run_weight_llm_branch(client, [], "text", rubric, branch_node, "model")
+    assert result == {"section-a": 3, "leaf-a1": 2, "leaf-a2": 1}
+
+
+# ── run_weight_llm_global tests ───────────────────────────────────────────────
+
+def test_run_weight_llm_global_sends_current_weights_as_context():
+    rubric = _two_leaf_rubric()
+    current_weights = {"root": 1, "a": 3, "b": 2}
+    client = _FakeClient('{"weights": {"root": 1, "a": 4, "b": 2}}')
+    pb_passes.run_weight_llm_global(client, [], "text", rubric, current_weights, "model")
+    instruction = client.messages.calls[0]["messages"][0]["content"][0]["text"]
+    assert '"a": 3' in instruction or "locally" in instruction.lower() or "calibrate" in instruction.lower()
+
+
+def test_run_weight_llm_global_with_feedback_appended():
+    rubric = _two_leaf_rubric()
+    client = _FakeClient('{"weights": {"root": 1, "a": 3, "b": 2}}')
+    pb_passes.run_weight_llm_global(client, [], "text", rubric, {}, "model", feedback="recheck table 3")
+    instruction = client.messages.calls[0]["messages"][0]["content"][0]["text"]
+    assert "USER FEEDBACK" in instruction
+    assert "recheck table 3" in instruction
+
+
+def test_run_weight_llm_global_without_feedback_no_feedback_block():
+    rubric = _two_leaf_rubric()
+    client = _FakeClient('{"weights": {"root": 1, "a": 3, "b": 2}}')
+    pb_passes.run_weight_llm_global(client, [], "text", rubric, {}, "model")
+    instruction = client.messages.calls[0]["messages"][0]["content"][0]["text"]
+    assert "USER FEEDBACK" not in instruction
+
+
 # ── run_weight_llm new param tests ────────────────────────────────────────────
 
 def _weight_instruction(client):

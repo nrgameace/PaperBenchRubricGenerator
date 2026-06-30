@@ -35,6 +35,18 @@ def _patch_llm(monkeypatch):
         return {node["id"]: 1 for node in iter_nodes(rubric)}
     monkeypatch.setattr(rubric_gen, "run_weight_llm", _fake_weight_llm)
 
+    def _fake_weight_llm_branch(*args, **kwargs):
+        from pb_schema import iter_nodes
+        branch_node = args[4]
+        return {node["id"]: 1 for node in iter_nodes(branch_node)}
+    monkeypatch.setattr(rubric_gen, "run_weight_llm_branch", _fake_weight_llm_branch)
+
+    def _fake_weight_llm_global(*args, **kwargs):
+        from pb_schema import iter_nodes
+        rubric = args[3]
+        return {node["id"]: 1 for node in iter_nodes(rubric)}
+    monkeypatch.setattr(rubric_gen, "run_weight_llm_global", _fake_weight_llm_global)
+
 
 def _make_input_dir(tmp_path):
     """Create a minimal valid input directory with a fake PDF and MinerU folder."""

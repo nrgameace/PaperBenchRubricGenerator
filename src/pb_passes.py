@@ -419,3 +419,55 @@ def run_weight_llm(client, system_blocks, content_list_text, rubric: dict, model
         invoke_llm(client, system_blocks, [_text_message(instruction)], model, tracker=tracker)
     )
     return parsed.get("weights", parsed) if isinstance(parsed, dict) else {}
+
+
+def run_weight_llm_branch(client, system_blocks, content_list_text, rubric: dict, branch_node: dict, model, tracker=None) -> dict:
+    """Assign weights to every node in branch_node's subtree (branch_node + all descendants).
+
+    Full rubric is sent for context but only weights for the subtree are requested.
+    """
+    branch_ids = [node["id"] for node in iter_nodes(branch_node)]
+    id_list = ", ".join(f'"{nid}"' for nid in branch_ids)
+    response_shape = (
+        'Respond with JSON ONLY mapping those node ids to integers: '
+        '{"weights": {' + ", ".join(f'"{nid}": <int>' for nid in branch_ids) + '}}'
+    )
+    instruction = (
+        f"TASK: Assign integer WEIGHTS to every node in the subtree rooted at \"{branch_node['id']}\" "
+        f"(node IDs: [{id_list}]). The full rubric is provided for context but only return weights for those IDs.\n\n"
+        f"PAPER CONTENT (MinerU structured parse):\n{content_list_text}\n\n"
+        "Within each group of sibling nodes, assign non-negative integers for relative importance "
+        "(they need NOT sum to any fixed value; the benchmark normalizes within each group). More "
+        "important or more effort-intensive siblings get larger integers.\n\n"
+        f"FULL RUBRIC (context only):\n{json.dumps(rubric, indent=2, ensure_ascii=False)}\n\n"
+        + response_shape
+    )
+    parsed = parse_json_response(
+        invoke_llm(client, system_blocks, [_text_message(instruction)], model, tracker=tracker)
+    )
+    return parsed.get("weights", parsed) if isinstance(parsed, dict) else {}
+
+
+def run_weight_llm_global(client, system_blocks, content_list_text, rubric: dict, current_weights: dict, model, tracker=None, feedback=None) -> dict:
+    """Calibrate weights across all branches using locally-assigned weights as context.
+
+    Sends the full rubric with current weights overlaid, asks model to ensure consistent
+    relative importance across top-level siblings and prioritize the right items globally.
+    """
+    instruction = (
+        "TASK: All branches have been weighted locally. Now calibrate across the complete rubric to ensure "
+        "top-level siblings have consistent relative importance and the right items are prioritized.\n\n"
+        f"PAPER CONTENT (MinerU structured parse):\n{content_list_text}\n\n"
+        "Within each group of sibling nodes, assign non-negative integers for relative importance "
+        "(they need NOT sum to any fixed value; the benchmark normalizes within each group). More "
+        "important or more effort-intensive siblings get larger integers. Use 1 for the root.\n\n"
+        f"CURRENT LOCALLY-ASSIGNED WEIGHTS (use as reference for calibration):\n{json.dumps(current_weights, indent=2)}\n\n"
+        f"FULL RUBRIC (ids included):\n{json.dumps(rubric, indent=2, ensure_ascii=False)}\n\n"
+        'Respond with JSON ONLY mapping EVERY node id to an integer: {"weights": {"<id>": <int>, ...}}'
+    )
+    if feedback:
+        instruction += f"\n\nUSER FEEDBACK (incorporate this when assigning weights):\n{feedback}"
+    parsed = parse_json_response(
+        invoke_llm(client, system_blocks, [_text_message(instruction)], model, tracker=tracker)
+    )
+    return parsed.get("weights", parsed) if isinstance(parsed, dict) else {}

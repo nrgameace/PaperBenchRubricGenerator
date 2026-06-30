@@ -33,12 +33,18 @@ resumable. There are three phases:
    section using `difflib` fuzzy heading match; falls back to the full content list when no
    heading matches (similarity < 0.3).
 
-3. **Weight pass** — `claude-sonnet-4-6` receives the full MinerU text and the completed
-   tree and assigns an integer weight to every node reflecting its importance to the paper's
-   core contributions. Any invalid weights (negative, non-numeric, boolean, or missing) are
-   corrected before the pass completes: in `--review` mode you are prompted per-node to enter
-   a weight manually or queue it for an LLM retry; in agentic mode all invalid nodes are
-   automatically re-queued. The retry cycle repeats until all weights are valid.
+3. **Weight pass** — `claude-sonnet-4-6`, two sub-phases:
+   - **Local passes** — one LLM call per top-level branch. Each call is focused on a single
+     subtree so the model can reason about relative importance within that branch without
+     distraction from unrelated sections. The full rubric is still sent for context.
+   - **Global calibration** — one final LLM call that receives all locally-assigned weights
+     and adjusts them for consistent relative importance across top-level siblings.
+   - The root node is always set to weight 1 by the orchestrator (no LLM call).
+   - Invalid weights (negative, non-numeric, boolean, or missing) are corrected after both
+     sub-phases: in `--review` mode you are prompted per-node to enter a weight manually or
+     queue it for an LLM retry; in agentic mode all invalid nodes are automatically re-queued.
+   - Human review happens **once**, after both sub-phases and all invalid-weight correction are
+     complete.
 
 ### Prompt caching
 
@@ -95,7 +101,7 @@ tests/
 | File | Responsibility |
 |---|---|
 | `rubric_gen.py` | Entry point; CLI parsing (`--review`, `--resume`); orchestrates all 3 phases; `human_review` flag threaded through phase functions; `_resolve_invalid_weights` correction loop; prints cost report |
-| `pb_passes.py` | Anthropic SDK calls; prompt construction; JSON parsing; node normalization; tree mutation (`apply_base`, `apply_expansion`, `apply_weights`); weight validation (`find_invalid_weights`); optional `feedback`, `node_ids`, and `tracker` params on weight LLM calls |
+| `pb_passes.py` | Anthropic SDK calls; prompt construction; JSON parsing; node normalization; tree mutation (`apply_base`, `apply_expansion`, `apply_weights`); weight validation (`find_invalid_weights`); `run_weight_llm_branch` for per-branch local passes; `run_weight_llm_global` for cross-branch calibration; `run_weight_llm` for targeted invalid-weight retries |
 | `pb_cost.py` | `CostTracker` — accumulates token usage (input, output, cache write, cache read) per model; computes and prints a formatted cost report |
 | `pb_input.py` | Discovers PDF and MinerU folder from input dir; loads `content_list.json` |
 | `pb_mineru.py` | Converts MinerU blocks to LLM-readable text (`blocks_to_text`); slices content to a section by heading fuzzy-match (`slice_section`) |
@@ -126,6 +132,24 @@ text. Falls back to the full list when the best heading score is below 0.3.
 ---
 
 ## Changelog
+
+### v6 — Two-phase weight generation (local + global)
+
+**Per-branch local weight passes.** The single global weight LLM call is replaced by one focused
+call per top-level branch (`run_weight_llm_branch`). Each call targets only the nodes in that
+subtree, giving the model a tighter context so it can reason about relative importance within a
+branch without interference from unrelated sections. The full rubric is still included for reference.
+
+**Global calibration pass.** After all local passes complete, a single calibration call
+(`run_weight_llm_global`) reviews the complete weighted tree and adjusts weights across branches
+for consistent relative importance at the top level.
+
+**Root always 1.** The root node weight is set to 1 directly by the orchestrator and is never
+passed to the LLM. If the global pass returns a different value it is overridden.
+
+**Single review point.** Human review (in `--review` mode) still occurs exactly once — after
+both the local and global sub-phases and all invalid-weight correction are complete. Feedback
+typed at that review is forwarded to the global calibration call on rerun.
 
 ### v5 — Agentic mode and `--review` flag
 

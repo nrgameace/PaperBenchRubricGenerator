@@ -26,7 +26,8 @@ from pb_cost import CostTracker
 from pb_input import discover_mineru_dir, discover_pdf, load_content_list
 from pb_mineru import blocks_to_text, slice_section
 from pb_passes import (apply_base, apply_expansion, apply_weights, build_client, build_system_blocks,
-                       find_invalid_weights, pdf_to_block, run_base_llm, run_expansion_llm, run_weight_llm)
+                       find_invalid_weights, pdf_to_block, run_base_llm, run_expansion_llm, run_weight_llm,
+                       run_weight_llm_branch, run_weight_llm_global)
 from pb_review import RerunPass, collect_weight_corrections, pretty_print_nodes, review_pass
 from pb_schema import all_ids, find_node, validate_final, validate_partial
 from pb_state import (PHASE_BASE, PHASE_DONE, PHASE_EXPANSION, PHASE_WEIGHT, determine_phase,
@@ -166,14 +167,30 @@ def _resolve_invalid_weights(client, system_blocks, content_list_text, rubric, m
 
 
 def run_weight_phase(client, system_blocks, content_list, state, model, output_dir, tracker=None, human_review=True) -> dict:
-    """Assign, review, and save integer weights across the whole tree."""
+    """Assign integer weights via per-branch local passes then a global calibration pass."""
     print("\n>>> WEIGHT PASS: assigning integer weights to every node...")
     content_list_text = blocks_to_text(content_list)
     feedback = ""
+    root_id = state["rubric"]["id"]
     while True:
         candidate = copy.deepcopy(state["rubric"])
-        weights = run_weight_llm(client, system_blocks, content_list_text, state["rubric"], model, tracker=tracker, feedback=feedback or None)
+        weights = {root_id: 1}
+
+        print("  Running local weight pass for each top-level branch...")
+        for branch_node in candidate.get("sub_tasks", []):
+            print(f"    Branch: {branch_node['id']}")
+            branch_weights = run_weight_llm_branch(client, system_blocks, content_list_text, candidate, branch_node, model, tracker=tracker)
+            weights.update(branch_weights)
+
         weights = _resolve_invalid_weights(client, system_blocks, content_list_text, candidate, model, weights, tracker=tracker, human_review=human_review)
+
+        print("  Running global calibration pass...")
+        global_weights = run_weight_llm_global(client, system_blocks, content_list_text, candidate, weights, model, tracker=tracker, feedback=feedback or None)
+        weights.update(global_weights)
+        weights[root_id] = 1
+
+        weights = _resolve_invalid_weights(client, system_blocks, content_list_text, candidate, model, weights, tracker=tracker, human_review=human_review)
+
         apply_weights(candidate, weights)
         pretty_print_nodes("Weighted rubric", candidate)
         if human_review:

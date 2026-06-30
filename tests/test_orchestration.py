@@ -265,7 +265,7 @@ def test_run_weight_phase_passes_feedback_to_llm_on_retry(tmp_path):
     from pb_review import RerunPass
     state = _minimal_weighted_state()
     review_calls = {"n": 0}
-    llm_feedback_args = []
+    global_feedback_args = []
 
     def fake_review(rubric, draft_path, validate_fn):
         review_calls["n"] += 1
@@ -273,11 +273,12 @@ def test_run_weight_phase_passes_feedback_to_llm_on_retry(tmp_path):
             raise RerunPass("check table 5")
         return rubric
 
-    def fake_run_weight_llm(*args, feedback=None, **kwargs):
-        llm_feedback_args.append(feedback)
+    def fake_global(*args, feedback=None, **kwargs):
+        global_feedback_args.append(feedback)
         return {"root": 1, "leaf": 2}
 
-    with patch("rubric_gen.run_weight_llm", side_effect=fake_run_weight_llm), \
+    with patch("rubric_gen.run_weight_llm_branch", return_value={"leaf": 2}), \
+         patch("rubric_gen.run_weight_llm_global", side_effect=fake_global), \
          patch("rubric_gen._resolve_invalid_weights", side_effect=lambda *a, **k: a[5]), \
          patch("rubric_gen.apply_weights"), \
          patch("rubric_gen.review_pass", side_effect=fake_review), \
@@ -286,8 +287,8 @@ def test_run_weight_phase_passes_feedback_to_llm_on_retry(tmp_path):
          patch("rubric_gen.blocks_to_text", return_value=""):
         rubric_gen.run_weight_phase(None, [], [], state, "model", tmp_path)
 
-    assert llm_feedback_args[0] is None
-    assert llm_feedback_args[1] == "check table 5"
+    assert global_feedback_args[0] is None
+    assert global_feedback_args[1] == "check table 5"
 
 
 # ── --review flag / agentic mode tests ───────────────────────────────────────
@@ -348,7 +349,8 @@ def test_run_expansion_phase_agentic_skips_review(tmp_path):
 def test_run_weight_phase_agentic_skips_review(tmp_path):
     state = _minimal_weighted_state()
 
-    with patch("rubric_gen.run_weight_llm", return_value={"root": 1, "leaf": 2}), \
+    with patch("rubric_gen.run_weight_llm_branch", return_value={"leaf": 2}), \
+         patch("rubric_gen.run_weight_llm_global", return_value={"root": 1, "leaf": 2}), \
          patch("rubric_gen._resolve_invalid_weights", side_effect=lambda *a, **k: a[5]), \
          patch("rubric_gen.apply_weights"), \
          patch("rubric_gen.review_pass") as mock_review, \
@@ -358,3 +360,134 @@ def test_run_weight_phase_agentic_skips_review(tmp_path):
         rubric_gen.run_weight_phase(None, [], [], state, "model", tmp_path, human_review=False)
 
     mock_review.assert_not_called()
+
+
+# ── run_weight_phase two-phase (local + global) tests ────────────────────────
+
+def _multi_branch_state():
+    return {
+        "rubric": {
+            "id": "root", "requirements": "r", "weight": 0, "task_category": None,
+            "finegrained_task_category": None,
+            "sub_tasks": [
+                {
+                    "id": "branch-a", "requirements": "branch a", "weight": 0,
+                    "task_category": None, "finegrained_task_category": None,
+                    "sub_tasks": [
+                        {"id": "leaf-a", "requirements": "do a", "weight": 0, "sub_tasks": [],
+                         "task_category": "Code Development", "finegrained_task_category": None},
+                    ],
+                },
+                {
+                    "id": "branch-b", "requirements": "branch b", "weight": 0,
+                    "task_category": None, "finegrained_task_category": None,
+                    "sub_tasks": [
+                        {"id": "leaf-b", "requirements": "do b", "weight": 0, "sub_tasks": [],
+                         "task_category": "Code Development", "finegrained_task_category": None},
+                    ],
+                },
+            ],
+        },
+        "queue": [],
+        "hints": {},
+    }
+
+
+def test_run_weight_phase_calls_branch_llm_per_top_level_child(tmp_path):
+    state = _multi_branch_state()
+    branch_calls = []
+
+    def fake_branch(client, system_blocks, content_list_text, rubric, branch_node, model, tracker=None):
+        branch_calls.append(branch_node["id"])
+        return {}
+
+    with patch("rubric_gen.run_weight_llm_branch", side_effect=fake_branch), \
+         patch("rubric_gen.run_weight_llm_global", return_value={"root": 1, "branch-a": 3, "leaf-a": 2, "branch-b": 2, "leaf-b": 1}), \
+         patch("rubric_gen._resolve_invalid_weights", side_effect=lambda *a, **k: a[5]), \
+         patch("rubric_gen.apply_weights"), \
+         patch("rubric_gen.pretty_print_nodes"), \
+         patch("rubric_gen.commit"), \
+         patch("rubric_gen.blocks_to_text", return_value=""):
+        rubric_gen.run_weight_phase(None, [], [], state, "model", tmp_path, human_review=False)
+
+    assert branch_calls == ["branch-a", "branch-b"]
+
+
+def test_run_weight_phase_calls_global_llm_once(tmp_path):
+    state = _multi_branch_state()
+
+    with patch("rubric_gen.run_weight_llm_branch", return_value={}), \
+         patch("rubric_gen.run_weight_llm_global", return_value={"root": 1, "branch-a": 3, "leaf-a": 2, "branch-b": 2, "leaf-b": 1}) as mock_global, \
+         patch("rubric_gen._resolve_invalid_weights", side_effect=lambda *a, **k: a[5]), \
+         patch("rubric_gen.apply_weights"), \
+         patch("rubric_gen.pretty_print_nodes"), \
+         patch("rubric_gen.commit"), \
+         patch("rubric_gen.blocks_to_text", return_value=""):
+        rubric_gen.run_weight_phase(None, [], [], state, "model", tmp_path, human_review=False)
+
+    assert mock_global.call_count == 1
+
+
+def test_run_weight_phase_sets_root_weight_to_one(tmp_path):
+    state = _multi_branch_state()
+    applied_weights = {}
+
+    def capture_apply(rubric, weights):
+        applied_weights.update(weights)
+
+    with patch("rubric_gen.run_weight_llm_branch", return_value={}), \
+         patch("rubric_gen.run_weight_llm_global", return_value={"root": 5, "branch-a": 3, "leaf-a": 2, "branch-b": 2, "leaf-b": 1}), \
+         patch("rubric_gen._resolve_invalid_weights", side_effect=lambda *a, **k: a[5]), \
+         patch("rubric_gen.apply_weights", side_effect=capture_apply), \
+         patch("rubric_gen.pretty_print_nodes"), \
+         patch("rubric_gen.commit"), \
+         patch("rubric_gen.blocks_to_text", return_value=""):
+        rubric_gen.run_weight_phase(None, [], [], state, "model", tmp_path, human_review=False)
+
+    assert applied_weights.get("root") == 1
+
+
+def test_run_weight_phase_review_only_once_at_end(tmp_path):
+    state = _multi_branch_state()
+
+    with patch("rubric_gen.run_weight_llm_branch", return_value={}), \
+         patch("rubric_gen.run_weight_llm_global", return_value={"root": 1, "branch-a": 3, "leaf-a": 2, "branch-b": 2, "leaf-b": 1}), \
+         patch("rubric_gen._resolve_invalid_weights", side_effect=lambda *a, **k: a[5]), \
+         patch("rubric_gen.apply_weights"), \
+         patch("rubric_gen.pretty_print_nodes"), \
+         patch("rubric_gen.commit"), \
+         patch("rubric_gen.blocks_to_text", return_value=""), \
+         patch("rubric_gen.review_pass", return_value=state["rubric"]) as mock_review:
+        rubric_gen.run_weight_phase(None, [], [], state, "model", tmp_path, human_review=True)
+
+    assert mock_review.call_count == 1
+
+
+def test_run_weight_phase_reruns_global_with_feedback_on_review(tmp_path):
+    from pb_review import RerunPass
+    state = _multi_branch_state()
+    review_calls = {"n": 0}
+    global_feedback_args = []
+
+    def fake_review(rubric, draft_path, validate_fn):
+        review_calls["n"] += 1
+        if review_calls["n"] == 1:
+            raise RerunPass("adjust section weights")
+        return rubric
+
+    def fake_global(*args, feedback=None, **kwargs):
+        global_feedback_args.append(feedback)
+        return {"root": 1, "branch-a": 3, "leaf-a": 2, "branch-b": 2, "leaf-b": 1}
+
+    with patch("rubric_gen.run_weight_llm_branch", return_value={}), \
+         patch("rubric_gen.run_weight_llm_global", side_effect=fake_global), \
+         patch("rubric_gen._resolve_invalid_weights", side_effect=lambda *a, **k: a[5]), \
+         patch("rubric_gen.apply_weights"), \
+         patch("rubric_gen.pretty_print_nodes"), \
+         patch("rubric_gen.commit"), \
+         patch("rubric_gen.blocks_to_text", return_value=""), \
+         patch("rubric_gen.review_pass", side_effect=fake_review):
+        rubric_gen.run_weight_phase(None, [], [], state, "model", tmp_path, human_review=True)
+
+    assert global_feedback_args[0] is None
+    assert global_feedback_args[1] == "adjust section weights"
