@@ -123,6 +123,47 @@ def test_apply_expansion_missing_node_raises():
         pb_passes.apply_expansion({"id": "root", "sub_tasks": []}, "ghost", {"children": []}, {})
 
 
+def test_apply_expansion_within_max_depth_is_unaffected():
+    rubric, queue, hints = pb_passes.apply_base(
+        {"root": {"requirements": "r"}, "children": [{"requirements": "setup", "expandable": True, "expansion_hint": "env"}]})
+    node_id = queue[0]  # depth 1
+    parsed = {"children": [{"requirements": "subarea", "expandable": True, "expansion_hint": "more"}]}
+    errors = []
+    new_pending = pb_passes.apply_expansion(rubric, node_id, parsed, hints, errors=errors, max_depth=2)
+    assert len(new_pending) == 1
+    assert errors == []
+
+
+def test_apply_expansion_forces_leaf_and_records_error_past_max_depth():
+    rubric, queue, hints = pb_passes.apply_base(
+        {"root": {"requirements": "r"}, "children": [{"requirements": "setup", "expandable": True, "expansion_hint": "env"}]})
+    node_id = queue[0]  # depth 1; children would be depth 2
+    parsed = {"children": [{"id": "too-deep", "requirements": "subarea", "expandable": True, "expansion_hint": "more"}]}
+    errors = []
+    new_pending = pb_passes.apply_expansion(rubric, node_id, parsed, hints, errors=errors, max_depth=1)
+    target = find_node(rubric, node_id)
+    child = target["sub_tasks"][0]
+    assert child["id"] == "too-deep"
+    assert child["task_category"] is not None
+    assert child["sub_tasks"] == []
+    assert new_pending == []
+    assert "too-deep" not in hints
+    assert len(errors) == 1
+    assert "too-deep" in errors[0]
+    assert "maximum depth of 1" in errors[0]
+    validate_final(rubric)
+
+
+def test_apply_expansion_depth_guardrail_is_noop_without_errors_list():
+    rubric, queue, hints = pb_passes.apply_base(
+        {"root": {"requirements": "r"}, "children": [{"requirements": "setup", "expandable": True, "expansion_hint": "env"}]})
+    node_id = queue[0]
+    parsed = {"children": [{"id": "too-deep", "requirements": "subarea", "expandable": True, "expansion_hint": "more"}]}
+    new_pending = pb_passes.apply_expansion(rubric, node_id, parsed, hints, max_depth=1)
+    assert new_pending == []
+    validate_final(rubric)
+
+
 def _two_leaf_rubric():
     return {
         "id": "root", "requirements": "r", "weight": 0, "task_category": None,

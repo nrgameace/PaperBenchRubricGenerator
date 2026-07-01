@@ -5,6 +5,8 @@ import sys
 from pathlib import Path
 from unittest.mock import MagicMock, call, patch
 
+import pytest
+
 import rubric_gen
 from pb_schema import find_node
 
@@ -109,6 +111,28 @@ def test_expand_subtree_forwards_feedback_to_all_calls():
     assert feedback_seen == ["be more detailed"]
 
 
+def test_expand_subtree_threads_errors_list_into_apply_expansion():
+    rubric = _rubric_with_expandable_node()
+    hints = {"section-a": "hint"}
+    seen_errors_args = []
+
+    def fake_apply_expansion(rb, node_id, parsed, hints_arg, errors=None):
+        seen_errors_args.append(errors)
+        if errors is not None:
+            errors.append(f"{node_id}: Model attempted to expand past the maximum depth of 7 nodes.")
+        return []
+
+    with patch("rubric_gen.run_expansion_llm", return_value={"children": []}), \
+         patch("rubric_gen.apply_expansion", side_effect=fake_apply_expansion), \
+         patch("rubric_gen.blocks_to_text", return_value=""), \
+         patch("rubric_gen.slice_section", return_value=[]):
+        errors = []
+        rubric_gen._expand_subtree(None, [], [], rubric, "section-a", hints, "model", errors=errors)
+
+    assert seen_errors_args == [errors]
+    assert errors == ["section-a: Model attempted to expand past the maximum depth of 7 nodes."]
+
+
 def test_expand_subtree_no_feedback_passes_empty_string():
     rubric = _rubric_with_expandable_node()
     hints = {"section-a": "hint"}
@@ -166,6 +190,54 @@ def test_expansion_phase_reviews_once_per_top_level_node(tmp_path):
     assert review_count["n"] == 2
 
 
+def test_expansion_phase_commits_accumulated_errors_after_approval(tmp_path):
+    state = _two_node_state()
+
+    def fake_expand_subtree(client, system_blocks, content_list, rubric, node_id, hints, model, feedback="", tracker=None, errors=None):
+        if errors is not None:
+            errors.append(f"{node_id}: Model attempted to expand past the maximum depth of 7 nodes.")
+
+    with patch("rubric_gen._expand_subtree", side_effect=fake_expand_subtree), \
+         patch("rubric_gen.review_pass", side_effect=lambda rubric, draft_path, validate_fn: rubric), \
+         patch("rubric_gen.pretty_print_nodes"), \
+         patch("rubric_gen.commit"), \
+         patch("rubric_gen.reconcile_queue", side_effect=lambda _rubric, q: q):
+        rubric_gen.run_expansion_phase(None, [], [], state, "model", tmp_path)
+
+    assert state["errors"] == [
+        "node-a: Model attempted to expand past the maximum depth of 7 nodes.",
+        "node-b: Model attempted to expand past the maximum depth of 7 nodes.",
+    ]
+
+
+def test_expansion_phase_discards_errors_from_rejected_candidate(tmp_path):
+    from pb_review import RerunPass
+    state = _two_node_state()
+    state["queue"] = ["node-a"]
+    review_calls = {"n": 0}
+
+    def fake_review(rubric, draft_path, validate_fn):
+        review_calls["n"] += 1
+        if review_calls["n"] == 1:
+            raise RerunPass("try again")
+        return rubric
+
+    def fake_expand_subtree(client, system_blocks, content_list, rubric, node_id, hints, model, feedback="", tracker=None, errors=None):
+        if errors is not None:
+            errors.append(f"{node_id}-attempt-{review_calls['n']}: too deep")
+
+    with patch("rubric_gen._expand_subtree", side_effect=fake_expand_subtree), \
+         patch("rubric_gen.review_pass", side_effect=fake_review), \
+         patch("rubric_gen.pretty_print_nodes"), \
+         patch("rubric_gen.commit"), \
+         patch("rubric_gen.reconcile_queue", return_value=[]):
+        rubric_gen.run_expansion_phase(None, [], [], state, "model", tmp_path)
+
+    # Only the second (approved) attempt's error should survive — the first, rejected
+    # attempt's error must be discarded, not merged in.
+    assert state["errors"] == ["node-a-attempt-1: too deep"]
+
+
 def test_expansion_phase_passes_feedback_on_rerun(tmp_path):
     from pb_review import RerunPass
     state = _two_node_state()
@@ -180,7 +252,7 @@ def test_expansion_phase_passes_feedback_on_rerun(tmp_path):
 
     subtree_calls = []
 
-    def fake_expand_subtree(client, system_blocks, content_list, rubric, node_id, hints, model, feedback="", tracker=None):
+    def fake_expand_subtree(client, system_blocks, content_list, rubric, node_id, hints, model, feedback="", tracker=None, errors=None):
         subtree_calls.append((node_id, feedback))
 
     with patch("rubric_gen._expand_subtree", side_effect=fake_expand_subtree), \
@@ -193,6 +265,24 @@ def test_expansion_phase_passes_feedback_on_rerun(tmp_path):
     # node-a expanded twice: once with empty feedback, once with "needs more detail"
     node_a_calls = [(nid, fb) for nid, fb in subtree_calls if nid == "node-a"]
     assert node_a_calls == [("node-a", ""), ("node-a", "needs more detail")]
+
+
+# ── write_error_log tests ─────────────────────────────────────────────────────
+
+def test_write_error_log_creates_file_with_one_line_per_error(tmp_path):
+    errors = [
+        "too-deep-a: Model attempted to expand past the maximum depth of 7 nodes.",
+        "too-deep-b: Model attempted to expand past the maximum depth of 7 nodes.",
+    ]
+    rubric_gen.write_error_log(errors, tmp_path)
+    error_file = tmp_path / "errors.txt"
+    assert error_file.exists()
+    assert error_file.read_text(encoding="utf-8") == "\n".join(errors) + "\n"
+
+
+def test_write_error_log_writes_nothing_when_no_errors(tmp_path):
+    rubric_gen.write_error_log([], tmp_path)
+    assert not (tmp_path / "errors.txt").exists()
 
 
 # ── _resolve_invalid_weights tests ───────────────────────────────────────────
@@ -242,6 +332,45 @@ def test_resolve_invalid_weights_loops_on_persistent_invalidity():
          patch("rubric_gen.run_weight_llm", return_value={"a": 4}):
         result = rubric_gen._resolve_invalid_weights(None, [], "", _weighted_rubric(), "model", {})
     assert result["a"] == 4
+
+
+def test_resolve_invalid_weights_raises_after_max_retries_agentic():
+    invalid = [("a", "do a", None)]
+    with patch("rubric_gen.find_invalid_weights", return_value=invalid), \
+         patch("rubric_gen.run_weight_llm", return_value={}) as mock_llm:
+        with pytest.raises(rubric_gen.MaxRetriesExceeded):
+            rubric_gen._resolve_invalid_weights(None, [], "", _weighted_rubric(), "model", {}, human_review=False)
+    # Exactly MAX_WEIGHT_RESOLUTION_RETRIES reprompt attempts were made before giving up.
+    assert mock_llm.call_count == rubric_gen.MAX_WEIGHT_RESOLUTION_RETRIES
+
+
+def test_resolve_invalid_weights_raises_after_max_retries_human_review():
+    invalid = [("a", "do a", None)]
+    with patch("rubric_gen.find_invalid_weights", return_value=invalid), \
+         patch("rubric_gen.collect_weight_corrections", return_value=({}, ["a"])) as mock_collect, \
+         patch("rubric_gen.run_weight_llm", return_value={}):
+        with pytest.raises(rubric_gen.MaxRetriesExceeded):
+            rubric_gen._resolve_invalid_weights(None, [], "", _weighted_rubric(), "model", {}, human_review=True)
+    # Exactly MAX_WEIGHT_RESOLUTION_RETRIES retry cycles were offered before giving up.
+    assert mock_collect.call_count == rubric_gen.MAX_WEIGHT_RESOLUTION_RETRIES
+
+
+def test_resolve_invalid_weights_exception_names_invalid_nodes():
+    invalid = [("a", "do a", None)]
+    with patch("rubric_gen.find_invalid_weights", return_value=invalid), \
+         patch("rubric_gen.run_weight_llm", return_value={}):
+        with pytest.raises(rubric_gen.MaxRetriesExceeded, match="a"):
+            rubric_gen._resolve_invalid_weights(None, [], "", _weighted_rubric(), "model", {}, human_review=False)
+
+
+def test_resolve_invalid_weights_does_not_raise_when_resolved_within_cap():
+    invalid = [("a", "do a", None)]
+    # Fails for MAX_WEIGHT_RESOLUTION_RETRIES - 1 attempts, then succeeds on the last allowed one.
+    responses = [invalid] * (rubric_gen.MAX_WEIGHT_RESOLUTION_RETRIES - 1) + [[]]
+    with patch("rubric_gen.find_invalid_weights", side_effect=responses), \
+         patch("rubric_gen.run_weight_llm", return_value={"a": 1}):
+        result = rubric_gen._resolve_invalid_weights(None, [], "", _weighted_rubric(), "model", {}, human_review=False)
+    assert result["a"] == 1
 
 
 # ── run_weight_phase feedback bug fix test ───────────────────────────────────

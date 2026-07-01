@@ -5,19 +5,35 @@ import pb_state
 
 def test_empty_state_shape():
     state = pb_state.empty_state()
-    assert state == {"rubric": None, "queue": [], "hints": {}}
+    assert state == {"rubric": None, "queue": [], "hints": {}, "errors": []}
 
 
 def test_save_and_load_roundtrip(tmp_path):
     path = tmp_path / "rubric_state.json"
     rubric = {"id": "root", "sub_tasks": []}
-    pb_state.save_state(path, rubric, ["a", "b"], {"a": "hint"})
+    pb_state.save_state(path, rubric, ["a", "b"], {"a": "hint"}, ["node-x: too deep"])
     loaded = pb_state.load_state(path)
-    assert loaded == {"rubric": rubric, "queue": ["a", "b"], "hints": {"a": "hint"}}
+    assert loaded == {"rubric": rubric, "queue": ["a", "b"], "hints": {"a": "hint"}, "errors": ["node-x: too deep"]}
+
+
+def test_save_state_defaults_errors_to_empty(tmp_path):
+    path = tmp_path / "rubric_state.json"
+    pb_state.save_state(path, {"id": "root"}, [], {})
+    loaded = pb_state.load_state(path)
+    assert loaded["errors"] == []
 
 
 def test_load_missing_returns_none(tmp_path):
     assert pb_state.load_state(tmp_path / "nope.json") is None
+
+
+def test_load_backfills_missing_errors_key_for_legacy_state(tmp_path):
+    import json
+    path = tmp_path / "rubric_state.json"
+    with open(path, "w", encoding="utf-8") as handle:
+        json.dump({"rubric": {"id": "root"}, "queue": [], "hints": {}}, handle)
+    loaded = pb_state.load_state(path)
+    assert loaded["errors"] == []
 
 
 def test_save_state_is_atomic_no_leftover_tmp(tmp_path):

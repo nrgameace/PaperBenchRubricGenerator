@@ -82,3 +82,24 @@ def test_validate_partial_still_flags_non_pending_uncategorized_leaf():
                               "task_category": None, "finegrained_task_category": None}]}
     with pytest.raises(ValueError):
         pb_schema.validate_partial(pending, pending_ids=set())
+
+
+def test_node_depth_of_root_is_zero():
+    tree = _internal("root", [_leaf("a")])
+    assert pb_schema.node_depth(tree, "root") == 0
+
+
+def test_node_depth_of_direct_child_is_one():
+    tree = _internal("root", [_leaf("a"), _internal("b", [_leaf("c")])])
+    assert pb_schema.node_depth(tree, "a") == 1
+    assert pb_schema.node_depth(tree, "b") == 1
+
+
+def test_node_depth_of_grandchild_is_two():
+    tree = _internal("root", [_internal("b", [_leaf("c")])])
+    assert pb_schema.node_depth(tree, "c") == 2
+
+
+def test_node_depth_of_missing_id_is_none():
+    tree = _internal("root", [_leaf("a")])
+    assert pb_schema.node_depth(tree, "missing") is None

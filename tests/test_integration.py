@@ -3,6 +3,8 @@
 import json
 import sys
 
+import pytest
+
 import pb_review
 import rubric_gen
 from pb_schema import validate_final
@@ -101,6 +103,23 @@ def test_rerun_with_final_present_short_circuits(tmp_path, monkeypatch, capsys):
 
     rubric_gen.main()
     assert "already exists" in capsys.readouterr().out
+
+
+def test_main_exits_cleanly_when_weight_resolution_exceeds_max_retries(tmp_path, monkeypatch):
+    input_dir = _make_input_dir(tmp_path)
+    output_dir = tmp_path / "output"
+    _patch_llm(monkeypatch)
+    # Every weight-assigning call returns nothing, so every node stays invalid no matter how
+    # many times the pipeline retries.
+    monkeypatch.setattr(rubric_gen, "run_weight_llm_branch", lambda *a, **k: {})
+    monkeypatch.setattr(rubric_gen, "run_weight_llm_global", lambda *a, **k: {})
+    monkeypatch.setattr(rubric_gen, "run_weight_llm", lambda *a, **k: {})
+    monkeypatch.setattr(sys, "argv", ["rubric_gen", "--input", str(input_dir), "--output", str(output_dir)])
+
+    with pytest.raises(SystemExit) as exc_info:
+        rubric_gen.main()
+
+    assert "--resume" in str(exc_info.value)
 
 
 def _walk(node):

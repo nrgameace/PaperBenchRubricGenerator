@@ -37,6 +37,11 @@ HERE = Path(__file__).resolve().parent
 OPUS = "claude-opus-4-8"
 SONNET = "claude-sonnet-4-6"
 FEW_SHOT_RUBRIC_PATH = Path(os.environ.get("FEW_SHOT_RUBRIC_PATH", HERE.parent / "examples" / "example_rubric.json"))
+MAX_WEIGHT_RESOLUTION_RETRIES = 5
+
+
+class MaxRetriesExceeded(Exception):
+    """Raised when weight resolution still has invalid nodes after MAX_WEIGHT_RESOLUTION_RETRIES attempts."""
 
 
 def parse_args():
@@ -77,7 +82,7 @@ def prune_hints(state: dict) -> None:
 
 def commit(state: dict, output_dir: Path) -> None:
     """Persist the current state to the checkpoint file in output_dir."""
-    save_state(output_dir / "rubric_state.json", state["rubric"], state["queue"], state["hints"])
+    save_state(output_dir / "rubric_state.json", state["rubric"], state["queue"], state["hints"], state.get("errors", []))
 
 
 def run_base_phase(client, system_blocks, pdf_block, content_list, state, model, output_dir, tracker=None, human_review=True) -> None:
@@ -104,7 +109,7 @@ def run_base_phase(client, system_blocks, pdf_block, content_list, state, model,
         return
 
 
-def _expand_subtree(client, system_blocks, content_list, rubric, node_id, hints, model, feedback: str = "", tracker=None) -> None:
+def _expand_subtree(client, system_blocks, content_list, rubric, node_id, hints, model, feedback: str = "", tracker=None, errors=None) -> None:
     """Fully expand node_id and all its expandable descendants in-place (BFS, no review pause)."""
     local_queue = [node_id]
     while local_queue:
@@ -113,7 +118,7 @@ def _expand_subtree(client, system_blocks, content_list, rubric, node_id, hints,
         section_text = blocks_to_text(slice_section(content_list, hint))
         print(f"  Expanding '{current_id}'...")
         parsed = run_expansion_llm(client, system_blocks, section_text, rubric, current_id, hint, model, feedback=feedback, tracker=tracker)
-        new_pending = apply_expansion(rubric, current_id, parsed, hints)
+        new_pending = apply_expansion(rubric, current_id, parsed, hints, errors=errors)
         local_queue.extend(new_pending)
 
 
@@ -127,7 +132,8 @@ def run_expansion_phase(client, system_blocks, content_list, state, model, outpu
         while True:
             candidate = copy.deepcopy(state["rubric"])
             candidate_hints = dict(state["hints"])
-            _expand_subtree(client, system_blocks, content_list, candidate, node_id, candidate_hints, model, feedback, tracker=tracker)
+            candidate_errors = list(state.get("errors", []))
+            _expand_subtree(client, system_blocks, content_list, candidate, node_id, candidate_hints, model, feedback, tracker=tracker, errors=candidate_errors)
             remaining_queue = state["queue"][1:]
             pretty_print_nodes(f"Subtree '{node_id}' (fully expanded)", [find_node(candidate, node_id)])
             if human_review:
@@ -142,6 +148,7 @@ def run_expansion_phase(client, system_blocks, content_list, state, model, outpu
                 approved = candidate
             state["rubric"] = approved
             state["hints"] = candidate_hints
+            state["errors"] = candidate_errors
             state["queue"] = reconcile_queue(approved, remaining_queue)
             prune_hints(state)
             commit(state, output_dir)
@@ -149,11 +156,24 @@ def run_expansion_phase(client, system_blocks, content_list, state, model, outpu
 
 
 def _resolve_invalid_weights(client, system_blocks, content_list_text, rubric, model, weights, tracker=None, input_fn=input, human_review=True):
-    """Loop until all weights in the dict are valid for rubric."""
+    """Loop until all weights in the dict are valid for rubric.
+
+    Raises MaxRetriesExceeded if MAX_WEIGHT_RESOLUTION_RETRIES attempts still leave invalid
+    nodes, so a persistently-wrong model (or a human who keeps choosing retry) can't spin
+    forever.
+    """
+    attempt = 0
     while True:
         invalid = find_invalid_weights(rubric, weights)
         if not invalid:
             return weights
+        attempt += 1
+        if attempt > MAX_WEIGHT_RESOLUTION_RETRIES:
+            invalid_ids = [node_id for node_id, _, _ in invalid]
+            raise MaxRetriesExceeded(
+                f"Weight resolution failed after {MAX_WEIGHT_RESOLUTION_RETRIES} retries; "
+                f"nodes still invalid: {invalid_ids}. Re-run with --resume to try again."
+            )
         if human_review:
             manual_overrides, regen_ids = collect_weight_corrections(invalid, input_fn=input_fn)
             weights.update(manual_overrides)
@@ -216,6 +236,19 @@ def finalize(rubric: dict, output_dir: Path) -> None:
     print(f"\nFinal rubric written to {final_file} ({len(all_ids(rubric))} nodes) and validated.")
 
 
+def write_error_log(errors: list, output_dir: Path) -> None:
+    """Write errors.txt alongside rubric_final.json, one guardrail violation per line.
+
+    Only created when there is at least one error; an empty/absent errors list writes nothing.
+    """
+    if not errors:
+        return
+    error_file = output_dir / "errors.txt"
+    with open(error_file, "w", encoding="utf-8") as handle:
+        handle.write("\n".join(errors) + "\n")
+    print(f"\n{len(errors)} guardrail violation(s) logged to {error_file}")
+
+
 def main() -> None:
     """Drive the rubric-generation pipeline, resuming if requested."""
     args = parse_args()
@@ -256,7 +289,12 @@ def main() -> None:
         run_expansion_phase(client, system_blocks, content_list, state, SONNET, output_dir, tracker, human_review=human_review)
         phase = PHASE_WEIGHT
     if phase == PHASE_WEIGHT:
-        finalize(run_weight_phase(client, system_blocks, content_list, state, SONNET, output_dir, tracker, human_review=human_review), output_dir)
+        try:
+            weighted_rubric = run_weight_phase(client, system_blocks, content_list, state, SONNET, output_dir, tracker, human_review=human_review)
+        except MaxRetriesExceeded as e:
+            raise SystemExit(str(e))
+        finalize(weighted_rubric, output_dir)
+        write_error_log(state.get("errors", []), output_dir)
     tracker.print_report()
 
 

@@ -12,7 +12,10 @@ from pathlib import Path
 
 import anthropic
 
-from pb_schema import FINEGRAINED_CATEGORIES, LEAF_CATEGORIES, all_ids, find_node, iter_nodes
+from pb_schema import FINEGRAINED_CATEGORIES, LEAF_CATEGORIES, all_ids, find_node, iter_nodes, node_depth
+
+MAX_EXPANSION_DEPTH = 7
+_DEPTH_FALLBACK_CATEGORY = "Code Development"
 
 SYSTEM_PREAMBLE = f"""You are an expert ML research engineer building a PaperBench grading \
 rubric for ONE specific paper, supplied as a PDF in the user message.
@@ -283,18 +286,28 @@ def _children_from_parsed(parsed):
     return parsed.get("children", [])
 
 
-def apply_expansion(rubric: dict, node_id: str, parsed, hints: dict) -> list:
-    """Attach generated children to ``node_id`` in place; return the new pending ids."""
+def apply_expansion(rubric: dict, node_id: str, parsed, hints: dict, errors: list = None, max_depth: int = MAX_EXPANSION_DEPTH) -> list:
+    """Attach generated children to ``node_id`` in place; return the new pending ids.
+
+    Children that would sit past ``max_depth`` are forced into leaves instead of being
+    queued for further expansion, since expansion cost is unbounded otherwise. Each such
+    guardrail hit is appended to ``errors`` (if provided) as ``"<id>: ..."``.
+    """
     target = find_node(rubric, node_id)
     if target is None:
         raise ValueError(f"Node '{node_id}' not found in rubric.")
+    child_depth = node_depth(rubric, node_id) + 1
     target["sub_tasks"] = []
     new_pending = []
     used_ids = set(all_ids(rubric))
     for raw in _children_from_parsed(parsed):
         node, hint = normalize_child(raw, used_ids)
         target["sub_tasks"].append(node)
-        if hint is not None:
+        if hint is not None and child_depth > max_depth:
+            node["task_category"] = _DEPTH_FALLBACK_CATEGORY
+            if errors is not None:
+                errors.append(f"{node['id']}: Model attempted to expand past the maximum depth of {max_depth} nodes.")
+        elif hint is not None:
             new_pending.append(node["id"])
             hints[node["id"]] = hint
     if target["sub_tasks"]:

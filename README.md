@@ -33,6 +33,12 @@ resumable. There are three phases:
    section using `difflib` fuzzy heading match; falls back to the full content list when no
    heading matches (similarity < 0.3).
 
+   **Max depth guardrail.** No node may sit deeper than `MAX_EXPANSION_DEPTH` (7; root = depth
+   0, top-level nodes = depth 1) — this bounds worst-case expansion cost. If the model marks a
+   node at depth 8+ as expandable, the guardrail silently forces it into a valid leaf instead
+   (fallback `task_category` of `Code Development`) and records the violation. See
+   [Output files](#output-files) for `errors.txt`.
+
 3. **Weight pass** — `claude-sonnet-4-6`, two sub-phases:
    - **Local passes** — one LLM call per top-level branch. Each call is focused on a single
      subtree so the model can reason about relative importance within that branch without
@@ -43,6 +49,11 @@ resumable. There are three phases:
    - Invalid weights (negative, non-numeric, boolean, or missing) are corrected after both
      sub-phases: in `--review` mode you are prompted per-node to enter a weight manually or
      queue it for an LLM retry; in agentic mode all invalid nodes are automatically re-queued.
+   - **Max retry guardrail.** Weight correction is capped at `MAX_WEIGHT_RESOLUTION_RETRIES`
+     (5) retry cycles, in both `--review` and agentic mode. If nodes are still invalid after 5
+     retries, the run raises `MaxRetriesExceeded`, which `main()` turns into a clean
+     `SystemExit` (no stack trace) telling you to re-run with `--resume` — it never spins
+     forever burning tokens on a model that keeps returning bad weights.
    - Human review happens **once**, after both sub-phases and all invalid-weight correction are
      complete.
 
@@ -88,9 +99,10 @@ data/
     mineru_out/           ← any folder name; must contain content_list.json at its root
       content_list.json
   output/<paper>/
-    rubric_state.json     ← resumable checkpoint (rubric + expansion queue + hints)
+    rubric_state.json     ← resumable checkpoint (rubric + expansion queue + hints + errors)
     rubric_draft.json     ← editable draft for the current pass
     rubric_final.json     ← final validated rubric (written when all phases complete)
+    errors.txt             ← guardrail violations, if any occurred (see Output files)
 examples/
   example_rubric.json     ← few-shot format/depth exemplar (different paper)
 tests/
@@ -100,20 +112,20 @@ tests/
 
 | File | Responsibility |
 |---|---|
-| `rubric_gen.py` | Entry point; CLI parsing (`--review`, `--resume`); orchestrates all 3 phases; `human_review` flag threaded through phase functions; `_resolve_invalid_weights` correction loop; prints cost report |
-| `pb_passes.py` | Anthropic SDK calls; prompt construction; JSON parsing; node normalization; tree mutation (`apply_base`, `apply_expansion`, `apply_weights`); weight validation (`find_invalid_weights`); `run_weight_llm_branch` for per-branch local passes; `run_weight_llm_global` for cross-branch calibration; `run_weight_llm` for targeted invalid-weight retries |
+| `rubric_gen.py` | Entry point; CLI parsing (`--review`, `--resume`); orchestrates all 3 phases; `human_review` flag threaded through phase functions; `_resolve_invalid_weights` correction loop, capped at `MAX_WEIGHT_RESOLUTION_RETRIES` (5) and raising `MaxRetriesExceeded` past that; `write_error_log` writes `errors.txt`; prints cost report |
+| `pb_passes.py` | Anthropic SDK calls; prompt construction; JSON parsing; node normalization; tree mutation (`apply_base`, `apply_expansion`, `apply_weights`); `MAX_EXPANSION_DEPTH` (7) guardrail enforced in `apply_expansion`; weight validation (`find_invalid_weights`); `run_weight_llm_branch` for per-branch local passes; `run_weight_llm_global` for cross-branch calibration; `run_weight_llm` for targeted invalid-weight retries |
 | `pb_cost.py` | `CostTracker` — accumulates token usage (input, output, cache write, cache read) per model; computes and prints a formatted cost report |
 | `pb_input.py` | Discovers PDF and MinerU folder from input dir; loads `content_list.json` |
 | `pb_mineru.py` | Converts MinerU blocks to LLM-readable text (`blocks_to_text`); slices content to a section by heading fuzzy-match (`slice_section`) |
-| `pb_schema.py` | Rubric dict traversal and validation (`validate_partial`, `validate_final`, `find_node`, `all_ids`) |
-| `pb_state.py` | State persistence; phase constants (`PHASE_BASE → EXPANSION → WEIGHT → DONE`); atomic write via temp-file rename |
+| `pb_schema.py` | Rubric dict traversal and validation (`validate_partial`, `validate_final`, `find_node`, `all_ids`, `node_depth`) |
+| `pb_state.py` | State persistence; phase constants (`PHASE_BASE → EXPANSION → WEIGHT → DONE`); atomic write via temp-file rename; state includes an `errors` list of guardrail violations |
 | `pb_review.py` | Blocks on `input()` for human review; raises `RerunPass(feedback)` when user types non-empty text; `collect_weight_corrections` handles interactive per-node weight correction |
 | `task_node.py` | Frozen `TaskNode` dataclass (adapted from OpenAI's frontier-evals); leaf/internal validation in `__post_init__` |
 
 ### TaskNode rules
 
 - **Leaf nodes**: `task_category` must be one of `Code Development`, `Code Execution`,
-  `Result Analysis`, `Paper Analysis`; `sub_tasks` must be empty.
+  `Result Analysis`; `sub_tasks` must be empty.
 - **Internal nodes**: `task_category` must be `None`; `sub_tasks` must be non-empty.
 - All node IDs must be unique within the tree and in kebab-case.
 - `weight` is 0 during base/expansion phases; set to a non-negative integer by the weight pass.
@@ -132,6 +144,35 @@ text. Falls back to the full list when the best heading score is below 0.3.
 ---
 
 ## Changelog
+
+### v8 — Max-retry cap on weight resolution
+
+**`MAX_WEIGHT_RESOLUTION_RETRIES` (5).** `_resolve_invalid_weights` previously looped
+`while True:` with no bound until every node had a valid weight — if the model kept
+returning invalid weights for the same node(s), agentic mode (and a human who always
+chose "retry via LLM") could spin forever. The loop now counts retry cycles and raises
+`MaxRetriesExceeded` after 5, in both agentic and `--review` modes.
+
+**Clean failure, not a crash.** `main()` catches `MaxRetriesExceeded` around the weight
+phase and re-raises it as `SystemExit` with a message naming the still-invalid node ids
+and telling you to `--resume` — no raw stack trace. Since `commit()` only runs at the end
+of `run_weight_phase` (after approval), no state is lost by this failure; `--resume`
+simply restarts weight assignment from the last good checkpoint (the fully-expanded
+rubric).
+
+### v7 — Max expansion depth guardrail and errors.txt
+
+**Depth cap.** `apply_expansion` now enforces `MAX_EXPANSION_DEPTH` (7, root = depth 0,
+top-level = depth 1) via the new `pb_schema.node_depth` helper. If the model marks a node
+past that depth as expandable, the node is forced into a valid leaf (`task_category` falls
+back to `Code Development`) instead of being queued for further expansion, so the run
+never becomes unbounded in cost.
+
+**`errors.txt`.** Each guardrail violation is recorded as `"<node-id>: Model attempted to
+expand past the maximum depth of 7 nodes."`. Violations are threaded through
+`_expand_subtree`/`run_expansion_phase` the same way expansion hints are, persisted in
+`state["errors"]` across `--resume` runs, and written to `errors.txt` next to
+`rubric_final.json` at the end of the run — only if at least one violation occurred.
 
 ### v6 — Two-phase weight generation (local + global)
 
@@ -315,8 +356,9 @@ Without `--resume`, an existing `rubric_state.json` is overwritten and the run s
 | File | Description |
 |---|---|
 | `rubric_draft.json` | Editable draft for the current pass. |
-| `rubric_state.json` | Resumable checkpoint (rubric + expansion queue + hints). |
+| `rubric_state.json` | Resumable checkpoint (rubric + expansion queue + hints + guardrail errors). |
 | `rubric_final.json` | Final validated rubric (written when all phases complete). |
+| `errors.txt` | Guardrail violations, one per line. Only written if at least one occurred; today the only violation is the model trying to expand a node past `MAX_EXPANSION_DEPTH` (7), logged as `"<node-id>: Model attempted to expand past the maximum depth of 7 nodes."`. |
 
 If `rubric_final.json` already exists and `--resume` is passed, the tool reports it and
 exits — delete it or omit `--resume` to start over.
