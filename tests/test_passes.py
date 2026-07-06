@@ -77,6 +77,44 @@ def test_normalize_child_expandable_without_hint_gets_default():
     assert hint and isinstance(hint, str)
 
 
+_ENV_SETUP_2_RAW = {
+    "id": "env-setup-2",
+    "requirements": (
+        "All 10 environments are configured and runnable: ant_big_maze, ant_hardest_maze, "
+        "arm_binpick_hard, arm_push_easy, arm_push_hard, humanoid, humanoid_big_maze, "
+        "humanoid_u_maze, ant_u4_maze, ant_u5_maze."
+    ),
+    "expandable": False,
+    "task_category": "Code Execution",
+}
+
+
+def test_normalize_child_overrides_dense_leaf_that_enumerates_items():
+    node, hint = pb_passes.normalize_child(_ENV_SETUP_2_RAW, set())
+    assert hint is not None
+    assert node["task_category"] is None
+    assert node["sub_tasks"] == []
+    assert node["finegrained_task_category"] is None
+
+
+def test_normalize_child_override_hint_mentions_detected_count():
+    _, hint = pb_passes.normalize_child(_ENV_SETUP_2_RAW, set())
+    assert "10" in hint
+    assert "children" in hint
+
+
+def test_normalize_child_leaf_stays_leaf_below_enumeration_threshold():
+    node, hint = pb_passes.normalize_child({"requirements": "do x", "expandable": False, "task_category": "Code Execution"}, set())
+    assert hint is None
+    assert node["task_category"] == "Code Execution"
+
+
+def test_normalize_child_expandable_flag_takes_precedence_over_enumeration_check():
+    raw = dict(_ENV_SETUP_2_RAW, expandable=True, expansion_hint="model's own hint")
+    _, hint = pb_passes.normalize_child(raw, set())
+    assert hint == "model's own hint"
+
+
 def test_apply_base_uses_model_ids():
     parsed = {"root": {"requirements": "reproduce paper"},
               "children": [{"id": "env-setup", "requirements": "setup", "expandable": True, "expansion_hint": "env"},
@@ -106,6 +144,18 @@ def test_apply_expansion_attaches_children_and_returns_pending():
     target = find_node(rubric, node_id)
     assert len(target["sub_tasks"]) == 2 and target["task_category"] is None
     assert len(new_pending) == 1 and node_id not in hints
+    validate_partial(rubric, new_pending)
+
+
+def test_apply_expansion_queues_forced_expandable_child_from_enumeration_override():
+    rubric, queue, hints = pb_passes.apply_base(
+        {"root": {"requirements": "r"}, "children": [{"requirements": "setup", "expandable": True, "expansion_hint": "env"}]})
+    node_id = queue[0]
+    parsed = {"children": [_ENV_SETUP_2_RAW]}
+    new_pending = pb_passes.apply_expansion(rubric, node_id, parsed, hints)
+    assert "env-setup-2" in new_pending
+    assert "env-setup-2" in hints
+    assert find_node(rubric, "env-setup-2")["task_category"] is None
     validate_partial(rubric, new_pending)
 
 
@@ -441,6 +491,62 @@ def test_run_expansion_llm_no_feedback_block_when_empty():
     )
     instruction = client.messages.calls[0]["messages"][0]["content"][0]["text"]
     assert "USER FEEDBACK" not in instruction
+
+
+def _dense_target_rubric():
+    return {
+        "id": "root", "requirements": "r", "weight": 0, "task_category": None,
+        "finegrained_task_category": None,
+        "sub_tasks": [{"id": "target", "requirements": _ENV_SETUP_2_RAW["requirements"], "weight": 0,
+                       "sub_tasks": [], "task_category": None, "finegrained_task_category": None}]
+    }
+
+
+def test_run_expansion_llm_injects_enumeration_guardrail_for_dense_target():
+    client = _FakeClient('{"children": []}')
+    pb_passes.run_expansion_llm(
+        client,
+        [{"type": "text", "text": "sys"}],
+        "section text",
+        _dense_target_rubric(),
+        "target",
+        "expansion hint",
+        "claude-sonnet-4-6",
+    )
+    instruction = client.messages.calls[0]["messages"][0]["content"][0]["text"]
+    assert "ENUMERATION GUARDRAIL" in instruction
+    assert "10" in instruction
+
+
+def test_run_expansion_llm_omits_enumeration_guardrail_for_single_item_target():
+    client = _FakeClient('{"children": []}')
+    pb_passes.run_expansion_llm(
+        client,
+        [{"type": "text", "text": "sys"}],
+        "section text",
+        _target_rubric(),
+        "target",
+        "expansion hint",
+        "claude-sonnet-4-6",
+    )
+    instruction = client.messages.calls[0]["messages"][0]["content"][0]["text"]
+    assert "ENUMERATION GUARDRAIL" not in instruction
+
+
+def test_run_expansion_llm_enumeration_guardrail_appears_before_feedback_block():
+    client = _FakeClient('{"children": []}')
+    pb_passes.run_expansion_llm(
+        client,
+        [{"type": "text", "text": "sys"}],
+        "section text",
+        _dense_target_rubric(),
+        "target",
+        "expansion hint",
+        "claude-sonnet-4-6",
+        feedback="check table 3",
+    )
+    instruction = client.messages.calls[0]["messages"][0]["content"][0]["text"]
+    assert instruction.index("ENUMERATION GUARDRAIL") < instruction.index("USER FEEDBACK")
 
 
 def test_invoke_llm_records_usage_when_tracker_provided():

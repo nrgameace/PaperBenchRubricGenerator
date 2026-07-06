@@ -39,6 +39,16 @@ resumable. There are three phases:
    (fallback `task_category` of `Code Development`) and records the violation. See
    [Output files](#output-files) for `errors.txt`.
 
+   **Enumeration-triggered recursion.** Before a candidate leaf is finalized, its requirements
+   text is scanned for enumeration signals — comma-separated lists after "including"/"such
+   as"/a colon, `et al.` citations, or `Table`/`Figure` references. If it names three or more
+   distinct sub-items (e.g. "All 10 environments are configured and runnable: env_a, env_b,
+   ..."), the node is forced back into an expandable/pending state instead of being accepted
+   as one dense leaf, and the next expansion call is explicitly told to produce at least that
+   many children — one per named item. This is a cheap regex pass (`pb_enumeration.py`), no
+   extra LLM call, and applies to both the base pass and every expansion pass since both share
+   `normalize_child`.
+
 3. **Weight pass** — `claude-sonnet-4-6`, two sub-phases:
    - **Local passes** — one LLM call per top-level branch. Each call is focused on a single
      subtree so the model can reason about relative importance within that branch without
@@ -59,8 +69,8 @@ resumable. There are three phases:
 
 ### Prompt caching
 
-Two blocks are cached with a 1-hour TTL via the Anthropic extended-cache-ttl beta
-(`prompt-caching-2024-07-31,extended-cache-ttl-2025-02-19`):
+Two blocks are cached with a 1-hour TTL (`cache_control: {type: ephemeral, ttl: "1h"}`,
+no beta header required):
 
 - **System preamble** — grounding rules and the few-shot format exemplar.
 - **PDF document block** — base64-encoded PDF, sent only in the base pass.
@@ -113,9 +123,10 @@ tests/
 | File | Responsibility |
 |---|---|
 | `rubric_gen.py` | Entry point; CLI parsing (`--review`, `--resume`); orchestrates all 3 phases; `human_review` flag threaded through phase functions; `_resolve_invalid_weights` correction loop, capped at `MAX_WEIGHT_RESOLUTION_RETRIES` (5) and raising `MaxRetriesExceeded` past that; `write_error_log` writes `errors.txt`; prints cost report |
-| `pb_passes.py` | Anthropic SDK calls; prompt construction; JSON parsing; node normalization; tree mutation (`apply_base`, `apply_expansion`, `apply_weights`); `MAX_EXPANSION_DEPTH` (7) guardrail enforced in `apply_expansion`; weight validation (`find_invalid_weights`); `run_weight_llm_branch` for per-branch local passes; `run_weight_llm_global` for cross-branch calibration; `run_weight_llm` for targeted invalid-weight retries |
+| `pb_passes.py` | Anthropic SDK calls; prompt construction; JSON parsing; node normalization; tree mutation (`apply_base`, `apply_expansion`, `apply_weights`); `MAX_EXPANSION_DEPTH` (7) guardrail enforced in `apply_expansion`; enumeration-triggered recursion override in `normalize_child` and prompt injection in `run_expansion_llm` (via `pb_enumeration`); weight validation (`find_invalid_weights`); `run_weight_llm_branch` for per-branch local passes; `run_weight_llm_global` for cross-branch calibration; `run_weight_llm` for targeted invalid-weight retries |
 | `pb_cost.py` | `CostTracker` — accumulates token usage (input, output, cache write, cache read) per model; computes and prints a formatted cost report |
 | `pb_input.py` | Discovers PDF and MinerU folder from input dir; loads `content_list.json` |
+| `pb_enumeration.py` | `count_enumerated_items` and `build_enumeration_hint` — pure regex heuristics (no LLM/network dependency) detecting enumerated sub-items in requirements text; `MIN_ENUMERATED_ITEMS_TO_SPLIT` (3) constant |
 | `pb_mineru.py` | Converts MinerU blocks to LLM-readable text (`blocks_to_text`); slices content to a section by heading fuzzy-match (`slice_section`) |
 | `pb_schema.py` | Rubric dict traversal and validation (`validate_partial`, `validate_final`, `find_node`, `all_ids`, `node_depth`) |
 | `pb_state.py` | State persistence; phase constants (`PHASE_BASE → EXPANSION → WEIGHT → DONE`); atomic write via temp-file rename; state includes an `errors` list of guardrail violations |
@@ -144,6 +155,26 @@ text. Falls back to the full list when the best heading score is below 0.3.
 ---
 
 ## Changelog
+
+### v9 — Enumeration-triggered recursion guardrail
+
+**`pb_enumeration.py`.** A new pure module detects when a node's requirements text names
+multiple distinct sub-items — comma-separated lists after "including"/"such as"/a colon,
+`et al.` citations, or `Table`/`Figure` references — via `count_enumerated_items`. A count
+`>= MIN_ENUMERATED_ITEMS_TO_SPLIT` (3) signals the text should split into one child per item
+rather than remain a single dense node.
+
+**Leaf override in `normalize_child`.** A node the model marked non-expandable is now forced
+back into a pending/expandable state when its own requirements enumerate enough items, with a
+synthesized hint (`build_enumeration_hint`) telling the next expansion call how many children
+to produce. Since `normalize_child` is the single chokepoint shared by both `apply_base`
+(Phase 1) and `apply_expansion` (Phase 2), this applies uniformly across both without any
+changes to either function's body — a node forced into pending state composes with the
+existing `MAX_EXPANSION_DEPTH` guardrail exactly like any other expandable node.
+
+**Prompt injection in `run_expansion_llm`.** When the node being expanded itself enumerates
+multiple items, an "ENUMERATION GUARDRAIL" instruction is appended to the Sonnet prompt asking
+for at least that many children, one per named item.
 
 ### v8 — Max-retry cap on weight resolution
 
@@ -248,10 +279,9 @@ The pipeline was refactored from a LangChain-backed single-model flow into a cos
 multi-model pipeline built on the raw Anthropic SDK:
 
 **LangChain removed.** `ChatAnthropic` replaced with `anthropic.Anthropic` directly.
-`build_client()` attaches the extended-cache-ttl beta header at construction time.
 
 **Extended prompt caching.** System preamble and PDF are each marked
-`cache_control: {type: ephemeral}`. With a 1-hour TTL, the cache outlasts human-review
+`cache_control: {type: ephemeral, ttl: "1h"}`. With a 1-hour TTL, the cache outlasts human-review
 pauses between phases, eliminating repeated full-context charges.
 
 **Model tiering.** `claude-opus-4-8` is used only for the base pass where deep paper

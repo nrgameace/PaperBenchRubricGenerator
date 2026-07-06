@@ -12,6 +12,7 @@ from pathlib import Path
 
 import anthropic
 
+from pb_enumeration import MIN_ENUMERATED_ITEMS_TO_SPLIT, build_enumeration_hint, count_enumerated_items
 from pb_schema import FINEGRAINED_CATEGORIES, LEAF_CATEGORIES, all_ids, find_node, iter_nodes, node_depth
 
 MAX_EXPANSION_DEPTH = 7
@@ -130,18 +131,14 @@ or, for an atomic leaf requirement:
 
 
 def build_client() -> anthropic.Anthropic:
-    """Construct the Anthropic client with the extended-cache-ttl beta enabled."""
-    return anthropic.Anthropic(
-        default_headers={
-            "anthropic-beta": "prompt-caching-2024-07-31,extended-cache-ttl-2025-02-19"
-        }
-    )
+    """Construct the Anthropic client."""
+    return anthropic.Anthropic()
 
 
 def build_system_blocks(few_shot_json: str) -> list:
     """Build the cached system block: grounding rules plus the few-shot format exemplar."""
     text = f"{SYSTEM_PREAMBLE}\n\n{_EXAMPLE_HEADER}\n{few_shot_json}\n{_EXAMPLE_FOOTER}"
-    return [{"type": "text", "text": text, "cache_control": {"type": "ephemeral"}}]
+    return [{"type": "text", "text": text, "cache_control": {"type": "ephemeral", "ttl": "1h"}}]
 
 
 def pdf_to_block(pdf_path) -> dict:
@@ -151,7 +148,7 @@ def pdf_to_block(pdf_path) -> dict:
     return {
         "type": "document",
         "source": {"type": "base64", "media_type": "application/pdf", "data": encoded},
-        "cache_control": {"type": "ephemeral"},
+        "cache_control": {"type": "ephemeral", "ttl": "1h"},
     }
 
 
@@ -241,7 +238,15 @@ def choose_id(raw: dict, used_ids: set) -> str:
 
 
 def normalize_child(raw: dict, used_ids: set) -> tuple:
-    """Convert a generated child object into a (node_dict, hint_or_None) pair, honoring its id."""
+    """Convert a generated child object into a (node_dict, hint_or_None) pair, honoring its id.
+
+    A node the model marked non-expandable is still forced into a pending/expandable
+    state when its own requirements text enumerates >= MIN_ENUMERATED_ITEMS_TO_SPLIT
+    named sub-items (comma-separated lists, "et al." citations, or Table/Figure
+    references) — this catches dense leaves like "all 10 environments are ...: a, b,
+    c, ..." that should split into one child per item instead of remaining a single
+    node.
+    """
     node = {
         "id": choose_id(raw, used_ids),
         "requirements": (raw.get("requirements") or "").strip(),
@@ -253,6 +258,9 @@ def normalize_child(raw: dict, used_ids: set) -> tuple:
     if raw.get("expandable"):
         hint = (raw.get("expansion_hint") or "").strip() or "Expand this node into its sub-tasks based on the paper."
         return node, hint
+    enum_count = count_enumerated_items(node["requirements"])
+    if enum_count >= MIN_ENUMERATED_ITEMS_TO_SPLIT:
+        return node, build_enumeration_hint(raw.get("expansion_hint"), enum_count)
     node["task_category"] = raw.get("task_category")
     node["finegrained_task_category"] = raw.get("finegrained_task_category")
     return node, None
@@ -378,7 +386,12 @@ def run_base_llm(client, system_blocks, pdf_block, content_list_text, model, tra
 
 
 def run_expansion_llm(client, system_blocks, section_text, rubric: dict, node_id: str, hint: str, model, feedback: str = "", tracker=None) -> dict:
-    """Run an expansion pass for one node; sends only the relevant section text (no PDF)."""
+    """Run an expansion pass for one node; sends only the relevant section text (no PDF).
+
+    Injects an ENUMERATION GUARDRAIL instruction when the node's own requirements
+    enumerate >= MIN_ENUMERATED_ITEMS_TO_SPLIT named sub-items, telling the model to
+    produce at least that many children rather than collapsing them.
+    """
     target = find_node(rubric, node_id)
     instruction = (
         "TASK: Expand ONE node of the in-progress rubric into its DIRECT children, grounded in the "
@@ -388,6 +401,14 @@ def run_expansion_llm(client, system_blocks, section_text, rubric: dict, node_id
         f"FULL RUBRIC SO FAR (context only):\n{json.dumps(rubric, indent=2, ensure_ascii=False)}\n\n"
         'Respond with JSON ONLY: {"children": [ <child objects> ]}\n\n' + _CHILD_SHAPE
     )
+    enum_count = count_enumerated_items(target["requirements"])
+    if enum_count >= MIN_ENUMERATED_ITEMS_TO_SPLIT:
+        instruction += (
+            f"\n\nENUMERATION GUARDRAIL: this node's requirements name at least {enum_count} "
+            "distinct sub-items (baselines, model variants, table rows, or ablation settings). "
+            f"Produce at least {enum_count} children, one per named item — do not collapse them "
+            "into fewer, denser nodes."
+        )
     if feedback:
         instruction += f"\n\nUSER FEEDBACK (incorporate this when generating children):\n{feedback}"
     return parse_json_response(

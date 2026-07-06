@@ -16,26 +16,33 @@ def _normalize(text: str) -> str:
     return " ".join(text.lower().split())
 
 
+def _as_text(value) -> str:
+    """Coerce a MinerU field to a stripped string; MinerU emits captions as lists of lines."""
+    if isinstance(value, list):
+        return " ".join(str(v).strip() for v in value if str(v).strip())
+    return str(value).strip()
+
+
 def blocks_to_text(blocks: list) -> str:
     """Convert MinerU content blocks to a structured, LLM-readable string."""
     parts = []
     for block in blocks:
         btype = block.get("type", "")
         if btype == "text":
-            text = block.get("text", "").strip()
+            text = _as_text(block.get("text", ""))
             if not text:
                 continue
             level = block.get("text_level")
             parts.append(f"{'#' * min(level, 4)} {text}" if level else text)
         elif btype == "image":
-            caption = block.get("img_caption", "").strip()
+            caption = _as_text(block.get("img_caption", ""))
             parts.append(f"[Figure: {caption}]" if caption else "[Figure]")
         elif btype == "table":
-            body = block.get("table_body", "").strip()
-            caption = block.get("table_caption", "").strip()
+            body = _as_text(block.get("table_body", ""))
+            caption = _as_text(block.get("table_caption", ""))
             parts.append(f"[Table: {caption}]\n{body}" if caption else body)
         elif btype == "equation":
-            eq = block.get("text", "").strip()
+            eq = _as_text(block.get("text", ""))
             parts.append(f"[Equation: {eq}]" if eq else "[Equation]")
     return "\n\n".join(p for p in parts if p)
 

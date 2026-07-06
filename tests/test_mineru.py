@@ -46,6 +46,17 @@ def test_blocks_to_text_table_includes_caption_and_body():
     assert "Results" in result and "| A |" in result
 
 
+def test_blocks_to_text_image_caption_as_list():
+    result = pb_mineru.blocks_to_text([{"type": "image", "img_caption": ["Figure 1:", "Overview"]}])
+    assert "[Figure: Figure 1: Overview]" in result
+
+
+def test_blocks_to_text_table_caption_and_body_as_lists():
+    block = {"type": "table", "table_body": ["| A |", "|---|"], "table_caption": ["Table 1:", "Results"]}
+    result = pb_mineru.blocks_to_text([block])
+    assert "Table 1: Results" in result and "| A |" in result
+
+
 def test_blocks_to_text_unknown_type_skipped():
     result = pb_mineru.blocks_to_text([{"type": "footnote", "text": "ignored"}])
     assert result == ""
