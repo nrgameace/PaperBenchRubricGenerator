@@ -29,6 +29,16 @@ def all_ids(node: dict) -> list:
     return [candidate.get("id") for candidate in iter_nodes(node)]
 
 
+def find_parent(node: dict, node_id: str):
+    """Return the parent dict of ``node_id`` within node's subtree, or None if node_id is
+    the root of this subtree or absent."""
+    for candidate in iter_nodes(node):
+        for child in candidate.get("sub_tasks", []) or []:
+            if child.get("id") == node_id:
+                return candidate
+    return None
+
+
 def node_depth(node: dict, node_id: str, _current_depth: int = 0) -> int | None:
     """Return the depth of ``node_id`` from ``node`` (root=0), or None if absent."""
     if node.get("id") == node_id:

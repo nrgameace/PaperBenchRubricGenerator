@@ -25,9 +25,10 @@ except ImportError:
 from pb_cost import CostTracker
 from pb_input import discover_mineru_dir, discover_pdf, load_content_list
 from pb_mineru import blocks_to_text, slice_section
-from pb_passes import (apply_base, apply_expansion, apply_weights, build_client, build_system_blocks,
-                       find_invalid_weights, pdf_to_block, run_base_llm, run_expansion_llm, run_weight_llm,
-                       run_weight_llm_branch, run_weight_llm_global)
+from pb_passes import (MAX_BRANCH_NODES, apply_base, apply_dedup, apply_expansion, apply_split, apply_weights,
+                       branch_size, build_client, build_system_blocks, find_invalid_weights,
+                       force_branch_cap_leaves, pdf_to_block, run_base_llm, run_expansion_llm, run_split_check_llm,
+                       run_weight_llm, run_weight_llm_branch, run_weight_llm_global)
 from pb_review import RerunPass, collect_weight_corrections, pretty_print_nodes, review_pass
 from pb_schema import all_ids, find_node, validate_final, validate_partial
 from pb_state import (PHASE_BASE, PHASE_DONE, PHASE_EXPANSION, PHASE_WEIGHT, determine_phase,
@@ -51,6 +52,8 @@ def parse_args():
     parser.add_argument("--output", required=True, help="Path to the output directory (receives state and final rubric).")
     parser.add_argument("--resume", action="store_true", help="Resume from an existing rubric_state.json in the output dir.")
     parser.add_argument("--review", action="store_true", help="Enable human-in-the-loop review after each pass.")
+    parser.add_argument("--no-split-check", action="store_false", dest="split_check",
+                        help="Disable the split-check pass that runs before weighting.")
     return parser.parse_args()
 
 
@@ -82,7 +85,8 @@ def prune_hints(state: dict) -> None:
 
 def commit(state: dict, output_dir: Path) -> None:
     """Persist the current state to the checkpoint file in output_dir."""
-    save_state(output_dir / "rubric_state.json", state["rubric"], state["queue"], state["hints"], state.get("errors", []))
+    save_state(output_dir / "rubric_state.json", state["rubric"], state["queue"], state["hints"],
+              state.get("errors", []), state.get("capped_branches", []))
 
 
 def run_base_phase(client, system_blocks, pdf_block, content_list, state, model, output_dir, tracker=None, human_review=True) -> None:
@@ -109,10 +113,20 @@ def run_base_phase(client, system_blocks, pdf_block, content_list, state, model,
         return
 
 
-def _expand_subtree(client, system_blocks, content_list, rubric, node_id, hints, model, feedback: str = "", tracker=None, errors=None) -> None:
-    """Fully expand node_id and all its expandable descendants in-place (BFS, no review pause)."""
+def _expand_subtree(client, system_blocks, content_list, rubric, node_id, hints, model, feedback: str = "",
+                    tracker=None, errors=None, capped_branches=None) -> None:
+    """Fully expand node_id and all its expandable descendants in-place (BFS, no review pause).
+
+    node_id is always a top-level branch root (see run_expansion_phase), so every node processed
+    in this call belongs to the same branch; once that branch hits MAX_BRANCH_NODES, every node
+    still queued for expansion is force-flattened into a leaf instead of making further LLM calls.
+    """
+    branch_id = node_id
     local_queue = [node_id]
     while local_queue:
+        if branch_size(rubric, branch_id) >= MAX_BRANCH_NODES:
+            force_branch_cap_leaves(rubric, local_queue, branch_id, hints, errors=errors, capped_branches=capped_branches)
+            break
         current_id = local_queue.pop(0)
         hint = hints.get(current_id, "Expand this node into its sub-tasks based on the paper.")
         section_text = blocks_to_text(slice_section(content_list, hint))
@@ -133,7 +147,9 @@ def run_expansion_phase(client, system_blocks, content_list, state, model, outpu
             candidate = copy.deepcopy(state["rubric"])
             candidate_hints = dict(state["hints"])
             candidate_errors = list(state.get("errors", []))
-            _expand_subtree(client, system_blocks, content_list, candidate, node_id, candidate_hints, model, feedback, tracker=tracker, errors=candidate_errors)
+            candidate_capped_branches = set(state.get("capped_branches", []))
+            _expand_subtree(client, system_blocks, content_list, candidate, node_id, candidate_hints, model, feedback,
+                           tracker=tracker, errors=candidate_errors, capped_branches=candidate_capped_branches)
             remaining_queue = state["queue"][1:]
             pretty_print_nodes(f"Subtree '{node_id}' (fully expanded)", [find_node(candidate, node_id)])
             if human_review:
@@ -149,6 +165,7 @@ def run_expansion_phase(client, system_blocks, content_list, state, model, outpu
             state["rubric"] = approved
             state["hints"] = candidate_hints
             state["errors"] = candidate_errors
+            state["capped_branches"] = candidate_capped_branches
             state["queue"] = reconcile_queue(approved, remaining_queue)
             prune_hints(state)
             commit(state, output_dir)
@@ -184,6 +201,36 @@ def _resolve_invalid_weights(client, system_blocks, content_list_text, rubric, m
             for node_id in regen_ids:
                 if node_id in retry:
                     weights[node_id] = retry[node_id]
+
+
+def run_split_check_phase(client, system_blocks, content_list, state, model, output_dir, tracker=None) -> None:
+    """Check Evaluation/Metrics and Result Analysis leaves for semantic bundling, one call per branch.
+
+    Runs after expansion is fully complete (every node is a leaf or has sub_tasks) and
+    before weighting. Idempotent across --resume: once a leaf is split its category fields
+    are cleared, so it no longer matches the split-check filter on a later run.
+    """
+    print("\n>>> SPLIT-CHECK PASS: checking Evaluation/Result-Analysis leaves for bundling...")
+    capped = set(state.get("capped_branches", []))
+    for branch_node in state["rubric"].get("sub_tasks", []):
+        section_text = blocks_to_text(slice_section(content_list, branch_node["requirements"]))
+        include_all = branch_node["id"] in capped
+        result = run_split_check_llm(client, system_blocks, section_text, state["rubric"], branch_node, model,
+                                     tracker=tracker, include_all_leaves=include_all)
+        for leaf_id, duplicate_of_id in result.get("duplicates", {}).items():
+            if leaf_id == duplicate_of_id:
+                continue
+            if find_node(state["rubric"], leaf_id) is None or find_node(state["rubric"], duplicate_of_id) is None:
+                continue
+            apply_dedup(state["rubric"], leaf_id, duplicate_of_id, errors=state["errors"])
+        for leaf_id, raw_children in result.get("splits", {}).items():
+            if find_node(state["rubric"], leaf_id) is None:
+                continue
+            new_children = apply_split(state["rubric"], leaf_id, raw_children, errors=state["errors"])
+            state["errors"].append(
+                f"{leaf_id}: split-check split into {len(new_children)} children (branch '{branch_node['id']}')."
+            )
+    commit(state, output_dir)
 
 
 def run_weight_phase(client, system_blocks, content_list, state, model, output_dir, tracker=None, human_review=True) -> dict:
@@ -289,6 +336,8 @@ def main() -> None:
         run_expansion_phase(client, system_blocks, content_list, state, SONNET, output_dir, tracker, human_review=human_review)
         phase = PHASE_WEIGHT
     if phase == PHASE_WEIGHT:
+        if args.split_check:
+            run_split_check_phase(client, system_blocks, content_list, state, SONNET, output_dir, tracker)
         try:
             weighted_rubric = run_weight_phase(client, system_blocks, content_list, state, SONNET, output_dir, tracker, human_review=human_review)
         except MaxRetriesExceeded as e:

@@ -214,6 +214,94 @@ def test_apply_expansion_depth_guardrail_is_noop_without_errors_list():
     validate_final(rubric)
 
 
+# ── branch_size / force_branch_cap_leaves tests ──────────────────────────────
+
+def _nested_branch_rubric():
+    return {
+        "id": "root", "requirements": "r", "weight": 0, "task_category": None,
+        "finegrained_task_category": None,
+        "sub_tasks": [
+            {
+                "id": "branch-a", "requirements": "branch a", "weight": 0,
+                "task_category": None, "finegrained_task_category": None,
+                "sub_tasks": [
+                    {"id": "child-1", "requirements": "c1", "weight": 0, "sub_tasks": [],
+                     "task_category": None, "finegrained_task_category": None},
+                    {"id": "child-2", "requirements": "c2", "weight": 0,
+                     "task_category": None, "finegrained_task_category": None,
+                     "sub_tasks": [
+                         {"id": "grandchild-1", "requirements": "g1", "weight": 0, "sub_tasks": [],
+                          "task_category": None, "finegrained_task_category": None},
+                     ]},
+                ],
+            },
+            {"id": "branch-b", "requirements": "branch b", "weight": 0, "sub_tasks": [],
+             "task_category": "Code Development", "finegrained_task_category": None},
+        ],
+    }
+
+
+def test_branch_size_counts_full_subtree():
+    rubric = _nested_branch_rubric()
+    assert pb_passes.branch_size(rubric, "branch-a") == 4  # branch-a, child-1, child-2, grandchild-1
+
+
+def test_branch_size_returns_1_for_leaf():
+    rubric = _nested_branch_rubric()
+    assert pb_passes.branch_size(rubric, "branch-b") == 1
+
+
+def test_branch_size_raises_for_missing_branch():
+    rubric = _nested_branch_rubric()
+    with pytest.raises(ValueError):
+        pb_passes.branch_size(rubric, "ghost")
+
+
+def test_force_branch_cap_leaves_forces_all_ids_to_fallback_category():
+    rubric = _nested_branch_rubric()
+    hints = {"child-1": "hint1", "grandchild-1": "hint-g1"}
+    pb_passes.force_branch_cap_leaves(rubric, ["child-1", "grandchild-1"], "branch-a", hints)
+    assert find_node(rubric, "child-1")["task_category"] == pb_passes._DEPTH_FALLBACK_CATEGORY
+    assert find_node(rubric, "grandchild-1")["task_category"] == pb_passes._DEPTH_FALLBACK_CATEGORY
+
+
+def test_force_branch_cap_leaves_pops_hints_for_forced_nodes():
+    rubric = _nested_branch_rubric()
+    hints = {"child-1": "hint1", "grandchild-1": "hint-g1"}
+    pb_passes.force_branch_cap_leaves(rubric, ["child-1", "grandchild-1"], "branch-a", hints)
+    assert hints == {}
+
+
+def test_force_branch_cap_leaves_logs_one_error_line_per_node_with_branch_id():
+    rubric = _nested_branch_rubric()
+    hints = {"child-1": "hint1", "grandchild-1": "hint-g1"}
+    errors = []
+    pb_passes.force_branch_cap_leaves(rubric, ["child-1", "grandchild-1"], "branch-a", hints, errors=errors)
+    assert len(errors) == 2
+    assert errors[0] == f"child-1: Branch 'branch-a' hit the {pb_passes.MAX_BRANCH_NODES}-node cap; forced to leaf."
+    assert errors[1] == f"grandchild-1: Branch 'branch-a' hit the {pb_passes.MAX_BRANCH_NODES}-node cap; forced to leaf."
+
+
+def test_force_branch_cap_leaves_no_error_mutation_when_errors_none():
+    rubric = _nested_branch_rubric()
+    hints = {"child-1": "hint1"}
+    pb_passes.force_branch_cap_leaves(rubric, ["child-1"], "branch-a", hints)  # should not raise
+
+
+def test_force_branch_cap_leaves_adds_branch_id_to_capped_branches_set():
+    rubric = _nested_branch_rubric()
+    hints = {"child-1": "hint1", "grandchild-1": "hint-g1"}
+    capped = set()
+    pb_passes.force_branch_cap_leaves(rubric, ["child-1", "grandchild-1"], "branch-a", hints, capped_branches=capped)
+    assert capped == {"branch-a"}
+
+
+def test_force_branch_cap_leaves_no_capped_branches_mutation_when_none():
+    rubric = _nested_branch_rubric()
+    hints = {"child-1": "hint1"}
+    pb_passes.force_branch_cap_leaves(rubric, ["child-1"], "branch-a", hints)  # should not raise
+
+
 def _two_leaf_rubric():
     return {
         "id": "root", "requirements": "r", "weight": 0, "task_category": None,
@@ -590,3 +678,271 @@ def test_invoke_llm_wraps_errors():
 
     with pytest.raises(RuntimeError, match="Anthropic API call failed"):
         pb_passes.invoke_llm(_BoomClient(), [], [], "claude-opus-4-8")
+
+
+# ── run_split_check_llm tests ─────────────────────────────────────────────────
+
+def _split_check_branch():
+    """A branch with one Result Analysis leaf, one Evaluation/Metrics leaf, one non-matching leaf."""
+    return {
+        "id": "branch-a", "requirements": "branch a", "weight": 0,
+        "task_category": None, "finegrained_task_category": None,
+        "sub_tasks": [
+            {"id": "result-leaf", "requirements": "small, medium, and large model variants all match",
+             "weight": 0, "sub_tasks": [], "task_category": "Result Analysis", "finegrained_task_category": None},
+            {"id": "eval-leaf", "requirements": "accuracy on the benchmark", "weight": 0, "sub_tasks": [],
+             "task_category": None, "finegrained_task_category": "Evaluation, Metrics & Benchmarking"},
+            {"id": "code-leaf", "requirements": "implement the model", "weight": 0, "sub_tasks": [],
+             "task_category": "Code Development", "finegrained_task_category": None},
+        ],
+    }
+
+
+def _split_check_rubric():
+    return {"id": "root", "requirements": "r", "weight": 0, "task_category": None,
+            "finegrained_task_category": None, "sub_tasks": [_split_check_branch()]}
+
+
+def test_run_split_check_llm_only_includes_matching_category_leaves_in_prompt():
+    rubric = _split_check_rubric()
+    branch = rubric["sub_tasks"][0]
+    client = _FakeClient('{"splits": {}}')
+    pb_passes.run_split_check_llm(client, [], "section text", rubric, branch, "model")
+    instruction = client.messages.calls[0]["messages"][0]["content"][0]["text"]
+    assert "result-leaf" in instruction
+    assert "eval-leaf" in instruction
+    assert "code-leaf" not in instruction
+
+
+def test_run_split_check_llm_includes_section_text():
+    rubric = _split_check_rubric()
+    branch = rubric["sub_tasks"][0]
+    client = _FakeClient('{"splits": {}}')
+    pb_passes.run_split_check_llm(client, [], "unique section text marker", rubric, branch, "model")
+    instruction = client.messages.calls[0]["messages"][0]["content"][0]["text"]
+    assert "unique section text marker" in instruction
+
+
+def test_run_split_check_llm_skips_llm_call_when_no_matching_leaves():
+    rubric = {"id": "root", "requirements": "r", "weight": 0, "task_category": None,
+              "finegrained_task_category": None, "sub_tasks": [
+                  {"id": "branch-b", "requirements": "branch b", "weight": 0,
+                   "task_category": None, "finegrained_task_category": None, "sub_tasks": [
+                       {"id": "code-leaf", "requirements": "implement it", "weight": 0, "sub_tasks": [],
+                        "task_category": "Code Development", "finegrained_task_category": None},
+                   ]},
+              ]}
+    branch = rubric["sub_tasks"][0]
+    client = _FakeClient('{"splits": {}}')
+    result = pb_passes.run_split_check_llm(client, [], "text", rubric, branch, "model")
+    assert result == {"splits": {}, "duplicates": {}}
+    assert client.messages.calls == []
+
+
+def test_run_split_check_llm_returns_splits_and_duplicates_dict():
+    rubric = _split_check_rubric()
+    branch = rubric["sub_tasks"][0]
+    client = _FakeClient(
+        '{"splits": {"result-leaf": [{"id": "a", "requirements": "x"}]}, '
+        '"duplicates": {"eval-leaf": "result-leaf"}}'
+    )
+    result = pb_passes.run_split_check_llm(client, [], "text", rubric, branch, "model")
+    assert result == {"splits": {"result-leaf": [{"id": "a", "requirements": "x"}]},
+                       "duplicates": {"eval-leaf": "result-leaf"}}
+
+
+def test_run_split_check_llm_defaults_missing_duplicates_key_to_empty_dict():
+    rubric = _split_check_rubric()
+    branch = rubric["sub_tasks"][0]
+    client = _FakeClient('{"splits": {"result-leaf": [{"id": "a", "requirements": "x"}]}}')
+    result = pb_passes.run_split_check_llm(client, [], "text", rubric, branch, "model")
+    assert result["duplicates"] == {}
+
+
+def test_run_split_check_llm_prompt_mentions_duplicates():
+    rubric = _split_check_rubric()
+    branch = rubric["sub_tasks"][0]
+    client = _FakeClient('{"splits": {}, "duplicates": {}}')
+    pb_passes.run_split_check_llm(client, [], "text", rubric, branch, "model")
+    instruction = client.messages.calls[0]["messages"][0]["content"][0]["text"]
+    assert "duplicates" in instruction.lower()
+
+
+def test_run_split_check_llm_includes_all_leaves_when_flagged():
+    rubric = _split_check_rubric()
+    branch = rubric["sub_tasks"][0]
+    client = _FakeClient('{"splits": {}, "duplicates": {}}')
+    pb_passes.run_split_check_llm(client, [], "text", rubric, branch, "model", include_all_leaves=True)
+    instruction = client.messages.calls[0]["messages"][0]["content"][0]["text"]
+    assert "code-leaf" in instruction
+
+
+def test_run_split_check_llm_include_all_leaves_defaults_false():
+    rubric = _split_check_rubric()
+    branch = rubric["sub_tasks"][0]
+    client = _FakeClient('{"splits": {}, "duplicates": {}}')
+    pb_passes.run_split_check_llm(client, [], "text", rubric, branch, "model")
+    instruction = client.messages.calls[0]["messages"][0]["content"][0]["text"]
+    assert "code-leaf" not in instruction
+
+
+def test_split_check_candidates_include_all_returns_every_leaf_regardless_of_category():
+    branch = _split_check_branch()
+    candidates = pb_passes._split_check_candidates(branch, include_all=True)
+    assert {n["id"] for n in candidates} == {"result-leaf", "eval-leaf", "code-leaf"}
+
+
+def test_split_check_candidates_default_still_filters_by_category():
+    branch = _split_check_branch()
+    candidates = pb_passes._split_check_candidates(branch)
+    assert {n["id"] for n in candidates} == {"result-leaf", "eval-leaf"}
+
+
+# ── apply_dedup tests ─────────────────────────────────────────────────────────
+
+def _dedup_rubric():
+    return {
+        "id": "root", "requirements": "r", "weight": 0, "task_category": None,
+        "finegrained_task_category": None,
+        "sub_tasks": [
+            {
+                "id": "branch-a", "requirements": "branch a", "weight": 0,
+                "task_category": None, "finegrained_task_category": None,
+                "sub_tasks": [
+                    {"id": "leaf-1", "requirements": "claim one", "weight": 0, "sub_tasks": [],
+                     "task_category": "Result Analysis", "finegrained_task_category": None},
+                    {"id": "leaf-2", "requirements": "claim one restated", "weight": 0, "sub_tasks": [],
+                     "task_category": "Result Analysis", "finegrained_task_category": None},
+                ],
+            },
+            {
+                "id": "branch-b", "requirements": "branch b", "weight": 0,
+                "task_category": None, "finegrained_task_category": None,
+                "sub_tasks": [
+                    {"id": "only-child", "requirements": "sole claim", "weight": 0, "sub_tasks": [],
+                     "task_category": "Result Analysis", "finegrained_task_category": None},
+                ],
+            },
+        ],
+    }
+
+
+def test_apply_dedup_removes_leaf_from_parent_sub_tasks():
+    rubric = _dedup_rubric()
+    pb_passes.apply_dedup(rubric, "leaf-2", "leaf-1")
+    assert find_node(rubric, "leaf-2") is None
+    assert find_node(rubric, "leaf-1") is not None
+
+
+def test_apply_dedup_raises_for_leaf_with_no_parent():
+    rubric = _dedup_rubric()
+    with pytest.raises(ValueError):
+        pb_passes.apply_dedup(rubric, "root", "leaf-1")
+    with pytest.raises(ValueError):
+        pb_passes.apply_dedup(rubric, "ghost", "leaf-1")
+
+
+def test_apply_dedup_logs_removal_with_duplicate_of_id():
+    rubric = _dedup_rubric()
+    errors = []
+    pb_passes.apply_dedup(rubric, "leaf-2", "leaf-1", errors=errors)
+    assert errors[0] == "leaf-2: split-check removed as duplicate of 'leaf-1'."
+
+
+def test_apply_dedup_no_error_mutation_when_errors_none():
+    rubric = _dedup_rubric()
+    pb_passes.apply_dedup(rubric, "leaf-2", "leaf-1")  # should not raise
+
+
+def test_apply_dedup_forces_parent_to_leaf_when_last_child_removed():
+    rubric = _dedup_rubric()
+    errors = []
+    pb_passes.apply_dedup(rubric, "only-child", "leaf-1", errors=errors)
+    parent = find_node(rubric, "branch-b")
+    assert parent["task_category"] == pb_passes._DEPTH_FALLBACK_CATEGORY
+    assert parent["sub_tasks"] == []
+    assert len(errors) == 2
+    assert "branch-b" in errors[1]
+    validate_final(rubric)
+
+
+# ── apply_split tests ─────────────────────────────────────────────────────────
+
+def _split_target_rubric():
+    return {
+        "id": "root", "requirements": "r", "weight": 0, "task_category": None,
+        "finegrained_task_category": None,
+        "sub_tasks": [
+            {"id": "bundled-leaf", "requirements": "small, medium, and large model variants all match",
+             "weight": 0, "sub_tasks": [], "task_category": "Result Analysis", "finegrained_task_category": None},
+        ],
+    }
+
+
+def test_apply_split_replaces_leaf_with_children():
+    rubric = _split_target_rubric()
+    children = [
+        {"id": "small-variant", "requirements": "small variant matches", "expandable": False, "task_category": "Result Analysis"},
+        {"id": "medium-variant", "requirements": "medium variant matches", "expandable": False, "task_category": "Result Analysis"},
+        {"id": "large-variant", "requirements": "large variant matches", "expandable": False, "task_category": "Result Analysis"},
+    ]
+    new_children = pb_passes.apply_split(rubric, "bundled-leaf", children)
+    leaf = find_node(rubric, "bundled-leaf")
+    assert leaf["task_category"] is None
+    assert leaf["finegrained_task_category"] is None
+    assert [c["id"] for c in leaf["sub_tasks"]] == ["small-variant", "medium-variant", "large-variant"]
+    assert len(new_children) == 3
+
+
+def test_apply_split_raises_for_missing_leaf():
+    rubric = _split_target_rubric()
+    with pytest.raises(ValueError):
+        pb_passes.apply_split(rubric, "ghost", [])
+
+
+def test_apply_split_deduplicates_child_ids_against_rest_of_rubric():
+    rubric = _split_target_rubric()
+    rubric["sub_tasks"].append(
+        {"id": "existing-id", "requirements": "already here", "weight": 0, "sub_tasks": [],
+         "task_category": "Code Development", "finegrained_task_category": None}
+    )
+    children = [{"id": "existing-id", "requirements": "collides", "expandable": False, "task_category": "Result Analysis"}]
+    pb_passes.apply_split(rubric, "bundled-leaf", children)
+    leaf = find_node(rubric, "bundled-leaf")
+    assert leaf["sub_tasks"][0]["id"] != "existing-id"
+
+
+def test_apply_split_logs_warning_when_child_still_enumerates():
+    rubric = _split_target_rubric()
+    children = [
+        {"id": "still-bundled", "requirements": "including a, b, c, d",
+         "expandable": False, "task_category": "Result Analysis"},
+    ]
+    errors = []
+    pb_passes.apply_split(rubric, "bundled-leaf", children, errors=errors)
+    leaf = find_node(rubric, "bundled-leaf")
+    assert leaf["sub_tasks"][0]["task_category"] == pb_passes._DEPTH_FALLBACK_CATEGORY
+    assert len(errors) == 1
+    assert "still-bundled" in errors[0]
+    assert "under-split" in errors[0]
+
+
+def test_apply_split_no_error_list_mutation_when_errors_none():
+    rubric = _split_target_rubric()
+    children = [
+        {"id": "still-bundled", "requirements": "including a, b, c, d",
+         "expandable": False, "task_category": "Result Analysis"},
+    ]
+    # Should not raise even though errors=None (default)
+    pb_passes.apply_split(rubric, "bundled-leaf", children)
+
+
+def test_apply_split_accepts_atomic_children_without_warning():
+    rubric = _split_target_rubric()
+    children = [
+        {"id": "atomic-a", "requirements": "atomic claim a", "expandable": False, "task_category": "Result Analysis"},
+        {"id": "atomic-b", "requirements": "atomic claim b", "expandable": False, "task_category": "Result Analysis"},
+    ]
+    errors = []
+    pb_passes.apply_split(rubric, "bundled-leaf", children, errors=errors)
+    assert errors == []

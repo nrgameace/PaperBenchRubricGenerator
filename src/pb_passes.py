@@ -13,10 +13,11 @@ from pathlib import Path
 import anthropic
 
 from pb_enumeration import MIN_ENUMERATED_ITEMS_TO_SPLIT, build_enumeration_hint, count_enumerated_items
-from pb_schema import FINEGRAINED_CATEGORIES, LEAF_CATEGORIES, all_ids, find_node, iter_nodes, node_depth
+from pb_schema import FINEGRAINED_CATEGORIES, LEAF_CATEGORIES, all_ids, find_node, find_parent, iter_nodes, node_depth
 
 MAX_EXPANSION_DEPTH = 7
 _DEPTH_FALLBACK_CATEGORY = "Code Development"
+MAX_BRANCH_NODES = 40
 
 SYSTEM_PREAMBLE = f"""You are an expert ML research engineer building a PaperBench grading \
 rubric for ONE specific paper, supplied as a PDF in the user message.
@@ -325,6 +326,37 @@ def apply_expansion(rubric: dict, node_id: str, parsed, hints: dict, errors: lis
     return new_pending
 
 
+def branch_size(rubric: dict, branch_id: str) -> int:
+    """Return the number of nodes currently in branch_id's subtree (including branch_id itself)."""
+    branch_root = find_node(rubric, branch_id)
+    if branch_root is None:
+        raise ValueError(f"Node '{branch_id}' not found in rubric.")
+    return len(list(iter_nodes(branch_root)))
+
+
+def force_branch_cap_leaves(rubric: dict, node_ids: list, branch_id: str, hints: dict,
+                             errors: list = None, capped_branches: set = None,
+                             max_branch_nodes: int = MAX_BRANCH_NODES) -> None:
+    """Force each still-pending node_id (a barren stub already attached to the tree) into a leaf
+    because branch_id hit the node cap, rather than expanding it further.
+
+    The cap is checked at BFS-dequeue granularity by the caller (mirroring the depth guardrail's
+    style), so a single expansion call that attaches many children at once can push branch_size
+    past max_branch_nodes before the next check catches it — expected, not an off-by-one.
+    """
+    for node_id in node_ids:
+        node = find_node(rubric, node_id)
+        if node is None:
+            continue
+        node["task_category"] = _DEPTH_FALLBACK_CATEGORY
+        node["sub_tasks"] = []
+        hints.pop(node_id, None)
+        if errors is not None:
+            errors.append(f"{node_id}: Branch '{branch_id}' hit the {max_branch_nodes}-node cap; forced to leaf.")
+    if capped_branches is not None:
+        capped_branches.add(branch_id)
+
+
 def apply_weights(rubric: dict, weights: dict) -> None:
     """Set an integer weight on every node from an id->weight mapping.
 
@@ -481,6 +513,115 @@ def run_weight_llm_branch(client, system_blocks, content_list_text, rubric: dict
         invoke_llm(client, system_blocks, [_text_message(instruction)], model, tracker=tracker)
     )
     return parsed.get("weights", parsed) if isinstance(parsed, dict) else {}
+
+
+_SPLIT_CHECK_FINEGRAINED_CATEGORIES = ("Evaluation, Metrics & Benchmarking",)
+_SPLIT_CHECK_TASK_CATEGORY = "Result Analysis"
+
+
+def _split_check_candidates(branch_node: dict, include_all: bool = False) -> list:
+    """Return leaves in branch_node's subtree in the split-check scope.
+
+    When include_all is True (a branch that triggered the MAX_BRANCH_NODES cap — the branch
+    most likely to contain runaway duplication), every leaf is a candidate regardless of
+    category. Otherwise only leaves in the usual Evaluation/Result-Analysis category scope.
+    """
+    if include_all:
+        return [n for n in iter_nodes(branch_node) if not n.get("sub_tasks")]
+    return [
+        n for n in iter_nodes(branch_node)
+        if not n.get("sub_tasks")
+        and (n.get("finegrained_task_category") in _SPLIT_CHECK_FINEGRAINED_CATEGORIES
+             or n.get("task_category") == _SPLIT_CHECK_TASK_CATEGORY)
+    ]
+
+
+def run_split_check_llm(client, system_blocks, section_text, rubric: dict, branch_node: dict, model,
+                        tracker=None, include_all_leaves: bool = False) -> dict:
+    """Check leaves in a branch for semantic bundling (splits) and restated duplicate claims.
+
+    Skips the LLM call entirely (returns empty splits/duplicates) when the branch has no leaves
+    in scope, since the enumeration regex is the cheap first-tier filter and this second-tier
+    semantic check is only worth the tokens where over-bundling actually concentrates.
+    """
+    leaves = _split_check_candidates(branch_node, include_all=include_all_leaves)
+    if not leaves:
+        return {"splits": {}, "duplicates": {}}
+    leaf_lines = "\n".join(f'- "{n["id"]}": {n["requirements"]}' for n in leaves)
+    instruction = (
+        f"TASK: Review these candidate leaves in the subtree rooted at \"{branch_node['id']}\" for "
+        "two kinds of problems:\n\n"
+        f"{leaf_lines}\n\n"
+        f"RELEVANT PAPER SECTION:\n{section_text}\n\n"
+        "1. SPLITS — a leaf bundles 2+ independently verifiable claims (named entities, metrics, "
+        "or table rows stated in the requirements text) into a single node. Return replacement "
+        "child nodes to split it into (one per claim).\n"
+        "2. DUPLICATES — a leaf restates a claim already covered by another leaf in this list — "
+        "same underlying fact, different wording. Return the id of the leaf it duplicates; it "
+        "should be removed rather than split.\n\n"
+        "A leaf must not appear in both \"splits\" and \"duplicates\". Leaves that are already "
+        "atomic and non-duplicate must NOT appear in the response at all.\n\n"
+        'Respond with JSON ONLY: {"splits": {"<leaf_id>": [ <child objects> ], ...}, '
+        '"duplicates": {"<leaf_id>": "<id_of_the_leaf_it_duplicates>", ...}}\n\n' + _CHILD_SHAPE
+    )
+    parsed = parse_json_response(
+        invoke_llm(client, system_blocks, [_text_message(instruction)], model, tracker=tracker)
+    )
+    if not isinstance(parsed, dict):
+        return {"splits": {}, "duplicates": {}}
+    return {"splits": parsed.get("splits") or {}, "duplicates": parsed.get("duplicates") or {}}
+
+
+def apply_split(rubric: dict, leaf_id: str, children: list, errors: list = None) -> list:
+    """Replace a leaf with the given split children in place; return the new children.
+
+    Reuses normalize_child for each replacement child, so a child that still enumerates
+    >= MIN_ENUMERATED_ITEMS_TO_SPLIT items (or that the model marked expandable) is a sign
+    the model under-split — it's forced into a valid leaf via the depth-guardrail fallback
+    category and logged to errors as a warning rather than silently accepted, since this
+    pass runs after expansion is complete and there's no BFS queue left to push it onto.
+    """
+    leaf = find_node(rubric, leaf_id)
+    if leaf is None:
+        raise ValueError(f"Node '{leaf_id}' not found in rubric.")
+    used_ids = set(all_ids(rubric)) - {leaf_id}
+    new_children = []
+    for raw in children:
+        node, hint = normalize_child(raw, used_ids)
+        if hint is not None:
+            node["task_category"] = _DEPTH_FALLBACK_CATEGORY
+            if errors is not None:
+                errors.append(
+                    f"{node['id']}: split-check child of '{leaf_id}' still enumerates "
+                    f">= {MIN_ENUMERATED_ITEMS_TO_SPLIT} items after splitting (model under-split)."
+                )
+        new_children.append(node)
+    leaf["task_category"] = None
+    leaf["finegrained_task_category"] = None
+    leaf["sub_tasks"] = new_children
+    return new_children
+
+
+def apply_dedup(rubric: dict, leaf_id: str, duplicate_of_id: str, errors: list = None) -> None:
+    """Remove leaf_id from its parent's sub_tasks because it duplicates duplicate_of_id.
+
+    Raises ValueError if leaf_id has no parent (missing id, or the root). If removal leaves the
+    parent with no children, an internal node with no children and no task_category is invalid,
+    so the parent is force-flattened into a leaf via the same fallback category the depth and
+    branch-cap guardrails use, with its own logged errors line.
+    """
+    parent = find_parent(rubric, leaf_id)
+    if parent is None:
+        raise ValueError(f"Node '{leaf_id}' not found in rubric (or is the root).")
+    parent["sub_tasks"] = [n for n in parent["sub_tasks"] if n.get("id") != leaf_id]
+    if errors is not None:
+        errors.append(f"{leaf_id}: split-check removed as duplicate of '{duplicate_of_id}'.")
+    if not parent["sub_tasks"]:
+        parent["task_category"] = _DEPTH_FALLBACK_CATEGORY
+        if errors is not None:
+            errors.append(
+                f"{parent['id']}: forced to leaf after its last child '{leaf_id}' was removed as a duplicate."
+            )
 
 
 def run_weight_llm_global(client, system_blocks, content_list_text, rubric: dict, current_weights: dict, model, tracker=None, feedback=None) -> dict:

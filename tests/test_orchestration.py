@@ -7,6 +7,7 @@ from unittest.mock import MagicMock, call, patch
 
 import pytest
 
+import pb_passes
 import rubric_gen
 from pb_schema import find_node
 
@@ -133,6 +134,60 @@ def test_expand_subtree_threads_errors_list_into_apply_expansion():
     assert errors == ["section-a: Model attempted to expand past the maximum depth of 7 nodes."]
 
 
+def test_expand_subtree_caps_infinite_expansion_at_max_branch_nodes():
+    """Smoke test: a model that keeps generating more expandable children (breadth-2 per call,
+    so the tree stays well within MAX_EXPANSION_DEPTH while the node count balloons) must be
+    capped at MAX_BRANCH_NODES, with every remaining node forced to a leaf and none left pending."""
+    from pb_passes import MAX_BRANCH_NODES
+    import pb_schema
+
+    rubric = _rubric_with_expandable_node()
+    hints = {"section-a": "hint for section a"}
+    counter = {"n": 0}
+
+    def fake_run_expansion_llm(client, system_blocks, section_text, rb, node_id, hint, model, feedback="", tracker=None):
+        counter["n"] += 1
+        return {"children": [
+            {"id": f"gen-{counter['n']}-a", "requirements": "x", "expandable": True, "expansion_hint": "keep going"},
+            {"id": f"gen-{counter['n']}-b", "requirements": "x", "expandable": True, "expansion_hint": "keep going"},
+        ]}
+
+    errors = []
+    capped = set()
+    with patch("rubric_gen.run_expansion_llm", side_effect=fake_run_expansion_llm), \
+         patch("rubric_gen.blocks_to_text", return_value="text"), \
+         patch("rubric_gen.slice_section", return_value=[]):
+        rubric_gen._expand_subtree(None, [], [], rubric, "section-a", hints, "model",
+                                   errors=errors, capped_branches=capped)
+
+    branch_root = pb_schema.find_node(rubric, "section-a")
+    # Cap is checked at BFS-dequeue granularity, so a batch of children attached in one call
+    # can push branch_size a little past the cap before the next check catches it.
+    assert MAX_BRANCH_NODES <= pb_passes.branch_size(rubric, "section-a") < MAX_BRANCH_NODES * 2
+    assert capped == {"section-a"}
+    assert errors  # non-empty
+    assert not any(n.get("sub_tasks") == [] and n.get("task_category") is None
+                   for n in pb_schema.iter_nodes(branch_root))
+
+
+def test_expand_subtree_no_cap_effect_when_under_limit():
+    rubric = _rubric_with_expandable_node()
+    hints = {"section-a": "hint for section a"}
+    capped = set()
+
+    def fake_run_expansion_llm(client, system_blocks, section_text, rb, node_id, hint, model, feedback="", tracker=None):
+        return {"children": [
+            {"id": "leaf-1", "requirements": "x", "expandable": False, "task_category": "Code Development"},
+        ]}
+
+    with patch("rubric_gen.run_expansion_llm", side_effect=fake_run_expansion_llm), \
+         patch("rubric_gen.blocks_to_text", return_value="text"), \
+         patch("rubric_gen.slice_section", return_value=[]):
+        rubric_gen._expand_subtree(None, [], [], rubric, "section-a", hints, "model", capped_branches=capped)
+
+    assert capped == set()
+
+
 def test_expand_subtree_no_feedback_passes_empty_string():
     rubric = _rubric_with_expandable_node()
     hints = {"section-a": "hint"}
@@ -193,7 +248,7 @@ def test_expansion_phase_reviews_once_per_top_level_node(tmp_path):
 def test_expansion_phase_commits_accumulated_errors_after_approval(tmp_path):
     state = _two_node_state()
 
-    def fake_expand_subtree(client, system_blocks, content_list, rubric, node_id, hints, model, feedback="", tracker=None, errors=None):
+    def fake_expand_subtree(client, system_blocks, content_list, rubric, node_id, hints, model, feedback="", tracker=None, errors=None, capped_branches=None):
         if errors is not None:
             errors.append(f"{node_id}: Model attempted to expand past the maximum depth of 7 nodes.")
 
@@ -222,7 +277,7 @@ def test_expansion_phase_discards_errors_from_rejected_candidate(tmp_path):
             raise RerunPass("try again")
         return rubric
 
-    def fake_expand_subtree(client, system_blocks, content_list, rubric, node_id, hints, model, feedback="", tracker=None, errors=None):
+    def fake_expand_subtree(client, system_blocks, content_list, rubric, node_id, hints, model, feedback="", tracker=None, errors=None, capped_branches=None):
         if errors is not None:
             errors.append(f"{node_id}-attempt-{review_calls['n']}: too deep")
 
@@ -252,7 +307,7 @@ def test_expansion_phase_passes_feedback_on_rerun(tmp_path):
 
     subtree_calls = []
 
-    def fake_expand_subtree(client, system_blocks, content_list, rubric, node_id, hints, model, feedback="", tracker=None, errors=None):
+    def fake_expand_subtree(client, system_blocks, content_list, rubric, node_id, hints, model, feedback="", tracker=None, errors=None, capped_branches=None):
         subtree_calls.append((node_id, feedback))
 
     with patch("rubric_gen._expand_subtree", side_effect=fake_expand_subtree), \
@@ -265,6 +320,50 @@ def test_expansion_phase_passes_feedback_on_rerun(tmp_path):
     # node-a expanded twice: once with empty feedback, once with "needs more detail"
     node_a_calls = [(nid, fb) for nid, fb in subtree_calls if nid == "node-a"]
     assert node_a_calls == [("node-a", ""), ("node-a", "needs more detail")]
+
+
+def test_expansion_phase_writes_back_capped_branches_on_approval(tmp_path):
+    state = _two_node_state()
+    state["queue"] = ["node-a"]
+
+    def fake_expand_subtree(client, system_blocks, content_list, rubric, node_id, hints, model, feedback="", tracker=None, errors=None, capped_branches=None):
+        if capped_branches is not None:
+            capped_branches.add(node_id)
+
+    with patch("rubric_gen._expand_subtree", side_effect=fake_expand_subtree), \
+         patch("rubric_gen.review_pass", side_effect=lambda rubric, draft_path, validate_fn: rubric), \
+         patch("rubric_gen.pretty_print_nodes"), \
+         patch("rubric_gen.commit"), \
+         patch("rubric_gen.reconcile_queue", return_value=[]):
+        rubric_gen.run_expansion_phase(None, [], [], state, "model", tmp_path)
+
+    assert state["capped_branches"] == {"node-a"}
+
+
+def test_expansion_phase_discards_capped_branches_from_rejected_candidate(tmp_path):
+    from pb_review import RerunPass
+    state = _two_node_state()
+    state["queue"] = ["node-a"]
+    review_calls = {"n": 0}
+
+    def fake_review(rubric, draft_path, validate_fn):
+        review_calls["n"] += 1
+        if review_calls["n"] == 1:
+            raise RerunPass("try again")
+        return rubric
+
+    def fake_expand_subtree(client, system_blocks, content_list, rubric, node_id, hints, model, feedback="", tracker=None, errors=None, capped_branches=None):
+        if capped_branches is not None:
+            capped_branches.add(f"{node_id}-attempt-{review_calls['n']}")
+
+    with patch("rubric_gen._expand_subtree", side_effect=fake_expand_subtree), \
+         patch("rubric_gen.review_pass", side_effect=fake_review), \
+         patch("rubric_gen.pretty_print_nodes"), \
+         patch("rubric_gen.commit"), \
+         patch("rubric_gen.reconcile_queue", return_value=[]):
+        rubric_gen.run_expansion_phase(None, [], [], state, "model", tmp_path)
+
+    assert state["capped_branches"] == {"node-a-attempt-1"}
 
 
 # ── write_error_log tests ─────────────────────────────────────────────────────
@@ -590,6 +689,246 @@ def test_run_weight_phase_review_only_once_at_end(tmp_path):
         rubric_gen.run_weight_phase(None, [], [], state, "model", tmp_path, human_review=True)
 
     assert mock_review.call_count == 1
+
+
+# ── run_split_check_phase tests ───────────────────────────────────────────────
+
+def _split_check_state():
+    """Two branches: A has one bundled leaf + two atomic leaves, B has no matching leaves."""
+    return {
+        "rubric": {
+            "id": "root", "requirements": "r", "weight": 0, "task_category": None,
+            "finegrained_task_category": None,
+            "sub_tasks": [
+                {
+                    "id": "branch-a", "requirements": "branch a", "weight": 0,
+                    "task_category": None, "finegrained_task_category": None,
+                    "sub_tasks": [
+                        {"id": "bundled-leaf", "requirements": "small, medium, and large model variants all match",
+                         "weight": 0, "sub_tasks": [], "task_category": "Result Analysis", "finegrained_task_category": None},
+                        {"id": "atomic-leaf-1", "requirements": "accuracy matches table 1 exactly",
+                         "weight": 0, "sub_tasks": [], "task_category": "Result Analysis", "finegrained_task_category": None},
+                        {"id": "atomic-leaf-2", "requirements": "single benchmark metric",
+                         "weight": 0, "sub_tasks": [], "task_category": None,
+                         "finegrained_task_category": "Evaluation, Metrics & Benchmarking"},
+                    ],
+                },
+                {
+                    "id": "branch-b", "requirements": "branch b", "weight": 0,
+                    "task_category": None, "finegrained_task_category": None,
+                    "sub_tasks": [
+                        {"id": "code-leaf", "requirements": "implement the model", "weight": 0, "sub_tasks": [],
+                         "task_category": "Code Development", "finegrained_task_category": None},
+                    ],
+                },
+            ],
+        },
+        "queue": [],
+        "hints": {},
+        "errors": [],
+        "capped_branches": [],
+    }
+
+
+def test_run_split_check_phase_splits_only_bundled_leaf(tmp_path):
+    state = _split_check_state()
+
+    def fake_split_check_llm(client, system_blocks, section_text, rubric, branch_node, model, tracker=None, include_all_leaves=False):
+        if branch_node["id"] == "branch-a":
+            return {"splits": {"bundled-leaf": [
+                {"id": "small-variant", "requirements": "small variant matches", "expandable": False, "task_category": "Result Analysis"},
+                {"id": "medium-variant", "requirements": "medium variant matches", "expandable": False, "task_category": "Result Analysis"},
+                {"id": "large-variant", "requirements": "large variant matches", "expandable": False, "task_category": "Result Analysis"},
+            ]}, "duplicates": {}}
+        return {"splits": {}, "duplicates": {}}
+
+    with patch("rubric_gen.run_split_check_llm", side_effect=fake_split_check_llm), \
+         patch("rubric_gen.blocks_to_text", return_value="text"), \
+         patch("rubric_gen.slice_section", return_value=[]), \
+         patch("rubric_gen.commit"):
+        rubric_gen.run_split_check_phase(None, [], [], state, "model", tmp_path)
+
+    bundled = find_node(state["rubric"], "bundled-leaf")
+    assert bundled["task_category"] is None
+    assert [c["id"] for c in bundled["sub_tasks"]] == ["small-variant", "medium-variant", "large-variant"]
+
+    atomic1 = find_node(state["rubric"], "atomic-leaf-1")
+    atomic2 = find_node(state["rubric"], "atomic-leaf-2")
+    assert atomic1["task_category"] == "Result Analysis" and atomic1["sub_tasks"] == []
+    assert atomic2["finegrained_task_category"] == "Evaluation, Metrics & Benchmarking" and atomic2["sub_tasks"] == []
+
+
+def test_run_split_check_phase_logs_applied_split(tmp_path):
+    state = _split_check_state()
+
+    def fake_split_check_llm(client, system_blocks, section_text, rubric, branch_node, model, tracker=None, include_all_leaves=False):
+        if branch_node["id"] == "branch-a":
+            return {"splits": {"bundled-leaf": [
+                {"id": "small-variant", "requirements": "x", "expandable": False, "task_category": "Result Analysis"},
+                {"id": "medium-variant", "requirements": "y", "expandable": False, "task_category": "Result Analysis"},
+            ]}, "duplicates": {}}
+        return {"splits": {}, "duplicates": {}}
+
+    with patch("rubric_gen.run_split_check_llm", side_effect=fake_split_check_llm), \
+         patch("rubric_gen.blocks_to_text", return_value="text"), \
+         patch("rubric_gen.slice_section", return_value=[]), \
+         patch("rubric_gen.commit"):
+        rubric_gen.run_split_check_phase(None, [], [], state, "model", tmp_path)
+
+    assert any("bundled-leaf" in e and "branch-a" in e for e in state["errors"])
+
+
+def test_run_split_check_phase_calls_llm_once_per_branch_regardless_of_matches(tmp_path):
+    state = _split_check_state()
+    branch_calls = []
+
+    def fake_split_check_llm(client, system_blocks, section_text, rubric, branch_node, model, tracker=None, include_all_leaves=False):
+        branch_calls.append(branch_node["id"])
+        return {"splits": {}, "duplicates": {}}
+
+    with patch("rubric_gen.run_split_check_llm", side_effect=fake_split_check_llm), \
+         patch("rubric_gen.blocks_to_text", return_value="text"), \
+         patch("rubric_gen.slice_section", return_value=[]), \
+         patch("rubric_gen.commit"):
+        rubric_gen.run_split_check_phase(None, [], [], state, "model", tmp_path)
+
+    assert branch_calls == ["branch-a", "branch-b"]
+
+
+def test_run_split_check_phase_commits_state(tmp_path):
+    state = _split_check_state()
+
+    with patch("rubric_gen.run_split_check_llm", return_value={"splits": {}, "duplicates": {}}), \
+         patch("rubric_gen.blocks_to_text", return_value="text"), \
+         patch("rubric_gen.slice_section", return_value=[]), \
+         patch("rubric_gen.commit") as mock_commit:
+        rubric_gen.run_split_check_phase(None, [], [], state, "model", tmp_path)
+
+    mock_commit.assert_called_once_with(state, tmp_path)
+
+
+def test_run_split_check_phase_removes_duplicate_leaf(tmp_path):
+    state = _split_check_state()
+
+    def fake_split_check_llm(client, system_blocks, section_text, rubric, branch_node, model, tracker=None, include_all_leaves=False):
+        if branch_node["id"] == "branch-a":
+            return {"splits": {}, "duplicates": {"atomic-leaf-2": "atomic-leaf-1"}}
+        return {"splits": {}, "duplicates": {}}
+
+    with patch("rubric_gen.run_split_check_llm", side_effect=fake_split_check_llm), \
+         patch("rubric_gen.blocks_to_text", return_value="text"), \
+         patch("rubric_gen.slice_section", return_value=[]), \
+         patch("rubric_gen.commit"):
+        rubric_gen.run_split_check_phase(None, [], [], state, "model", tmp_path)
+
+    assert find_node(state["rubric"], "atomic-leaf-2") is None
+    assert find_node(state["rubric"], "atomic-leaf-1") is not None
+
+
+def test_run_split_check_phase_logs_duplicate_removal(tmp_path):
+    state = _split_check_state()
+
+    def fake_split_check_llm(client, system_blocks, section_text, rubric, branch_node, model, tracker=None, include_all_leaves=False):
+        if branch_node["id"] == "branch-a":
+            return {"splits": {}, "duplicates": {"atomic-leaf-2": "atomic-leaf-1"}}
+        return {"splits": {}, "duplicates": {}}
+
+    with patch("rubric_gen.run_split_check_llm", side_effect=fake_split_check_llm), \
+         patch("rubric_gen.blocks_to_text", return_value="text"), \
+         patch("rubric_gen.slice_section", return_value=[]), \
+         patch("rubric_gen.commit"):
+        rubric_gen.run_split_check_phase(None, [], [], state, "model", tmp_path)
+
+    assert any("atomic-leaf-2" in e and "atomic-leaf-1" in e for e in state["errors"])
+
+
+def test_run_split_check_phase_processes_duplicates_before_splits_for_same_leaf(tmp_path):
+    state = _split_check_state()
+
+    def fake_split_check_llm(client, system_blocks, section_text, rubric, branch_node, model, tracker=None, include_all_leaves=False):
+        if branch_node["id"] == "branch-a":
+            return {
+                "splits": {"bundled-leaf": [
+                    {"id": "small-variant", "requirements": "x", "expandable": False, "task_category": "Result Analysis"},
+                ]},
+                "duplicates": {"bundled-leaf": "atomic-leaf-1"},
+            }
+        return {"splits": {}, "duplicates": {}}
+
+    with patch("rubric_gen.run_split_check_llm", side_effect=fake_split_check_llm), \
+         patch("rubric_gen.blocks_to_text", return_value="text"), \
+         patch("rubric_gen.slice_section", return_value=[]), \
+         patch("rubric_gen.commit"):
+        rubric_gen.run_split_check_phase(None, [], [], state, "model", tmp_path)
+
+    assert find_node(state["rubric"], "bundled-leaf") is None
+    assert find_node(state["rubric"], "small-variant") is None
+
+
+def test_run_split_check_phase_skips_duplicate_with_missing_duplicate_of_target(tmp_path):
+    state = _split_check_state()
+
+    def fake_split_check_llm(client, system_blocks, section_text, rubric, branch_node, model, tracker=None, include_all_leaves=False):
+        if branch_node["id"] == "branch-a":
+            return {"splits": {}, "duplicates": {"atomic-leaf-2": "ghost-leaf"}}
+        return {"splits": {}, "duplicates": {}}
+
+    with patch("rubric_gen.run_split_check_llm", side_effect=fake_split_check_llm), \
+         patch("rubric_gen.blocks_to_text", return_value="text"), \
+         patch("rubric_gen.slice_section", return_value=[]), \
+         patch("rubric_gen.commit"):
+        rubric_gen.run_split_check_phase(None, [], [], state, "model", tmp_path)
+
+    assert find_node(state["rubric"], "atomic-leaf-2") is not None
+
+
+def test_run_split_check_phase_skips_self_referential_duplicate(tmp_path):
+    state = _split_check_state()
+
+    def fake_split_check_llm(client, system_blocks, section_text, rubric, branch_node, model, tracker=None, include_all_leaves=False):
+        if branch_node["id"] == "branch-a":
+            return {"splits": {}, "duplicates": {"atomic-leaf-2": "atomic-leaf-2"}}
+        return {"splits": {}, "duplicates": {}}
+
+    with patch("rubric_gen.run_split_check_llm", side_effect=fake_split_check_llm), \
+         patch("rubric_gen.blocks_to_text", return_value="text"), \
+         patch("rubric_gen.slice_section", return_value=[]), \
+         patch("rubric_gen.commit"):
+        rubric_gen.run_split_check_phase(None, [], [], state, "model", tmp_path)
+
+    assert find_node(state["rubric"], "atomic-leaf-2") is not None
+
+
+def test_run_split_check_phase_passes_include_all_leaves_true_for_capped_branch(tmp_path):
+    state = _split_check_state()
+    state["capped_branches"] = ["branch-a"]
+    calls = {}
+
+    def fake_split_check_llm(client, system_blocks, section_text, rubric, branch_node, model, tracker=None, include_all_leaves=False):
+        calls[branch_node["id"]] = include_all_leaves
+        return {"splits": {}, "duplicates": {}}
+
+    with patch("rubric_gen.run_split_check_llm", side_effect=fake_split_check_llm), \
+         patch("rubric_gen.blocks_to_text", return_value="text"), \
+         patch("rubric_gen.slice_section", return_value=[]), \
+         patch("rubric_gen.commit"):
+        rubric_gen.run_split_check_phase(None, [], [], state, "model", tmp_path)
+
+    assert calls == {"branch-a": True, "branch-b": False}
+
+
+# ── --no-split-check flag tests ───────────────────────────────────────────────
+
+def test_parse_args_split_check_true_by_default(monkeypatch):
+    monkeypatch.setattr(sys, "argv", ["rubric_gen", "--input", "in", "--output", "out"])
+    args = rubric_gen.parse_args()
+    assert args.split_check is True
+
+
+def test_parse_args_no_split_check_flag_disables_it(monkeypatch):
+    monkeypatch.setattr(sys, "argv", ["rubric_gen", "--input", "in", "--output", "out", "--no-split-check"])
+    args = rubric_gen.parse_args()
+    assert args.split_check is False
 
 
 def test_run_weight_phase_reruns_global_with_feedback_on_review(tmp_path):

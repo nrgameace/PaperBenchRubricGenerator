@@ -103,3 +103,23 @@ def test_node_depth_of_grandchild_is_two():
 def test_node_depth_of_missing_id_is_none():
     tree = _internal("root", [_leaf("a")])
     assert pb_schema.node_depth(tree, "missing") is None
+
+
+def test_find_parent_returns_parent_of_nested_child():
+    tree = _internal("root", [_internal("b", [_leaf("c")])])
+    assert pb_schema.find_parent(tree, "c")["id"] == "b"
+
+
+def test_find_parent_returns_parent_of_direct_child():
+    tree = _internal("root", [_leaf("a")])
+    assert pb_schema.find_parent(tree, "a")["id"] == "root"
+
+
+def test_find_parent_returns_none_for_root():
+    tree = _internal("root", [_leaf("a")])
+    assert pb_schema.find_parent(tree, "root") is None
+
+
+def test_find_parent_returns_none_for_missing_id():
+    tree = _internal("root", [_leaf("a")])
+    assert pb_schema.find_parent(tree, "missing") is None

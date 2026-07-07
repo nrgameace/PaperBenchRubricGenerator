@@ -48,6 +48,7 @@ def _patch_llm(monkeypatch):
         rubric = args[3]
         return {node["id"]: 1 for node in iter_nodes(rubric)}
     monkeypatch.setattr(rubric_gen, "run_weight_llm_global", _fake_weight_llm_global)
+    monkeypatch.setattr(rubric_gen, "run_split_check_llm", lambda *a, **k: {})
 
 
 def _make_input_dir(tmp_path):

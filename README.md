@@ -39,6 +39,14 @@ resumable. There are three phases:
    (fallback `task_category` of `Code Development`) and records the violation. See
    [Output files](#output-files) for `errors.txt`.
 
+   **Max branch node cap.** Each top-level branch is capped at `MAX_BRANCH_NODES` (40) total
+   nodes, independent of the depth guardrail — a model stuck re-expanding many near-identical
+   sub-items could otherwise stay within the depth limit while still generating an unbounded
+   number of nodes. The cap is checked before every expansion call; once a branch reaches 40
+   nodes, every node still queued for expansion in that branch is force-flattened into a leaf
+   (fallback `task_category` of `Code Development`) without spending an LLM call on it, and the
+   branch id is recorded so the split-check pass (below) prioritizes it for duplicate review.
+
    **Enumeration-triggered recursion.** Before a candidate leaf is finalized, its requirements
    text is scanned for enumeration signals — comma-separated lists after "including"/"such
    as"/a colon, `et al.` citations, or `Table`/`Figure` references. If it names three or more
@@ -49,7 +57,26 @@ resumable. There are three phases:
    extra LLM call, and applies to both the base pass and every expansion pass since both share
    `normalize_child`.
 
-3. **Weight pass** — `claude-sonnet-4-6`, two sub-phases:
+3. **Split-check pass** — `claude-sonnet-4-6`, one call per top-level branch, runs after
+   expansion is fully complete and before weighting. `pb_enumeration.py`'s regex heuristic
+   only catches *syntactic* bundling (comma lists, `et al.`, Table/Figure refs). This pass
+   catches *semantic* bundling with no consistent trigger phrase — e.g. "small, medium, and
+   large model variants" — but only in the two categories where over-bundling concentrates:
+   leaves with `finegrained_task_category == "Evaluation, Metrics & Benchmarking"` or
+   `task_category == "Result Analysis"` — except for a branch that triggered the max branch
+   node cap above, where every leaf in the branch is a candidate regardless of category, since
+   that's the branch most likely to contain runaway duplication. For each top-level branch, the
+   candidate leaves in scope (if any — the LLM call is skipped entirely for branches with none)
+   are sent along with the branch's paper section text; the model returns two judgments:
+   replacement children for any leaf that bundles 2+ independently verifiable claims
+   (`"splits"`), and the id of an existing leaf that a candidate restates in different words
+   (`"duplicates"`) — the duplicate is removed rather than split. If removing a leaf empties
+   its parent's children, the parent is force-flattened into a leaf too, since an internal node
+   with no children is invalid. Every applied split or duplicate removal is logged to
+   `errors.txt`, and if a replacement child still trips the enumeration threshold that's logged
+   too, as a model-under-split warning. Disable with `--no-split-check`.
+
+4. **Weight pass** — `claude-sonnet-4-6`, two sub-phases:
    - **Local passes** — one LLM call per top-level branch. Each call is focused on a single
      subtree so the model can reason about relative importance within that branch without
      distraction from unrelated sections. The full rubric is still sent for context.
@@ -109,7 +136,7 @@ data/
     mineru_out/           ← any folder name; must contain content_list.json at its root
       content_list.json
   output/<paper>/
-    rubric_state.json     ← resumable checkpoint (rubric + expansion queue + hints + errors)
+    rubric_state.json     ← resumable checkpoint (rubric + expansion queue + hints + errors + capped_branches)
     rubric_draft.json     ← editable draft for the current pass
     rubric_final.json     ← final validated rubric (written when all phases complete)
     errors.txt             ← guardrail violations, if any occurred (see Output files)
@@ -122,14 +149,14 @@ tests/
 
 | File | Responsibility |
 |---|---|
-| `rubric_gen.py` | Entry point; CLI parsing (`--review`, `--resume`); orchestrates all 3 phases; `human_review` flag threaded through phase functions; `_resolve_invalid_weights` correction loop, capped at `MAX_WEIGHT_RESOLUTION_RETRIES` (5) and raising `MaxRetriesExceeded` past that; `write_error_log` writes `errors.txt`; prints cost report |
-| `pb_passes.py` | Anthropic SDK calls; prompt construction; JSON parsing; node normalization; tree mutation (`apply_base`, `apply_expansion`, `apply_weights`); `MAX_EXPANSION_DEPTH` (7) guardrail enforced in `apply_expansion`; enumeration-triggered recursion override in `normalize_child` and prompt injection in `run_expansion_llm` (via `pb_enumeration`); weight validation (`find_invalid_weights`); `run_weight_llm_branch` for per-branch local passes; `run_weight_llm_global` for cross-branch calibration; `run_weight_llm` for targeted invalid-weight retries |
+| `rubric_gen.py` | Entry point; CLI parsing (`--review`, `--resume`, `--no-split-check`); orchestrates all 4 phases; `human_review` flag threaded through phase functions; `_expand_subtree` enforces the `MAX_BRANCH_NODES` cap before every expansion call and threads a `capped_branches` set the same way it threads `errors`; `run_split_check_phase` runs the split-check pass per top-level branch before weighting, processing `"duplicates"` (via `apply_dedup`) before `"splits"` so a leaf flagged as both is removed rather than split, and passing `include_all_leaves=True` for branches in `capped_branches`; `_resolve_invalid_weights` correction loop, capped at `MAX_WEIGHT_RESOLUTION_RETRIES` (5) and raising `MaxRetriesExceeded` past that; `write_error_log` writes `errors.txt`; prints cost report |
+| `pb_passes.py` | Anthropic SDK calls; prompt construction; JSON parsing; node normalization; tree mutation (`apply_base`, `apply_expansion`, `apply_split`, `apply_dedup`, `apply_weights`); `MAX_EXPANSION_DEPTH` (7) guardrail enforced in `apply_expansion`; `MAX_BRANCH_NODES` (40) guardrail via `branch_size`/`force_branch_cap_leaves`, checked by `rubric_gen._expand_subtree` before every expansion call; enumeration-triggered recursion override in `normalize_child` and prompt injection in `run_expansion_llm` (via `pb_enumeration`); `run_split_check_llm` — the semantic bundling/duplicate check scoped to `Evaluation, Metrics & Benchmarking` / `Result Analysis` leaves (or every leaf in the branch via `include_all_leaves=True`), one call per branch returning both `"splits"` and `"duplicates"`, skipped entirely when a branch has no candidate leaves; `apply_dedup` removes a duplicate leaf (via `pb_schema.find_parent`) and force-flattens its parent if that empties the parent's children; weight validation (`find_invalid_weights`); `run_weight_llm_branch` for per-branch local passes; `run_weight_llm_global` for cross-branch calibration; `run_weight_llm` for targeted invalid-weight retries |
 | `pb_cost.py` | `CostTracker` — accumulates token usage (input, output, cache write, cache read) per model; computes and prints a formatted cost report |
 | `pb_input.py` | Discovers PDF and MinerU folder from input dir; loads `content_list.json` |
 | `pb_enumeration.py` | `count_enumerated_items` and `build_enumeration_hint` — pure regex heuristics (no LLM/network dependency) detecting enumerated sub-items in requirements text; `MIN_ENUMERATED_ITEMS_TO_SPLIT` (3) constant |
 | `pb_mineru.py` | Converts MinerU blocks to LLM-readable text (`blocks_to_text`); slices content to a section by heading fuzzy-match (`slice_section`) |
-| `pb_schema.py` | Rubric dict traversal and validation (`validate_partial`, `validate_final`, `find_node`, `all_ids`, `node_depth`) |
-| `pb_state.py` | State persistence; phase constants (`PHASE_BASE → EXPANSION → WEIGHT → DONE`); atomic write via temp-file rename; state includes an `errors` list of guardrail violations |
+| `pb_schema.py` | Rubric dict traversal and validation (`validate_partial`, `validate_final`, `find_node`, `find_parent`, `all_ids`, `node_depth`) |
+| `pb_state.py` | State persistence; phase constants (`PHASE_BASE → EXPANSION → WEIGHT → DONE`); atomic write via temp-file rename; state includes an `errors` list of guardrail violations and a `capped_branches` list of branch ids that hit `MAX_BRANCH_NODES` |
 | `pb_review.py` | Blocks on `input()` for human review; raises `RerunPass(feedback)` when user types non-empty text; `collect_weight_corrections` handles interactive per-node weight correction |
 | `task_node.py` | Frozen `TaskNode` dataclass (adapted from OpenAI's frontier-evals); leaf/internal validation in `__post_init__` |
 
@@ -155,6 +182,59 @@ text. Falls back to the full list when the best heading score is below 0.3.
 ---
 
 ## Changelog
+
+### v12 — Per-branch node cap and duplicate-leaf detection
+
+**`MAX_BRANCH_NODES` (40) guardrail (`pb_passes.branch_size` / `force_branch_cap_leaves`,
+wired into `rubric_gen._expand_subtree`).** The depth guardrail bounds how *deep* a branch can
+get but not how *wide* — a model stuck re-expanding many near-identical sub-items can stay
+within `MAX_EXPANSION_DEPTH` while still generating an unbounded number of nodes. Since
+`_expand_subtree` only ever processes one top-level branch per call (its `node_id` argument
+*is* the branch id — sub-node pending ids never touch `state["queue"]`), the cap is checked at
+the top of the BFS loop before every expansion call: once `branch_size` reaches 40, every node
+still queued for that branch is force-flattened into a leaf in one call
+(`force_branch_cap_leaves`) rather than spending further LLM calls, and the branch id is
+recorded into a new `capped_branches` set — threaded through `run_expansion_phase` and
+persisted in `state`/`rubric_state.json` the same way `errors` already is (discarded on a
+rejected `RerunPass` candidate, written back only on approval).
+
+**Duplicate-leaf detection, folded into the split-check pass.** The split-check LLM call now
+asks for a second judgment alongside `"splits"`: `"duplicates"`, mapping a leaf id to the id of
+another leaf in the branch it restates in different words (same underlying claim, no shared
+trigger phrase — the kind of duplication a regex heuristic can't catch). `run_split_check_phase`
+processes `"duplicates"` before `"splits"` so a leaf flagged as both ends up removed rather than
+split, with existence/self-reference guards so a malformed model response can't crash the run.
+The new `apply_dedup` (using a new `pb_schema.find_parent` helper) removes the leaf from its
+parent's `sub_tasks`, force-flattening the parent into a leaf too if that empties its children
+(an internal node can't have zero children). Branches that triggered the node cap above have
+every leaf included as a duplicate/split candidate regardless of category — they're the ones
+most likely to contain runaway duplication — via a new `include_all_leaves` flag on
+`_split_check_candidates`/`run_split_check_llm`.
+
+### v11 — Targeted split-check pass for semantic bundling
+
+**`run_split_check_llm` / `apply_split` (`pb_passes.py`).** `pb_enumeration.py`'s regex
+heuristic only catches *syntactic* bundling (comma lists, `et al.`, Table/Figure refs). This
+adds a second, semantic-tier check for bundling with no consistent trigger phrase — e.g.
+"small, medium, and large model variants" — scoped to leaves where
+`finegrained_task_category == "Evaluation, Metrics & Benchmarking"` or `task_category ==
+"Result Analysis"`, since that's where over-bundling concentrates. One Sonnet call per
+top-level branch collects the branch's matching leaves (skipping the call entirely if none
+match) and asks the model which leaves bundle 2+ independently verifiable claims and what to
+split them into. `apply_split` reuses `normalize_child` for each replacement child, so the
+existing enumeration sanity check doubles as an under-split detector: a replacement child
+that still trips `MIN_ENUMERATED_ITEMS_TO_SPLIT` is forced into a valid leaf (the same
+depth-guardrail fallback category) and logged as a warning rather than silently accepted.
+
+**`run_split_check_phase` (`rubric_gen.py`).** Runs after expansion is fully complete and
+before the weight pass, iterating top-level branches and logging every applied split (leaf
+id, branch, child count) to the same `state["errors"]` list `errors.txt` is written from —
+this doubles as the audit trail for what the pass changed. Idempotent across `--resume`: a
+split leaf's category fields are cleared, so it no longer matches the filter on a later run,
+with no new `pb_state.py` phase constant needed.
+
+**`--no-split-check` flag.** Opt-out flag (pass runs by default), mirroring the `--review`
+opt-in pattern, for disabling the pass during quick iteration.
 
 ### v10 — Live per-call cost indicator
 
@@ -378,6 +458,10 @@ In `--review` mode the tool pauses after each pass for you to edit `rubric_draft
 Press **Enter** to approve (with or without edits), or type feedback and press **Enter** to
 discard the output and re-run that pass with your feedback forwarded to the model.
 
+Add `--no-split-check` to skip the split-check pass (runs by default) that checks
+`Evaluation, Metrics & Benchmarking` / `Result Analysis` leaves for semantic bundling before
+weighting — useful for faster iteration when you don't need that extra pass.
+
 After every single LLM call (in both agentic and `--review` mode), a running total is
 printed to the screen: `Current usage: $0.0421`. This reflects only the current session —
 a `--resume` run starts the counter back at `$0.0000`, even though the underlying rubric
@@ -400,9 +484,9 @@ Without `--resume`, an existing `rubric_state.json` is overwritten and the run s
 | File | Description |
 |---|---|
 | `rubric_draft.json` | Editable draft for the current pass. |
-| `rubric_state.json` | Resumable checkpoint (rubric + expansion queue + hints + guardrail errors). |
+| `rubric_state.json` | Resumable checkpoint (rubric + expansion queue + hints + guardrail errors + capped branch ids). |
 | `rubric_final.json` | Final validated rubric (written when all phases complete). |
-| `errors.txt` | Guardrail violations, one per line. Only written if at least one occurred; today the only violation is the model trying to expand a node past `MAX_EXPANSION_DEPTH` (7), logged as `"<node-id>: Model attempted to expand past the maximum depth of 7 nodes."`. |
+| `errors.txt` | Guardrail violations and split-check activity, one per line. Only written if at least one occurred. Includes: the model trying to expand a node past `MAX_EXPANSION_DEPTH` (7), logged as `"<node-id>: Model attempted to expand past the maximum depth of 7 nodes."`; a branch hitting `MAX_BRANCH_NODES` (40), logged per forced node as `"<node-id>: Branch '<branch-id>' hit the 40-node cap; forced to leaf."`; every split applied by the split-check pass, logged as `"<leaf-id>: split-check split into N children (branch '<branch-id>')."`; every duplicate leaf removed by the split-check pass, logged as `"<leaf-id>: split-check removed as duplicate of '<other-leaf-id>'."` (plus a second line if removing it force-flattened its now-childless parent); and any split-check child that still trips the enumeration threshold, logged as a model-under-split warning. |
 
 If `rubric_final.json` already exists and `--resume` is passed, the tool reports it and
 exits — delete it or omit `--resume` to start over.
