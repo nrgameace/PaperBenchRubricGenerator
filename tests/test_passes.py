@@ -564,6 +564,22 @@ def test_invoke_llm_no_tracker_still_returns_text():
     assert result == "hello"
 
 
+def test_invoke_llm_prints_current_usage_when_tracker_provided(capsys):
+    from pb_cost import CostTracker
+    tracker = CostTracker()
+    client = _FakeClient('{"a": 1}')
+    pb_passes.invoke_llm(client, [], [{"role": "user", "content": []}], "claude-opus-4-8", tracker=tracker)
+    out = capsys.readouterr().out
+    assert f"Current usage: ${tracker.total_cost():.4f}" in out
+
+
+def test_invoke_llm_no_print_when_tracker_is_none(capsys):
+    client = _FakeClient('{"a": 1}')
+    pb_passes.invoke_llm(client, [], [{"role": "user", "content": []}], "claude-opus-4-8")
+    out = capsys.readouterr().out
+    assert "Current usage" not in out
+
+
 def test_invoke_llm_wraps_errors():
     class _BoomMessages:
         def create(self, **kwargs):

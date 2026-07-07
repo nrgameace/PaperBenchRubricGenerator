@@ -175,6 +175,7 @@ def invoke_llm(client, system_blocks, messages, model, max_tokens=8000, tracker=
         raise RuntimeError(f"Anthropic API call failed: {exc}") from exc
     if tracker is not None:
         tracker.record(model, response.usage)
+        print(f"  Current usage: ${tracker.total_cost():.4f}")
     return response.content[0].text
 
 

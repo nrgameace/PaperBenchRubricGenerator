@@ -156,6 +156,17 @@ text. Falls back to the full list when the best heading score is below 0.3.
 
 ## Changelog
 
+### v10 — Live per-call cost indicator
+
+**`invoke_llm` prints running cost.** Immediately after each Anthropic API call is recorded
+into `CostTracker`, `invoke_llm` (the single choke point every `run_*_llm` function funnels
+through) prints `Current usage: $X.XXXX` — the cumulative cost for the session so far, via
+the existing `CostTracker.total_cost()`. This covers every phase and both agentic and
+`--review` modes with one change, since all model calls already route through `invoke_llm`.
+No print happens when no tracker is passed. `--resume` already starts `CostTracker` fresh
+(it isn't persisted to `rubric_state.json`), so the live counter and final report both
+reflect only the current session, restarting from `$0.0000` on resume.
+
 ### v9 — Enumeration-triggered recursion guardrail
 
 **`pb_enumeration.py`.** A new pure module detects when a node's requirements text names
@@ -367,8 +378,11 @@ In `--review` mode the tool pauses after each pass for you to edit `rubric_draft
 Press **Enter** to approve (with or without edits), or type feedback and press **Enter** to
 discard the output and re-run that pass with your feedback forwarded to the model.
 
-At the end of the run, a cost report is printed showing token counts and estimated USD cost
-broken down by model.
+After every single LLM call (in both agentic and `--review` mode), a running total is
+printed to the screen: `Current usage: $0.0421`. This reflects only the current session —
+a `--resume` run starts the counter back at `$0.0000`, even though the underlying rubric
+state is restored. At the end of the run, a full cost report is printed showing token
+counts and estimated USD cost broken down by model.
 
 ### Resuming an interrupted run
 
