@@ -164,19 +164,31 @@ def _text_message(instruction: str) -> dict:
 
 
 def invoke_llm(client, system_blocks, messages, model, max_tokens=8000, tracker=None) -> str:
-    """Invoke the model and return its text. Raises RuntimeError on API failure."""
+    """Invoke the model and return its text. Raises RuntimeError on API failure.
+
+    Uses the streaming API rather than a blocking ``create`` call: the Anthropic SDK refuses
+    a non-streaming request whenever ``max_tokens`` is large enough that the response could
+    plausibly take longer than 10 minutes (see run_split_check_llm's scaled max_tokens), and
+    streaming is the SDK's documented way to make those calls safely regardless of size.
+    """
     try:
-        response = client.messages.create(
+        with client.messages.stream(
             model=model,
             max_tokens=max_tokens,
             system=system_blocks,
             messages=messages,
-        )
+        ) as stream:
+            response = stream.get_final_message()
     except Exception as exc:
         raise RuntimeError(f"Anthropic API call failed: {exc}") from exc
     if tracker is not None:
         tracker.record(model, response.usage)
         print(f"  Current usage: ${tracker.total_cost():.4f}")
+    if getattr(response, "stop_reason", None) == "max_tokens":
+        raise RuntimeError(
+            f"Anthropic API response for {model} was truncated at max_tokens={max_tokens} "
+            "before completing its JSON output. Re-run with a higher max_tokens for this call."
+        )
     return response.content[0].text
 
 
@@ -193,24 +205,51 @@ def _strip_code_fences(text: str) -> str:
 
 
 def _extract_json_span(text: str) -> str:
-    """Return the substring spanning the first JSON object/array in the text."""
-    starts = [i for i in (text.find("{"), text.find("[")) if i != -1]
-    if not starts:
+    """Return the longest balanced JSON object/array found in text.
+
+    Scans every '{'/'[' as a candidate start and keeps the longest span that decodes to
+    complete, valid JSON. A naive first-open-to-last-close scan is fooled by stray bracket
+    characters in prose that precedes the real JSON (e.g. a model writing out a reasoning
+    scratchpad with math notation like "[0.4, 0.6]" or citation numbers before its actual
+    answer) — those parse as tiny valid JSON arrays in isolation and can span past the real
+    payload's closing bracket. Picking the longest successful decode instead reliably finds
+    the intended payload, and naturally prefers an outer object over its own nested
+    sub-objects (the outer span is always longer).
+    """
+    decoder = json.JSONDecoder()
+    best_span = None
+    for i, ch in enumerate(text):
+        if ch not in "{[":
+            continue
+        try:
+            _, end = decoder.raw_decode(text, i)
+        except json.JSONDecodeError:
+            continue
+        if best_span is None or (end - i) > (best_span[1] - best_span[0]):
+            best_span = (i, end)
+    if best_span is None:
         raise ValueError("No JSON object or array found in model response.")
-    start = min(starts)
-    end = max(text.rfind("}"), text.rfind("]"))
-    if end <= start:
-        raise ValueError("Unbalanced JSON in model response.")
-    return text[start : end + 1]
+    start, end = best_span
+    return text[start:end]
 
 
 def parse_json_response(text: str):
-    """Parse a model response into JSON, tolerating code fences and surrounding prose."""
+    """Parse a model response into JSON, tolerating code fences and surrounding prose.
+
+    Raises ValueError with a preview of the raw response on failure, so a malformed model
+    response is diagnosable instead of surfacing as an opaque JSONDecodeError with no context
+    on what the model actually returned.
+    """
     cleaned = _strip_code_fences(text)
     try:
         return json.loads(cleaned)
     except json.JSONDecodeError:
+        pass
+    try:
         return json.loads(_extract_json_span(cleaned))
+    except (json.JSONDecodeError, ValueError) as exc:
+        preview = cleaned[:2000]
+        raise ValueError(f"Model response was not valid JSON ({len(cleaned)} chars). Response: {preview!r}") from exc
 
 
 def clean_id(text: str) -> str:
@@ -547,6 +586,7 @@ def run_split_check_llm(client, system_blocks, section_text, rubric: dict, branc
     leaves = _split_check_candidates(branch_node, include_all=include_all_leaves)
     if not leaves:
         return {"splits": {}, "duplicates": {}}
+    max_tokens = min(8000 + 400 * len(leaves), 32000)
     leaf_lines = "\n".join(f'- "{n["id"]}": {n["requirements"]}' for n in leaves)
     instruction = (
         f"TASK: Review these candidate leaves in the subtree rooted at \"{branch_node['id']}\" for "
@@ -561,11 +601,14 @@ def run_split_check_llm(client, system_blocks, section_text, rubric: dict, branc
         "should be removed rather than split.\n\n"
         "A leaf must not appear in both \"splits\" and \"duplicates\". Leaves that are already "
         "atomic and non-duplicate must NOT appear in the response at all.\n\n"
-        'Respond with JSON ONLY: {"splits": {"<leaf_id>": [ <child objects> ], ...}, '
+        "Do NOT include any analysis, cross-referencing notes, or reasoning text in your response "
+        "— the system preamble's figure/self-check reasoning instructions do not apply to this "
+        "task. Respond with the JSON object ONLY, no text before or after it: "
+        '{"splits": {"<leaf_id>": [ <child objects> ], ...}, '
         '"duplicates": {"<leaf_id>": "<id_of_the_leaf_it_duplicates>", ...}}\n\n' + _CHILD_SHAPE
     )
     parsed = parse_json_response(
-        invoke_llm(client, system_blocks, [_text_message(instruction)], model, tracker=tracker)
+        invoke_llm(client, system_blocks, [_text_message(instruction)], model, max_tokens=max_tokens, tracker=tracker)
     )
     if not isinstance(parsed, dict):
         return {"splits": {}, "duplicates": {}}

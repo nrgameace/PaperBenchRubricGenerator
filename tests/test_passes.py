@@ -26,6 +26,35 @@ def test_parse_json_invalid_raises():
         pb_passes.parse_json_response("not json at all")
 
 
+def test_parse_json_invalid_error_includes_raw_response_preview():
+    with pytest.raises(ValueError, match="the model went off the rails"):
+        pb_passes.parse_json_response("the model went off the rails and said something weird")
+
+
+def test_parse_json_malformed_after_extraction_includes_raw_response_preview():
+    with pytest.raises(ValueError, match=r"nothing parses here"):
+        pb_passes.parse_json_response('prose with a { that never closes and nothing parses here')
+
+
+def test_parse_json_ignores_stray_brackets_in_reasoning_prose_before_real_json():
+    """Regression test: a model that writes a reasoning scratchpad (citing ranges like
+    "[0.4, 0.6]") before its actual JSON answer must not have that stray array mistaken
+    for the payload — this is the exact failure pattern seen in production split-check
+    responses that included prose analysis ahead of the JSON."""
+    text = (
+        'Looking at the alpha ablation, values in the range [0.4, 0.6] preserve accuracy.\n\n'
+        '{"splits": {}, "duplicates": {"leaf-a": "leaf-b"}}'
+    )
+    assert pb_passes.parse_json_response(text) == {"splits": {}, "duplicates": {"leaf-a": "leaf-b"}}
+
+
+def test_parse_json_prefers_outer_object_over_its_own_nested_sub_objects():
+    text = '{"splits": {"leaf-a": [{"id": "x", "requirements": "r"}]}, "duplicates": {}}'
+    parsed = pb_passes.parse_json_response(text)
+    assert set(parsed.keys()) == {"splits", "duplicates"}
+    assert parsed["splits"]["leaf-a"][0]["id"] == "x"
+
+
 def test_clean_id_normalizes_to_kebab_case():
     assert pb_passes.clean_id("Vim Block Forward SSM") == "vim-block-forward-ssm"
     assert pb_passes.clean_id("already-kebab-1") == "already-kebab-1"
@@ -499,27 +528,43 @@ class _FakeBlock:
 
 
 class _FakeResponse:
-    def __init__(self, text):
+    def __init__(self, text, stop_reason="end_turn"):
         self.content = [_FakeBlock(text)]
+        self.stop_reason = stop_reason
         self.usage = SimpleNamespace(
             input_tokens=10, output_tokens=5,
             cache_creation_input_tokens=0, cache_read_input_tokens=0,
         )
 
 
+class _FakeStreamManager:
+    def __init__(self, response):
+        self._response = response
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc_info):
+        return False
+
+    def get_final_message(self):
+        return self._response
+
+
 class _FakeMessages:
-    def __init__(self, content):
+    def __init__(self, content, stop_reason="end_turn"):
         self._content = content
+        self._stop_reason = stop_reason
         self.calls = []
 
-    def create(self, **kwargs):
+    def stream(self, **kwargs):
         self.calls.append(kwargs)
-        return _FakeResponse(self._content)
+        return _FakeStreamManager(_FakeResponse(self._content, stop_reason=self._stop_reason))
 
 
 class _FakeClient:
-    def __init__(self, content):
-        self.messages = _FakeMessages(content)
+    def __init__(self, content, stop_reason="end_turn"):
+        self.messages = _FakeMessages(content, stop_reason=stop_reason)
 
 
 def test_run_base_llm_with_fake_client():
@@ -670,7 +715,7 @@ def test_invoke_llm_no_print_when_tracker_is_none(capsys):
 
 def test_invoke_llm_wraps_errors():
     class _BoomMessages:
-        def create(self, **kwargs):
+        def stream(self, **kwargs):
             raise RuntimeError("network down")
 
     class _BoomClient:
@@ -678,6 +723,18 @@ def test_invoke_llm_wraps_errors():
 
     with pytest.raises(RuntimeError, match="Anthropic API call failed"):
         pb_passes.invoke_llm(_BoomClient(), [], [], "claude-opus-4-8")
+
+
+def test_invoke_llm_raises_clear_error_when_response_truncated_at_max_tokens():
+    client = _FakeClient('{"a": 1', stop_reason="max_tokens")
+    with pytest.raises(RuntimeError, match="truncated at max_tokens=8000"):
+        pb_passes.invoke_llm(client, [], [{"role": "user", "content": []}], "claude-sonnet-4-6")
+
+
+def test_invoke_llm_does_not_raise_when_stop_reason_is_end_turn():
+    client = _FakeClient('{"a": 1}', stop_reason="end_turn")
+    result = pb_passes.invoke_llm(client, [], [{"role": "user", "content": []}], "claude-sonnet-4-6")
+    assert result == '{"a": 1}'
 
 
 # ── run_split_check_llm tests ─────────────────────────────────────────────────
@@ -790,6 +847,39 @@ def test_split_check_candidates_include_all_returns_every_leaf_regardless_of_cat
     branch = _split_check_branch()
     candidates = pb_passes._split_check_candidates(branch, include_all=True)
     assert {n["id"] for n in candidates} == {"result-leaf", "eval-leaf", "code-leaf"}
+
+
+def test_run_split_check_llm_scales_max_tokens_with_candidate_count():
+    rubric = _split_check_rubric()
+    branch = rubric["sub_tasks"][0]
+    client = _FakeClient('{"splits": {}, "duplicates": {}}')
+    pb_passes.run_split_check_llm(client, [], "text", rubric, branch, "model")
+    assert client.messages.calls[0]["max_tokens"] == 8000 + 400 * 2
+
+
+def test_run_split_check_llm_scales_max_tokens_higher_with_include_all_leaves():
+    rubric = _split_check_rubric()
+    branch = rubric["sub_tasks"][0]
+    client = _FakeClient('{"splits": {}, "duplicates": {}}')
+    pb_passes.run_split_check_llm(client, [], "text", rubric, branch, "model", include_all_leaves=True)
+    assert client.messages.calls[0]["max_tokens"] == 8000 + 400 * 3
+
+
+def test_run_split_check_llm_caps_max_tokens_at_32000():
+    branch = {
+        "id": "huge-branch", "requirements": "r", "weight": 0,
+        "task_category": None, "finegrained_task_category": None,
+        "sub_tasks": [
+            {"id": f"leaf-{i}", "requirements": "x", "weight": 0, "sub_tasks": [],
+             "task_category": "Code Development", "finegrained_task_category": None}
+            for i in range(100)
+        ],
+    }
+    rubric = {"id": "root", "requirements": "r", "weight": 0, "task_category": None,
+              "finegrained_task_category": None, "sub_tasks": [branch]}
+    client = _FakeClient('{"splits": {}, "duplicates": {}}')
+    pb_passes.run_split_check_llm(client, [], "text", rubric, branch, "model", include_all_leaves=True)
+    assert client.messages.calls[0]["max_tokens"] == 32000
 
 
 def test_split_check_candidates_default_still_filters_by_category():
