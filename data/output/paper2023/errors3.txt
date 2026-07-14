@@ -1,0 +1,93 @@
+relu-output-fp16-dtype-check: Model attempted to expand past the maximum depth of 7 nodes.
+per-channel-quantization-granularity: Branch 'quantization-settings' hit the 40-node cap; forced to leaf.
+group-wise-quantization-granularity: Branch 'quantization-settings' hit the 40-node cap; forced to leaf.
+llm-int8-weight-per-channel-quantization: Branch 'quantization-settings' hit the 40-node cap; forced to leaf.
+llm-int8-activation-per-token-dynamic-quantization: Branch 'quantization-settings' hit the 40-node cap; forced to leaf.
+outlier-suppression-non-scaling-layernorm-and-token-clipping: Branch 'quantization-settings' hit the 40-node cap; forced to leaf.
+llama2-falcon-mistral-mixtral-accuracy-experiments: Branch 'accuracy-experiments' hit the 40-node cap; forced to leaf.
+accuracy-experiments-execution: Branch 'accuracy-experiments' hit the 40-node cap; forced to leaf.
+opt-scale-sweep-figure7-plot: Branch 'accuracy-experiments' hit the 40-node cap; forced to leaf.
+pytorch-context-single-gpu-opt-models: Branch 'speedup-memory-experiments' hit the 40-node cap; forced to leaf.
+fastertransformer-half-gpu-latency-result: Branch 'speedup-memory-experiments' hit the 40-node cap; forced to leaf.
+figure9-top-plot-generation: Branch 'speedup-memory-experiments' hit the 40-node cap; forced to leaf.
+figure9-bottom-opt13b-memory: Branch 'speedup-memory-experiments' hit the 40-node cap; forced to leaf.
+figure9-bottom-opt30b-memory: Branch 'speedup-memory-experiments' hit the 40-node cap; forced to leaf.
+figure9-bottom-opt66b-memory: Branch 'speedup-memory-experiments' hit the 40-node cap; forced to leaf.
+figure9-bottom-opt175b-memory: Branch 'speedup-memory-experiments' hit the 40-node cap; forced to leaf.
+figure9-bottom-plot-generation: Branch 'speedup-memory-experiments' hit the 40-node cap; forced to leaf.
+table10-half-gpu-similar-latency-confirmation: Branch 'mt-nlg-530b-scaling' hit the 40-node cap; forced to leaf.
+table10-memory-halving-confirmation: Branch 'mt-nlg-530b-scaling' hit the 40-node cap; forced to leaf.
+mt-nlg-530b-int8-smoothquant-o3-applied: Branch 'mt-nlg-530b-scaling' hit the 40-node cap; forced to leaf.
+delta-max-abs-value-computation: split-check removed as duplicate of 'symmetric-quant-delta-computation'.
+delta-outlier-preservation-property: split-check removed as duplicate of 'symmetric-quant-delta-computation'.
+delta-round-to-nearest-rounding: split-check removed as duplicate of 'symmetric-quant-rounding-formula'.
+quantization-step-size-delta-computation: forced to leaf after its last child 'delta-round-to-nearest-rounding' was removed as a duplicate.
+per-token-dynamic-runtime-computation: split-check removed as duplicate of 'per-token-delta-computation-per-row'.
+per-token-quantization-applied-in-o1: split-check removed as duplicate of 'smoothquant-o1-setting'.
+per-token-quantization-applied-in-zeroquant-baseline: split-check removed as duplicate of 'baseline-zeroquant-setting'.
+per-token-quantization-applied-in-llmint8-baseline: split-check removed as duplicate of 'llm-int8-activation-per-token-dynamic-quantization'.
+post-matmul-dequantization-scaling: split-check removed as duplicate of 'outer-dimension-scaling-constraint'.
+llm-int8-weight-per-channel-quantization: split-check removed as duplicate of 'per-channel-quantization-granularity'.
+outlier-suppression-no-smoothquant-smoothing: split-check removed as duplicate of 'outlier-suppression-non-scaling-layernorm-and-token-clipping'.
+smoothquant-o2-setting: split-check split into 2 children (branch 'quantization-settings').
+smoothquant-o3-setting: split-check split into 2 children (branch 'quantization-settings').
+smoothquant-o1-setting: split-check split into 2 children (branch 'quantization-settings').
+baseline-w8a8-naive-setting: split-check split into 2 children (branch 'quantization-settings').
+baseline-zeroquant-setting: split-check split into 2 children (branch 'quantization-settings').
+llm-int8-mixed-precision-fp16-decomposition: split-check split into 3 children (branch 'quantization-settings').
+outlier-suppression-non-scaling-layernorm-and-token-clipping: split-check split into 2 children (branch 'quantization-settings').
+outlier-persistence-verification: split-check removed as duplicate of 'figure4-outlier-persistence-across-tokens'.
+table4-w8a8-naive-multi-llm: split-check removed as duplicate of 'table3-w8a8-naive-opt175b'.
+table4-zeroquant-multi-llm: split-check removed as duplicate of 'table3-zeroquant-opt175b'.
+table4-llm-int8-multi-llm: split-check removed as duplicate of 'table3-llm-int8-opt175b'.
+table4-outlier-suppression-multi-llm: split-check removed as duplicate of 'table3-outlier-suppression-opt175b'.
+table4-smoothquant-o1-multi-llm: split-check removed as duplicate of 'table3-smoothquant-o1-opt175b'.
+table4-smoothquant-o2-multi-llm: split-check removed as duplicate of 'table3-smoothquant-o2-opt175b'.
+table4-smoothquant-o3-multi-llm: split-check removed as duplicate of 'table3-smoothquant-o3-opt175b'.
+llama2-falcon-mistral-mixtral-accuracy-experiments: split-check split into 7 children (branch 'accuracy-experiments').
+figure9-top-plot-final-generation: split-check removed as duplicate of 'figure9-latency-plot-generation'.
+figure9-top-plot-generation: split-check removed as duplicate of 'figure9-latency-plot-generation'.
+figure9-bottom-plot-generation: split-check removed as duplicate of 'figure9-memory-plot-generation'.
+figure9-single-gpu-speedup-result: split-check removed as duplicate of 'fastertransformer-context-stage-opt13b-single-gpu'.
+figure9-top-opt13b-single-gpu-latency: split-check removed as duplicate of 'fastertransformer-context-stage-opt13b-single-gpu'.
+figure9-top-opt30b-single-gpu-latency: split-check removed as duplicate of 'fastertransformer-context-stage-opt30b-single-gpu'.
+figure9-top-opt66b-multi-gpu-latency: split-check removed as duplicate of 'fastertransformer-context-stage-opt66b-multi-gpu'.
+figure9-top-opt175b-multi-gpu-latency: split-check removed as duplicate of 'fastertransformer-context-stage-opt175b-multi-gpu'.
+figure9-latency-plot: forced to leaf after its last child 'figure9-top-opt175b-multi-gpu-latency' was removed as a duplicate.
+figure9-half-gpu-opt66b-result: split-check removed as duplicate of 'fastertransformer-half-gpu-latency-result'.
+figure9-half-gpu-opt175b-result: split-check removed as duplicate of 'fastertransformer-half-gpu-latency-result'.
+figure9-half-gpu-result: forced to leaf after its last child 'figure9-half-gpu-opt175b-result' was removed as a duplicate.
+figure9-bottom-opt13b-memory: split-check removed as duplicate of 'figure9-bottom-memory-2x-reduction-overall'.
+figure9-bottom-opt30b-memory: split-check removed as duplicate of 'figure9-bottom-memory-2x-reduction-overall'.
+figure9-bottom-opt66b-memory: split-check removed as duplicate of 'figure9-bottom-memory-2x-reduction-overall'.
+figure9-bottom-opt175b-memory: split-check removed as duplicate of 'figure9-bottom-memory-2x-reduction-overall'.
+figure9-memory-2x-reduction-result: split-check removed as duplicate of 'figure9-bottom-memory-2x-reduction-overall'.
+fastertransformer-context-stage-opt30b-single-gpu: split-check split into 2 children (branch 'speedup-memory-experiments').
+fastertransformer-context-stage-opt13b-single-gpu: split-check split into 2 children (branch 'speedup-memory-experiments').
+figure9-latency-plot-generation: split-check split into 2 children (branch 'speedup-memory-experiments').
+figure9-memory-plot-generation: split-check split into 2 children (branch 'speedup-memory-experiments').
+table8-decoding-latency-speedup-results: split-check split into 2 children (branch 'speedup-memory-experiments').
+table10-half-gpu-similar-latency-result: split-check removed as duplicate of 'table10-half-gpu-similar-latency-confirmation'.
+table10-memory-halving-result: split-check removed as duplicate of 'table10-memory-halving-confirmation'.
+mt-nlg-530b-single-node-serving-result: split-check removed as duplicate of 'table10-half-gpu-similar-latency-confirmation'.
+table10-reproduction-output: split-check removed as duplicate of 'table10-int8-8gpu-latency-memory-results'.
+mt-nlg-530b-eval-setup: split-check split into 2 children (branch 'mt-nlg-530b-scaling').
+mt-nlg-530b-smoothquant-quantization: split-check split into 2 children (branch 'mt-nlg-530b-scaling').
+table9-fp16-mt-nlg-530b: split-check split into 5 children (branch 'mt-nlg-530b-scaling').
+table9-int8-mt-nlg-530b: split-check split into 5 children (branch 'mt-nlg-530b-scaling').
+mt-nlg-530b-fp16-16gpu-benchmark-execution: split-check split into 2 children (branch 'mt-nlg-530b-scaling').
+mt-nlg-530b-int8-8gpu-benchmark-execution: split-check split into 2 children (branch 'mt-nlg-530b-scaling').
+table10-fp16-16gpu-latency-memory-results: split-check split into 4 children (branch 'mt-nlg-530b-scaling').
+table10-int8-8gpu-latency-memory-results: split-check split into 4 children (branch 'mt-nlg-530b-scaling').
+table11-llmint8-opt13b-seqlen256: split-check split into 2 children (branch 'ablation-studies').
+table11-llmint8-opt13b-seqlen512: split-check split into 2 children (branch 'ablation-studies').
+table11-llmint8-opt30b-seqlen256: split-check split into 2 children (branch 'ablation-studies').
+table11-llmint8-opt30b-seqlen512: split-check split into 2 children (branch 'ablation-studies').
+table11-sq-o1-opt13b-seqlen256: split-check split into 2 children (branch 'ablation-studies').
+table11-sq-o2-opt13b-seqlen256: split-check split into 2 children (branch 'ablation-studies').
+table11-sq-o3-opt13b-seqlen256: split-check split into 2 children (branch 'ablation-studies').
+table11-sq-o3-opt30b-seqlen512: split-check split into 2 children (branch 'ablation-studies').
+table11-o1-to-o3-latency-ordering-result: split-check split into 3 children (branch 'ablation-studies').
+alpha-ablation-low-alpha-activation-error-result: split-check split into 2 children (branch 'ablation-studies').
+alpha-ablation-high-alpha-weight-error-result: split-check split into 2 children (branch 'ablation-studies').
+alpha-ablation-sweet-spot-result: split-check split into 2 children (branch 'ablation-studies').
