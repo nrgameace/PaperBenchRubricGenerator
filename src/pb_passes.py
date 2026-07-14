@@ -308,7 +308,7 @@ def normalize_child(raw: dict, used_ids: set) -> tuple:
 
 
 def apply_base(parsed: dict) -> tuple:
-    """Build the initial rubric, expansion queue, and hints from a base-pass response."""
+    """Build the initial rubric, expansion queue, hints, and section_map from a base-pass response."""
     root_requirements = (parsed.get("root", {}).get("requirements") or "Reproduce the paper from scratch.").strip()
     rubric = {
         "id": "root",
@@ -325,7 +325,8 @@ def apply_base(parsed: dict) -> tuple:
         if hint is not None:
             queue.append(node["id"])
             hints[node["id"]] = hint
-    return rubric, queue, hints
+    section_map = parsed.get("section_map") or {}
+    return rubric, queue, hints, section_map
 
 
 def _children_from_parsed(parsed):
@@ -448,9 +449,14 @@ def run_base_llm(client, system_blocks, pdf_block, content_list_text, model, tra
         "work needed to reproduce THIS paper. Most top-level children are expandable (they receive "
         "their own sub-tasks later); give each a one-sentence expansion_hint that names the paper "
         "section or topic it corresponds to (this hint is used to slice the relevant section for expansion).\n\n"
+        "Also return a section_map giving, for each top-level child id, its approximate page span "
+        "and the number of tables/figures it covers in the paper — use the MinerU structured parse's "
+        "page markers and table/figure blocks to determine this.\n\n"
         "Respond with JSON ONLY in exactly this shape:\n"
         '{"root": {"requirements": "<one sentence describing full reproduction of THIS paper>"}, '
-        '"children": [ <child objects> ]}\n\n' + _CHILD_SHAPE
+        '"children": [ <child objects> ], '
+        '"section_map": {"<top-level-child-id>": {"pages": [<start_page_int>, <end_page_int>], '
+        '"tables": <int>, "figures": <int>}}}\n\n' + _CHILD_SHAPE
     )
     return parse_json_response(
         invoke_llm(client, system_blocks, [_human_message(pdf_block, instruction)], model, tracker=tracker)
@@ -667,26 +673,3 @@ def apply_dedup(rubric: dict, leaf_id: str, duplicate_of_id: str, errors: list =
             )
 
 
-def run_weight_llm_global(client, system_blocks, content_list_text, rubric: dict, current_weights: dict, model, tracker=None, feedback=None) -> dict:
-    """Calibrate weights across all branches using locally-assigned weights as context.
-
-    Sends the full rubric with current weights overlaid, asks model to ensure consistent
-    relative importance across top-level siblings and prioritize the right items globally.
-    """
-    instruction = (
-        "TASK: All branches have been weighted locally. Now calibrate across the complete rubric to ensure "
-        "top-level siblings have consistent relative importance and the right items are prioritized.\n\n"
-        f"PAPER CONTENT (MinerU structured parse):\n{content_list_text}\n\n"
-        "Within each group of sibling nodes, assign non-negative integers for relative importance "
-        "(they need NOT sum to any fixed value; the benchmark normalizes within each group). More "
-        "important or more effort-intensive siblings get larger integers. Use 1 for the root.\n\n"
-        f"CURRENT LOCALLY-ASSIGNED WEIGHTS (use as reference for calibration):\n{json.dumps(current_weights, indent=2)}\n\n"
-        f"FULL RUBRIC (ids included):\n{json.dumps(rubric, indent=2, ensure_ascii=False)}\n\n"
-        'Respond with JSON ONLY mapping EVERY node id to an integer: {"weights": {"<id>": <int>, ...}}'
-    )
-    if feedback:
-        instruction += f"\n\nUSER FEEDBACK (incorporate this when assigning weights):\n{feedback}"
-    parsed = parse_json_response(
-        invoke_llm(client, system_blocks, [_text_message(instruction)], model, tracker=tracker)
-    )
-    return parsed.get("weights", parsed) if isinstance(parsed, dict) else {}

@@ -2,12 +2,25 @@
 
 import json
 import sys
+from types import SimpleNamespace
 
 import pytest
 
 import pb_review
 import rubric_gen
 from pb_schema import validate_final
+
+
+class _FakeEmbeddings:
+    def create(self, model, input):
+        # Deterministic vectors derived from text length so results are stable across runs.
+        vectors = [[float(len(text) % 7 + 1), 1.0] for text in input]
+        return SimpleNamespace(data=[SimpleNamespace(embedding=v) for v in vectors])
+
+
+class _FakeEmbeddingClient:
+    def __init__(self):
+        self.embeddings = _FakeEmbeddings()
 
 _BASE = {"root": {"requirements": "Reproduce the paper end to end."},
          "children": [{"requirements": "Set up environment", "expandable": True, "expansion_hint": "deps"},
@@ -27,6 +40,7 @@ def _auto_approve(monkeypatch):
 def _patch_llm(monkeypatch):
     """Patch out all network/model/asset touchpoints with deterministic fakes."""
     monkeypatch.setattr(rubric_gen, "build_client", lambda *a, **k: object())
+    monkeypatch.setattr(rubric_gen, "build_embedding_client", lambda *a, **k: _FakeEmbeddingClient())
     monkeypatch.setattr(rubric_gen, "pdf_to_block", lambda _p: {"type": "file"})
     monkeypatch.setattr(rubric_gen, "load_few_shot", lambda: '{"id": "root", "requirements": "example", "weight": 1, "sub_tasks": [], "task_category": "Code Development"}')
     monkeypatch.setattr(rubric_gen, "run_base_llm", lambda *a, **k: _BASE)
@@ -42,12 +56,6 @@ def _patch_llm(monkeypatch):
         branch_node = args[4]
         return {node["id"]: 1 for node in iter_nodes(branch_node)}
     monkeypatch.setattr(rubric_gen, "run_weight_llm_branch", _fake_weight_llm_branch)
-
-    def _fake_weight_llm_global(*args, **kwargs):
-        from pb_schema import iter_nodes
-        rubric = args[3]
-        return {node["id"]: 1 for node in iter_nodes(rubric)}
-    monkeypatch.setattr(rubric_gen, "run_weight_llm_global", _fake_weight_llm_global)
     monkeypatch.setattr(rubric_gen, "run_split_check_llm", lambda *a, **k: {})
 
 
@@ -113,7 +121,6 @@ def test_main_exits_cleanly_when_weight_resolution_exceeds_max_retries(tmp_path,
     # Every weight-assigning call returns nothing, so every node stays invalid no matter how
     # many times the pipeline retries.
     monkeypatch.setattr(rubric_gen, "run_weight_llm_branch", lambda *a, **k: {})
-    monkeypatch.setattr(rubric_gen, "run_weight_llm_global", lambda *a, **k: {})
     monkeypatch.setattr(rubric_gen, "run_weight_llm", lambda *a, **k: {})
     monkeypatch.setattr(sys, "argv", ["rubric_gen", "--input", str(input_dir), "--output", str(output_dir)])
 

@@ -148,7 +148,7 @@ def test_apply_base_uses_model_ids():
     parsed = {"root": {"requirements": "reproduce paper"},
               "children": [{"id": "env-setup", "requirements": "setup", "expandable": True, "expansion_hint": "env"},
                            {"id": "final-metric", "requirements": "atomic", "expandable": False, "task_category": "Code Development"}]}
-    rubric, queue, hints = pb_passes.apply_base(parsed)
+    rubric, queue, hints, _ = pb_passes.apply_base(parsed)
     assert rubric["id"] == "root" and rubric["requirements"] == "reproduce paper"
     assert [child["id"] for child in rubric["sub_tasks"]] == ["env-setup", "final-metric"]
     assert queue == ["env-setup"] and "env-setup" in hints
@@ -159,12 +159,12 @@ def test_apply_base_dedupes_colliding_model_ids():
     parsed = {"root": {"requirements": "r"},
               "children": [{"id": "build-model", "requirements": "a", "expandable": False, "task_category": "Code Development"},
                            {"id": "build-model", "requirements": "b", "expandable": False, "task_category": "Code Development"}]}
-    rubric, _, _ = pb_passes.apply_base(parsed)
+    rubric, _, _, _ = pb_passes.apply_base(parsed)
     assert [child["id"] for child in rubric["sub_tasks"]] == ["build-model", "build-model-2"]
 
 
 def test_apply_expansion_attaches_children_and_returns_pending():
-    rubric, queue, hints = pb_passes.apply_base(
+    rubric, queue, hints, _ = pb_passes.apply_base(
         {"root": {"requirements": "r"}, "children": [{"requirements": "setup", "expandable": True, "expansion_hint": "env"}]})
     node_id = queue[0]
     parsed = {"children": [{"requirements": "install deps", "expandable": False, "task_category": "Code Development"},
@@ -177,7 +177,7 @@ def test_apply_expansion_attaches_children_and_returns_pending():
 
 
 def test_apply_expansion_queues_forced_expandable_child_from_enumeration_override():
-    rubric, queue, hints = pb_passes.apply_base(
+    rubric, queue, hints, _ = pb_passes.apply_base(
         {"root": {"requirements": "r"}, "children": [{"requirements": "setup", "expandable": True, "expansion_hint": "env"}]})
     node_id = queue[0]
     parsed = {"children": [_ENV_SETUP_2_RAW]}
@@ -189,7 +189,7 @@ def test_apply_expansion_queues_forced_expandable_child_from_enumeration_overrid
 
 
 def test_apply_expansion_accepts_bare_list():
-    rubric, queue, hints = pb_passes.apply_base(
+    rubric, queue, hints, _ = pb_passes.apply_base(
         {"root": {"requirements": "r"}, "children": [{"requirements": "setup", "expandable": True, "expansion_hint": "env"}]})
     node_id = queue[0]
     pending = pb_passes.apply_expansion(rubric, node_id, [{"requirements": "x", "expandable": False, "task_category": "Code Development"}], hints)
@@ -203,7 +203,7 @@ def test_apply_expansion_missing_node_raises():
 
 
 def test_apply_expansion_within_max_depth_is_unaffected():
-    rubric, queue, hints = pb_passes.apply_base(
+    rubric, queue, hints, _ = pb_passes.apply_base(
         {"root": {"requirements": "r"}, "children": [{"requirements": "setup", "expandable": True, "expansion_hint": "env"}]})
     node_id = queue[0]  # depth 1
     parsed = {"children": [{"requirements": "subarea", "expandable": True, "expansion_hint": "more"}]}
@@ -214,7 +214,7 @@ def test_apply_expansion_within_max_depth_is_unaffected():
 
 
 def test_apply_expansion_forces_leaf_and_records_error_past_max_depth():
-    rubric, queue, hints = pb_passes.apply_base(
+    rubric, queue, hints, _ = pb_passes.apply_base(
         {"root": {"requirements": "r"}, "children": [{"requirements": "setup", "expandable": True, "expansion_hint": "env"}]})
     node_id = queue[0]  # depth 1; children would be depth 2
     parsed = {"children": [{"id": "too-deep", "requirements": "subarea", "expandable": True, "expansion_hint": "more"}]}
@@ -234,7 +234,7 @@ def test_apply_expansion_forces_leaf_and_records_error_past_max_depth():
 
 
 def test_apply_expansion_depth_guardrail_is_noop_without_errors_list():
-    rubric, queue, hints = pb_passes.apply_base(
+    rubric, queue, hints, _ = pb_passes.apply_base(
         {"root": {"requirements": "r"}, "children": [{"requirements": "setup", "expandable": True, "expansion_hint": "env"}]})
     node_id = queue[0]
     parsed = {"children": [{"id": "too-deep", "requirements": "subarea", "expandable": True, "expansion_hint": "more"}]}
@@ -465,34 +465,6 @@ def test_run_weight_llm_branch_returns_partial_weights():
     assert result == {"section-a": 3, "leaf-a1": 2, "leaf-a2": 1}
 
 
-# ── run_weight_llm_global tests ───────────────────────────────────────────────
-
-def test_run_weight_llm_global_sends_current_weights_as_context():
-    rubric = _two_leaf_rubric()
-    current_weights = {"root": 1, "a": 3, "b": 2}
-    client = _FakeClient('{"weights": {"root": 1, "a": 4, "b": 2}}')
-    pb_passes.run_weight_llm_global(client, [], "text", rubric, current_weights, "model")
-    instruction = client.messages.calls[0]["messages"][0]["content"][0]["text"]
-    assert '"a": 3' in instruction or "locally" in instruction.lower() or "calibrate" in instruction.lower()
-
-
-def test_run_weight_llm_global_with_feedback_appended():
-    rubric = _two_leaf_rubric()
-    client = _FakeClient('{"weights": {"root": 1, "a": 3, "b": 2}}')
-    pb_passes.run_weight_llm_global(client, [], "text", rubric, {}, "model", feedback="recheck table 3")
-    instruction = client.messages.calls[0]["messages"][0]["content"][0]["text"]
-    assert "USER FEEDBACK" in instruction
-    assert "recheck table 3" in instruction
-
-
-def test_run_weight_llm_global_without_feedback_no_feedback_block():
-    rubric = _two_leaf_rubric()
-    client = _FakeClient('{"weights": {"root": 1, "a": 3, "b": 2}}')
-    pb_passes.run_weight_llm_global(client, [], "text", rubric, {}, "model")
-    instruction = client.messages.calls[0]["messages"][0]["content"][0]["text"]
-    assert "USER FEEDBACK" not in instruction
-
-
 # ── run_weight_llm new param tests ────────────────────────────────────────────
 
 def _weight_instruction(client):
@@ -579,9 +551,32 @@ def test_run_base_llm_with_fake_client():
         "This is the structured paper text.",
         "claude-opus-4-8",
     )
-    rubric, queue, _ = pb_passes.apply_base(parsed)
+    rubric, queue, _, _ = pb_passes.apply_base(parsed)
     assert rubric["requirements"] == "repro" and len(queue) == 1
     assert client.messages.calls
+
+
+def test_run_base_llm_instruction_requests_section_map():
+    client = _FakeClient('{"root": {"requirements": "repro"}, "children": [], "section_map": {}}')
+    pb_passes.run_base_llm(client, [{"type": "text", "text": "sys"}], {"type": "document"}, "text", "model")
+    instruction = client.messages.calls[0]["messages"][0]["content"][1]["text"]
+    assert "section_map" in instruction
+
+
+def test_apply_base_extracts_section_map():
+    parsed = {
+        "root": {"requirements": "r"},
+        "children": [{"id": "env-setup", "requirements": "setup", "expandable": False, "task_category": "Code Development"}],
+        "section_map": {"env-setup": {"pages": [1, 3], "tables": 1, "figures": 0}},
+    }
+    _, _, _, section_map = pb_passes.apply_base(parsed)
+    assert section_map == {"env-setup": {"pages": [1, 3], "tables": 1, "figures": 0}}
+
+
+def test_apply_base_defaults_section_map_to_empty_when_absent():
+    parsed = {"root": {"requirements": "r"}, "children": []}
+    _, _, _, section_map = pb_passes.apply_base(parsed)
+    assert section_map == {}
 
 
 def _target_rubric():

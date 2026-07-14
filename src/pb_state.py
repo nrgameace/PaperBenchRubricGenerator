@@ -11,7 +11,7 @@ PHASE_BASE = "base"
 
 def empty_state() -> dict:
     """Return a fresh, empty state structure."""
-    return {"rubric": None, "queue": [], "hints": {}, "errors": [], "capped_branches": []}
+    return {"rubric": None, "queue": [], "hints": {}, "errors": [], "capped_branches": [], "section_map": {}}
 
 
 def load_state(path):
@@ -23,14 +23,15 @@ def load_state(path):
         state = json.load(handle)
     state.setdefault("errors", [])
     state.setdefault("capped_branches", [])
+    state.setdefault("section_map", {})
     return state
 
 
-def save_state(path, rubric, queue, hints, errors=None, capped_branches=None) -> None:
-    """Persist the rubric, expansion queue, hints, guardrail errors, and node-cap-triggered
-    branch ids atomically via a temp file."""
+def save_state(path, rubric, queue, hints, errors=None, capped_branches=None, section_map=None) -> None:
+    """Persist the rubric, expansion queue, hints, guardrail errors, node-cap-triggered
+    branch ids, and base-pass section_map atomically via a temp file."""
     payload = {"rubric": rubric, "queue": list(queue), "hints": dict(hints), "errors": list(errors or []),
-               "capped_branches": sorted(capped_branches or [])}
+               "capped_branches": sorted(capped_branches or []), "section_map": dict(section_map or {})}
     state_path = Path(path)
     tmp_path = state_path.with_suffix(state_path.suffix + ".tmp")
     with open(tmp_path, "w", encoding="utf-8") as handle:

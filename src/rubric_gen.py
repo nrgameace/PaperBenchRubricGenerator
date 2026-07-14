@@ -23,12 +23,13 @@ except ImportError:
     pass
 
 from pb_cost import CostTracker
+from pb_embeddings import build_embedding_client, rescale_global_weights, write_flagged_duplicates
 from pb_input import discover_mineru_dir, discover_pdf, load_content_list
 from pb_mineru import blocks_to_text, slice_section
 from pb_passes import (MAX_BRANCH_NODES, apply_base, apply_dedup, apply_expansion, apply_split, apply_weights,
                        branch_size, build_client, build_system_blocks, find_invalid_weights,
                        force_branch_cap_leaves, pdf_to_block, run_base_llm, run_expansion_llm, run_split_check_llm,
-                       run_weight_llm, run_weight_llm_branch, run_weight_llm_global)
+                       run_weight_llm, run_weight_llm_branch)
 from pb_review import RerunPass, collect_weight_corrections, pretty_print_nodes, review_pass
 from pb_schema import all_ids, find_node, validate_final, validate_partial
 from pb_state import (PHASE_BASE, PHASE_DONE, PHASE_EXPANSION, PHASE_WEIGHT, determine_phase,
@@ -86,7 +87,7 @@ def prune_hints(state: dict) -> None:
 def commit(state: dict, output_dir: Path) -> None:
     """Persist the current state to the checkpoint file in output_dir."""
     save_state(output_dir / "rubric_state.json", state["rubric"], state["queue"], state["hints"],
-              state.get("errors", []), state.get("capped_branches", []))
+              state.get("errors", []), state.get("capped_branches", []), state.get("section_map", {}))
 
 
 def run_base_phase(client, system_blocks, pdf_block, content_list, state, model, output_dir, tracker=None, human_review=True) -> None:
@@ -95,7 +96,7 @@ def run_base_phase(client, system_blocks, pdf_block, content_list, state, model,
     content_list_text = blocks_to_text(content_list)
     feedback = ""
     while True:
-        rubric, queue, hints = apply_base(run_base_llm(client, system_blocks, pdf_block, content_list_text, model, tracker=tracker))
+        rubric, queue, hints, section_map = apply_base(run_base_llm(client, system_blocks, pdf_block, content_list_text, model, tracker=tracker))
         pretty_print_nodes("Generated base nodes", rubric["sub_tasks"])
         if human_review:
             try:
@@ -108,6 +109,7 @@ def run_base_phase(client, system_blocks, pdf_block, content_list, state, model,
             approved = rubric
         state["rubric"], state["hints"] = approved, hints
         state["queue"] = reconcile_queue(approved, queue)
+        state["section_map"] = section_map
         prune_hints(state)
         commit(state, output_dir)
         return
@@ -233,11 +235,11 @@ def run_split_check_phase(client, system_blocks, content_list, state, model, out
     commit(state, output_dir)
 
 
-def run_weight_phase(client, system_blocks, content_list, state, model, output_dir, tracker=None, human_review=True) -> dict:
-    """Assign integer weights via per-branch local passes then a global calibration pass."""
+def run_weight_phase(client, embedding_client, system_blocks, content_list, state, model, output_dir, tracker=None, human_review=True) -> dict:
+    """Assign integer weights via per-branch local LLM passes, then a deterministic
+    embedding-based rescale across branches (see pb_embeddings.rescale_global_weights)."""
     print("\n>>> WEIGHT PASS: assigning integer weights to every node...")
     content_list_text = blocks_to_text(content_list)
-    feedback = ""
     root_id = state["rubric"]["id"]
     while True:
         candidate = copy.deepcopy(state["rubric"])
@@ -251,9 +253,11 @@ def run_weight_phase(client, system_blocks, content_list, state, model, output_d
 
         weights = _resolve_invalid_weights(client, system_blocks, content_list_text, candidate, model, weights, tracker=tracker, human_review=human_review)
 
-        print("  Running global calibration pass...")
-        global_weights = run_weight_llm_global(client, system_blocks, content_list_text, candidate, weights, model, tracker=tracker, feedback=feedback or None)
-        weights.update(global_weights)
+        print("  Rescaling weights via embedding-based branch mass and section coverage...")
+        rescaled_leaf_weights, duplicate_clusters = rescale_global_weights(
+            candidate, embedding_client, state.get("section_map", {})
+        )
+        weights.update(rescaled_leaf_weights)
         weights[root_id] = 1
 
         weights = _resolve_invalid_weights(client, system_blocks, content_list_text, candidate, model, weights, tracker=tracker, human_review=human_review)
@@ -263,13 +267,13 @@ def run_weight_phase(client, system_blocks, content_list, state, model, output_d
         if human_review:
             try:
                 approved = review_pass(candidate, output_dir / "rubric_draft.json", validate_final)
-            except RerunPass as e:
-                feedback = e.feedback
+            except RerunPass:
                 print("Re-running weight pass...")
                 continue
         else:
             approved = candidate
         state["rubric"], state["queue"] = approved, []
+        state["duplicate_clusters"] = duplicate_clusters
         commit(state, output_dir)
         return approved
 
@@ -322,6 +326,7 @@ def main() -> None:
         return
 
     client = build_client()
+    embedding_client = build_embedding_client()
     system_blocks = build_system_blocks(load_few_shot())
     pdf_block = pdf_to_block(pdf_path)
     mineru_dir = discover_mineru_dir(input_dir)
@@ -339,11 +344,12 @@ def main() -> None:
         if args.split_check:
             run_split_check_phase(client, system_blocks, content_list, state, SONNET, output_dir, tracker)
         try:
-            weighted_rubric = run_weight_phase(client, system_blocks, content_list, state, SONNET, output_dir, tracker, human_review=human_review)
+            weighted_rubric = run_weight_phase(client, embedding_client, system_blocks, content_list, state, SONNET, output_dir, tracker, human_review=human_review)
         except MaxRetriesExceeded as e:
             raise SystemExit(str(e))
         finalize(weighted_rubric, output_dir)
         write_error_log(state.get("errors", []), output_dir)
+        write_flagged_duplicates(state.get("duplicate_clusters", []), output_dir)
     tracker.print_report()
 
 

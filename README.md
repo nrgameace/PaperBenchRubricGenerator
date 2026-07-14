@@ -25,7 +25,9 @@ resumable. There are three phases:
 1. **Base pass** — `claude-opus-4-8` receives the full MinerU text plus the raw PDF (for
    figure analysis). Produces the root node and the top-level areas of work. Each top-level
    child is tagged as expandable (with an expansion hint naming the relevant paper section)
-   or a leaf.
+   or a leaf. It also emits a `section_map` — approximate page span, table count, and figure
+   count per top-level child — consumed later by the weight pass's embedding-based rescale;
+   this rides the same cached base-pass call, no extra PDF read.
 
 2. **Expansion passes** — `claude-sonnet-4-6`, breadth-first. For each top-level node, the
    tool fully expands its entire subtree (all depths) before pausing for review — **one review
@@ -76,23 +78,41 @@ resumable. There are three phases:
    `errors.txt`, and if a replacement child still trips the enumeration threshold that's logged
    too, as a model-under-split warning. Disable with `--no-split-check`.
 
-4. **Weight pass** — `claude-sonnet-4-6`, two sub-phases:
+4. **Weight pass** — one LLM sub-phase (`claude-sonnet-4-6`) followed by a deterministic,
+   embedding-based rescale (no LLM call):
    - **Local passes** — one LLM call per top-level branch. Each call is focused on a single
      subtree so the model can reason about relative importance within that branch without
      distraction from unrelated sections. The full rubric is still sent for context.
-   - **Global calibration** — one final LLM call that receives all locally-assigned weights
-     and adjusts them for consistent relative importance across top-level siblings.
+   - **Deterministic embedding-based rescale** (`pb_embeddings.rescale_global_weights`) —
+     replaces what used to be a second global LLM calibration call. That call tended to weight
+     branches by leaf count rather than substance: on one production run, a branch about a minor
+     scaling experiment (many leaves) ended up with nearly double the total leaf weight of the
+     branch covering the paper's headline result (few leaves). The rescale instead: (1) embeds
+     every leaf's requirements text in one batched OpenAI `text-embedding-3-small` call; (2)
+     clusters each branch's leaves by cosine similarity (threshold 0.87) to count *distinct
+     claims* rather than raw leaf count — this "branch mass" is what stops an over-decomposed
+     branch from inflating its own importance; (3) derives each branch's target weight share
+     from the base pass's `section_map` (page/table/figure span), falling back to a uniform
+     share for any branch with a missing or malformed entry; (4) rescales every leaf's weight
+     by `(target * total_mass) / branch_mass`, rounded and floored at 1. It also clusters all
+     leaves again ignoring branch boundaries (stricter threshold 0.92) to flag likely
+     cross-branch duplicates in `flagged_duplicates.json` for manual review — never
+     auto-deleted. Requires an `OPENAI_API_KEY` (separate from `ANTHROPIC_API_KEY`).
    - The root node is always set to weight 1 by the orchestrator (no LLM call).
-   - Invalid weights (negative, non-numeric, boolean, or missing) are corrected after both
-     sub-phases: in `--review` mode you are prompted per-node to enter a weight manually or
-     queue it for an LLM retry; in agentic mode all invalid nodes are automatically re-queued.
+   - Invalid weights (negative, non-numeric, boolean, or missing) are corrected after both the
+     local pass and the rescale: in `--review` mode you are prompted per-node to enter a weight
+     manually or queue it for an LLM retry; in agentic mode all invalid nodes are automatically
+     re-queued.
    - **Max retry guardrail.** Weight correction is capped at `MAX_WEIGHT_RESOLUTION_RETRIES`
      (5) retry cycles, in both `--review` and agentic mode. If nodes are still invalid after 5
      retries, the run raises `MaxRetriesExceeded`, which `main()` turns into a clean
      `SystemExit` (no stack trace) telling you to re-run with `--resume` — it never spins
      forever burning tokens on a model that keeps returning bad weights.
-   - Human review happens **once**, after both sub-phases and all invalid-weight correction are
-     complete.
+   - Human review happens **once**, after the local pass, the rescale, and all invalid-weight
+     correction are complete. Since the rescale is deterministic, typed review feedback no
+     longer steers it (there's no LLM call left to steer) — a rerun re-runs the local branch
+     passes and the rescale, and direct hand-edits to `rubric_draft.json` remain the way to
+     override individual weights.
 
 ### Prompt caching
 
@@ -136,10 +156,11 @@ data/
     mineru_out/           ← any folder name; must contain content_list.json at its root
       content_list.json
   output/<paper>/
-    rubric_state.json     ← resumable checkpoint (rubric + expansion queue + hints + errors + capped_branches)
+    rubric_state.json     ← resumable checkpoint (rubric + expansion queue + hints + errors + capped_branches + section_map)
     rubric_draft.json     ← editable draft for the current pass
     rubric_final.json     ← final validated rubric (written when all phases complete)
-    errors.txt             ← guardrail violations, if any occurred (see Output files)
+    errors.txt              ← guardrail violations, if any occurred (see Output files)
+    flagged_duplicates.json ← cross-branch duplicate leaves flagged for manual review, if any (see Output files)
 examples/
   example_rubric.json     ← few-shot format/depth exemplar (different paper)
 tests/
@@ -149,14 +170,15 @@ tests/
 
 | File | Responsibility |
 |---|---|
-| `rubric_gen.py` | Entry point; CLI parsing (`--review`, `--resume`, `--no-split-check`); orchestrates all 4 phases; `human_review` flag threaded through phase functions; `_expand_subtree` enforces the `MAX_BRANCH_NODES` cap before every expansion call and threads a `capped_branches` set the same way it threads `errors`; `run_split_check_phase` runs the split-check pass per top-level branch before weighting, processing `"duplicates"` (via `apply_dedup`) before `"splits"` so a leaf flagged as both is removed rather than split, and passing `include_all_leaves=True` for branches in `capped_branches`; `_resolve_invalid_weights` correction loop, capped at `MAX_WEIGHT_RESOLUTION_RETRIES` (5) and raising `MaxRetriesExceeded` past that; `write_error_log` writes `errors.txt`; prints cost report |
-| `pb_passes.py` | Anthropic SDK calls; prompt construction; JSON parsing; node normalization; tree mutation (`apply_base`, `apply_expansion`, `apply_split`, `apply_dedup`, `apply_weights`); `MAX_EXPANSION_DEPTH` (7) guardrail enforced in `apply_expansion`; `MAX_BRANCH_NODES` (40) guardrail via `branch_size`/`force_branch_cap_leaves`, checked by `rubric_gen._expand_subtree` before every expansion call; enumeration-triggered recursion override in `normalize_child` and prompt injection in `run_expansion_llm` (via `pb_enumeration`); `run_split_check_llm` — the semantic bundling/duplicate check scoped to `Evaluation, Metrics & Benchmarking` / `Result Analysis` leaves (or every leaf in the branch via `include_all_leaves=True`), one call per branch returning both `"splits"` and `"duplicates"`, skipped entirely when a branch has no candidate leaves; `apply_dedup` removes a duplicate leaf (via `pb_schema.find_parent`) and force-flattens its parent if that empties the parent's children; weight validation (`find_invalid_weights`); `run_weight_llm_branch` for per-branch local passes; `run_weight_llm_global` for cross-branch calibration; `run_weight_llm` for targeted invalid-weight retries; `invoke_llm` raises `RuntimeError` if the model response is truncated (`stop_reason == "max_tokens"`) instead of failing downstream as an opaque JSON parse error, and calls the Anthropic SDK's streaming API (`client.messages.stream(...)` / `get_final_message()`) rather than the blocking `create(...)`, since large `max_tokens` values can otherwise be rejected outright by the SDK; `run_split_check_llm` scales its `max_tokens` (8000 up to a 32000 cap) with candidate leaf count since `include_all_leaves` branches can need much longer responses; `parse_json_response` raises `ValueError` with a preview of the raw model text (up to 2000 chars) when a response isn't valid JSON, instead of a bare `JSONDecodeError` with no diagnostic context; `_extract_json_span` scans every `{`/`[` and keeps the longest balanced JSON decode rather than naively spanning first-open-to-last-close, so stray bracket characters in a model's reasoning prose (math ranges, citations) ahead of its real JSON answer can't be mistaken for the payload |
+| `rubric_gen.py` | Entry point; CLI parsing (`--review`, `--resume`, `--no-split-check`); orchestrates all 4 phases; `human_review` flag threaded through phase functions; `_expand_subtree` enforces the `MAX_BRANCH_NODES` cap before every expansion call and threads a `capped_branches` set the same way it threads `errors`; `run_split_check_phase` runs the split-check pass per top-level branch before weighting, processing `"duplicates"` (via `apply_dedup`) before `"splits"` so a leaf flagged as both is removed rather than split, and passing `include_all_leaves=True` for branches in `capped_branches`; `run_weight_phase` runs the local branch LLM passes then `pb_embeddings.rescale_global_weights` for the deterministic cross-branch rescale; `_resolve_invalid_weights` correction loop, capped at `MAX_WEIGHT_RESOLUTION_RETRIES` (5) and raising `MaxRetriesExceeded` past that; `write_error_log` writes `errors.txt`; `write_flagged_duplicates` writes `flagged_duplicates.json`; prints cost report |
+| `pb_passes.py` | Anthropic SDK calls; prompt construction; JSON parsing; node normalization; tree mutation (`apply_base`, `apply_expansion`, `apply_split`, `apply_dedup`, `apply_weights`); `apply_base` also extracts the base pass's `section_map` as its 4th return value (defaults to `{}` if absent); `MAX_EXPANSION_DEPTH` (7) guardrail enforced in `apply_expansion`; `MAX_BRANCH_NODES` (40) guardrail via `branch_size`/`force_branch_cap_leaves`, checked by `rubric_gen._expand_subtree` before every expansion call; enumeration-triggered recursion override in `normalize_child` and prompt injection in `run_expansion_llm` (via `pb_enumeration`); `run_split_check_llm` — the semantic bundling/duplicate check scoped to `Evaluation, Metrics & Benchmarking` / `Result Analysis` leaves (or every leaf in the branch via `include_all_leaves=True`), one call per branch returning both `"splits"` and `"duplicates"`, skipped entirely when a branch has no candidate leaves; `apply_dedup` removes a duplicate leaf (via `pb_schema.find_parent`) and force-flattens its parent if that empties the parent's children; weight validation (`find_invalid_weights`); `run_weight_llm_branch` for per-branch local passes; `run_weight_llm` for targeted invalid-weight retries; `invoke_llm` raises `RuntimeError` if the model response is truncated (`stop_reason == "max_tokens"`) instead of failing downstream as an opaque JSON parse error, and calls the Anthropic SDK's streaming API (`client.messages.stream(...)` / `get_final_message()`) rather than the blocking `create(...)`, since large `max_tokens` values can otherwise be rejected outright by the SDK; `run_split_check_llm` scales its `max_tokens` (8000 up to a 32000 cap) with candidate leaf count since `include_all_leaves` branches can need much longer responses; `parse_json_response` raises `ValueError` with a preview of the raw model text (up to 2000 chars) when a response isn't valid JSON, instead of a bare `JSONDecodeError` with no diagnostic context; `_extract_json_span` scans every `{`/`[` and keeps the longest balanced JSON decode rather than naively spanning first-open-to-last-close, so stray bracket characters in a model's reasoning prose (math ranges, citations) ahead of its real JSON answer can't be mistaken for the payload |
+| `pb_embeddings.py` | Deterministic embedding-based replacement for the old global LLM weight-calibration pass. `build_embedding_client`/`embed_texts` wrap the OpenAI embeddings API (`text-embedding-3-small`, one batched call); `extract_leaves` tags every leaf with its top-level branch id; `cosine_similarity`/`cluster_by_threshold` are a hand-rolled greedy single-link clusterer (no numpy/scipy/sklearn); `branch_mass`/`compute_all_branch_masses` count distinct-claim clusters per branch, not raw leaf count; `derive_target_proportions` converts `section_map` into per-branch target weight shares, falling back to a uniform share per branch on a missing/malformed entry; `rescale_branch_weights` applies the per-branch factor, floored at weight 1; `cluster_cross_branch_duplicates`/`build_duplicate_report`/`write_flagged_duplicates` flag (never auto-delete) likely duplicate leaves across branches; `rescale_global_weights` is the top-level orchestrator |
 | `pb_cost.py` | `CostTracker` — accumulates token usage (input, output, cache write, cache read) per model; computes and prints a formatted cost report |
 | `pb_input.py` | Discovers PDF and MinerU folder from input dir; loads `content_list.json` |
 | `pb_enumeration.py` | `count_enumerated_items` and `build_enumeration_hint` — pure regex heuristics (no LLM/network dependency) detecting enumerated sub-items in requirements text; `MIN_ENUMERATED_ITEMS_TO_SPLIT` (3) constant |
 | `pb_mineru.py` | Converts MinerU blocks to LLM-readable text (`blocks_to_text`); slices content to a section by heading fuzzy-match (`slice_section`) |
-| `pb_schema.py` | Rubric dict traversal and validation (`validate_partial`, `validate_final`, `find_node`, `find_parent`, `all_ids`, `node_depth`) |
-| `pb_state.py` | State persistence; phase constants (`PHASE_BASE → EXPANSION → WEIGHT → DONE`); atomic write via temp-file rename; state includes an `errors` list of guardrail violations and a `capped_branches` list of branch ids that hit `MAX_BRANCH_NODES` |
+| `pb_schema.py` | Rubric dict traversal and validation (`validate_partial`, `validate_final`, `find_node`, `find_parent`, `all_ids`, `node_depth`, `iter_nodes`) |
+| `pb_state.py` | State persistence; phase constants (`PHASE_BASE → EXPANSION → WEIGHT → DONE`); atomic write via temp-file rename; state includes an `errors` list of guardrail violations, a `capped_branches` list of branch ids that hit `MAX_BRANCH_NODES`, and a `section_map` dict from the base pass |
 | `pb_review.py` | Blocks on `input()` for human review; raises `RerunPass(feedback)` when user types non-empty text; `collect_weight_corrections` handles interactive per-node weight correction |
 | `task_node.py` | Frozen `TaskNode` dataclass (adapted from OpenAI's frontier-evals); leaf/internal validation in `__post_init__` |
 
@@ -182,6 +204,39 @@ text. Falls back to the full list when the best heading score is below 0.3.
 ---
 
 ## Changelog
+
+### v13 — Deterministic embedding-based weight rescale (replaces global LLM calibration)
+
+**`pb_embeddings.py` (new module).** The weight pass's global LLM calibration call
+(`run_weight_llm_global`) is removed and replaced with a deterministic, embedding-based rescale
+(`rescale_global_weights`). The global LLM pass tended to weight branches by leaf count rather
+than substance — on a production run, a branch about a minor scaling experiment (many leaves)
+ended up with nearly double the total leaf weight of the branch covering the paper's headline
+result (few leaves), because the LLM effectively counted leaves instead of judging how much of
+the paper's actual content or how many distinct claims each branch covered.
+
+The replacement: one batched OpenAI `text-embedding-3-small` call embeds every leaf's
+requirements text (the only new API cost — no further LLM judgment calls). Each branch's
+leaves are clustered by cosine similarity (hand-rolled greedy single-link, threshold 0.87, no
+numpy/scipy/sklearn) to compute a "branch mass" — its distinct-claim cluster count, not its raw
+leaf count — which is what stops an over-decomposed branch from inflating its own importance.
+Each branch's target weight share comes from a new `section_map` the base pass now also emits
+(page span, table count, figure count per top-level child, riding the same cached PDF read — no
+extra PDF load), falling back to a uniform share for any branch with a missing or malformed
+entry rather than failing the whole rescale. Every leaf's weight is then rescaled by
+`(target * total_mass) / branch_mass`, rounded and floored at 1 — pure arithmetic, deterministic
+and reproducible run to run. The same embeddings are reused to cluster all leaves again ignoring
+branch boundaries (stricter threshold 0.92), flagging any cluster spanning more than one branch
+in `flagged_duplicates.json` for manual review (never auto-deleted) — this catches the same
+underlying claim independently restated in different branches with no shared trigger phrase, the
+cross-branch equivalent of the split-check pass's within-branch duplicate detection.
+
+Since the rescale is now deterministic, human review of the weight phase still gates the final
+result (approve or `RerunPass`), but typed feedback text is no longer forwarded to it — there is
+no LLM call left to steer. A `RerunPass` re-runs the local per-branch LLM passes and the
+deterministic rescale; direct hand-edits to `rubric_draft.json` remain the way to override
+individual weights. Requires a new `OPENAI_API_KEY` (separate from `ANTHROPIC_API_KEY`) and adds
+`openai` to `requirements.txt`.
 
 ### v12 — Per-branch node cap and duplicate-leaf detection
 
@@ -412,18 +467,24 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 2. API key
+### 2. API keys
 
-Create a `.env` file in the repo root:
+Create a `.env` file in the repo root. Two keys are required: `ANTHROPIC_API_KEY` for the
+base/expansion/split-check/weight LLM passes, and `OPENAI_API_KEY` for the weight pass's
+embedding-based rescale.
 
 ```bash
-echo "ANTHROPIC_API_KEY=sk-ant-..." > .env
+cat >> .env <<'EOF'
+ANTHROPIC_API_KEY=sk-ant-...
+OPENAI_API_KEY=sk-...
+EOF
 ```
 
 `rubric_gen.py` loads `.env` automatically via `python-dotenv`. Alternatively:
 
 ```bash
 export ANTHROPIC_API_KEY=sk-ant-...
+export OPENAI_API_KEY=sk-...
 ```
 
 ### 3. MinerU
@@ -484,9 +545,10 @@ Without `--resume`, an existing `rubric_state.json` is overwritten and the run s
 | File | Description |
 |---|---|
 | `rubric_draft.json` | Editable draft for the current pass. |
-| `rubric_state.json` | Resumable checkpoint (rubric + expansion queue + hints + guardrail errors + capped branch ids). |
+| `rubric_state.json` | Resumable checkpoint (rubric + expansion queue + hints + guardrail errors + capped branch ids + base-pass `section_map`). |
 | `rubric_final.json` | Final validated rubric (written when all phases complete). |
 | `errors.txt` | Guardrail violations and split-check activity, one per line. Only written if at least one occurred. Includes: the model trying to expand a node past `MAX_EXPANSION_DEPTH` (7), logged as `"<node-id>: Model attempted to expand past the maximum depth of 7 nodes."`; a branch hitting `MAX_BRANCH_NODES` (40), logged per forced node as `"<node-id>: Branch '<branch-id>' hit the 40-node cap; forced to leaf."`; every split applied by the split-check pass, logged as `"<leaf-id>: split-check split into N children (branch '<branch-id>')."`; every duplicate leaf removed by the split-check pass, logged as `"<leaf-id>: split-check removed as duplicate of '<other-leaf-id>'."` (plus a second line if removing it force-flattened its now-childless parent); and any split-check child that still trips the enumeration threshold, logged as a model-under-split warning. |
+| `flagged_duplicates.json` | Leaves from *different* top-level branches that the weight pass's embedding-based rescale clustered together as likely restating the same claim (cosine similarity ≥ 0.92). Only written if at least one cross-branch cluster was found; never auto-deleted — for manual review. |
 
 If `rubric_final.json` already exists and `--resume` is passed, the tool reports it and
 exits — delete it or omit `--resume` to start over.
@@ -498,12 +560,15 @@ exits — delete it or omit `--resume` to start over.
 | Setting | How to set | Default |
 |---|---|---|
 | Few-shot example rubric | `FEW_SHOT_RUBRIC_PATH` env var | `examples/example_rubric.json` |
+| Embedding model | `pb_embeddings.EMBEDDING_MODEL` | `text-embedding-3-small` |
+| Within-branch cluster threshold | `pb_embeddings.BRANCH_CLUSTER_THRESHOLD` | `0.87` |
+| Cross-branch duplicate threshold | `pb_embeddings.DUPLICATE_CLUSTER_THRESHOLD` | `0.92` |
 
 ---
 
 ## Running the tests
 
-The test suite runs entirely offline (Anthropic calls are faked):
+The test suite runs entirely offline (Anthropic and OpenAI calls are faked):
 
 ```bash
 .venv/bin/pytest tests/
