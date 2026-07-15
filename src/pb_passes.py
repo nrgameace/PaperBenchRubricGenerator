@@ -175,6 +175,7 @@ def invoke_llm(client, system_blocks, messages, model, max_tokens=8000, tracker=
         with client.messages.stream(
             model=model,
             max_tokens=max_tokens,
+            temperature=0,
             system=system_blocks,
             messages=messages,
         ) as stream:
@@ -489,8 +490,9 @@ def run_expansion_llm(client, system_blocks, section_text, rubric: dict, node_id
         )
     if feedback:
         instruction += f"\n\nUSER FEEDBACK (incorporate this when generating children):\n{feedback}"
+    max_tokens = min(8000 + 400 * enum_count, 32000)
     return parse_json_response(
-        invoke_llm(client, system_blocks, [_text_message(instruction)], model, tracker=tracker)
+        invoke_llm(client, system_blocks, [_text_message(instruction)], model, max_tokens=max_tokens, tracker=tracker)
     )
 
 

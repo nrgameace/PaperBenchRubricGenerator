@@ -1,0 +1,18 @@
+[
+  {
+    "leaf_ids": [
+      "static-vs-dynamic-latency-o3-vs-o2-opt30b",
+      "static-vs-dynamic-latency-o2-vs-o1-opt30b",
+      "table11-opt30b-seq256-latencies"
+    ],
+    "branch_ids": [
+      "quantization-settings",
+      "speedup-memory-results"
+    ],
+    "requirements": {
+      "static-vs-dynamic-latency-o3-vs-o2-opt30b": "Table 11 reports that for OPT-30B at sequence length 256, SmoothQuant-O3 has latency 227.6ms and SmoothQuant-O2 has latency 240.2ms, confirming O3 is faster than O2.",
+      "static-vs-dynamic-latency-o2-vs-o1-opt30b": "Table 11 reports that for OPT-30B at sequence length 256, SmoothQuant-O2 has latency 240.2ms and SmoothQuant-O1 has latency 246.7ms, confirming O2 is faster than O1.",
+      "table11-opt30b-seq256-latencies": "For OPT-30B at sequence length 256, Table 11 reports SmoothQuant-O3 latency of 227.6ms, SmoothQuant-O2 latency of 240.2ms, and SmoothQuant-O1 latency of 246.7ms."
+    }
+  }
+]

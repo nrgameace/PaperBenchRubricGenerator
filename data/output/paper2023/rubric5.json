@@ -1,0 +1,2381 @@
+{
+  "id": "root",
+  "requirements": "The core contributions of 'SmoothQuant: Accurate and Efficient Post-Training Quantization for Large Language Models' have been reproduced, including the SmoothQuant per-channel smoothing transformation, the O1-O3 W8A8 quantization settings, accuracy preservation across OPT/BLOOM/GLM/MT-NLG/LLaMA/Llama-2/Falcon/Mistral/Mixtral models, and the measured speedup and memory savings in PyTorch and FasterTransformer.",
+  "weight": 1,
+  "sub_tasks": [
+    {
+      "id": "smoothquant-method",
+      "requirements": "The SmoothQuant per-channel smoothing transformation has been implemented, including the mathematically equivalent scaling of activations and weights, the migration strength alpha, the smoothing factor formula, and calibration on the Pile dataset.",
+      "weight": 5,
+      "sub_tasks": [
+        {
+          "id": "smoothing-transformation-equivalence",
+          "requirements": "The mathematically equivalent per-channel smoothing transformation has been implemented as defined in Equation 3: Y = (X diag(s)^{-1}) · (diag(s) W) = X_hat W_hat, where activations are divided by per-channel smoothing factor s and weights are multiplied by s. The smoothed model must produce numerically identical outputs to the unsmoothed FP16 model when no quantization is applied.",
+          "weight": 7,
+          "sub_tasks": [],
+          "task_category": "Code Development",
+          "finegrained_task_category": "Method Implementation"
+        },
+        {
+          "id": "smoothing-factor-formula",
+          "requirements": "The per-channel smoothing factor formula from Equation 4 has been implemented: s_j = max(|X_j|)^alpha / max(|W_j|)^(1-alpha), where j indexes the input channel, max(|X_j|) is the per-channel maximum activation magnitude, max(|W_j|) is the per-channel maximum weight magnitude, and alpha is the migration strength hyperparameter.",
+          "weight": 5,
+          "sub_tasks": [
+            {
+              "id": "smoothing-factor-per-channel-indexing",
+              "requirements": "The smoothing factor computation correctly indexes over input channels: for each input channel j in 1..C_i, a separate scalar s_j is computed, producing a per-channel vector s of length C_i (the input channel dimension of the linear layer), as specified in Equation 4 and Section 4.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "smoothing-factor-activation-max",
+              "requirements": "The per-channel maximum activation magnitude max(|X_j|) is correctly computed for each input channel j by taking the absolute maximum value across all tokens T and all calibration samples for that channel. This value is estimated offline from the 512 Pile calibration sentences, not computed dynamically at runtime.",
+              "weight": 6,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "smoothing-factor-weight-max",
+              "requirements": "The per-channel maximum weight magnitude max(|W_j|) is correctly computed for each input channel j by taking the absolute maximum value across all output channels C_o for that input channel row of the weight matrix W (shape C_i x C_o), as specified in Equation 4 and Section 4.",
+              "weight": 6,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "smoothing-factor-alpha-exponentiation",
+              "requirements": "The migration strength hyperparameter alpha is applied as an exponent to both terms: max(|X_j|) is raised to the power alpha and max(|W_j|) is raised to the power (1-alpha), and the smoothing factor s_j is computed as their ratio: s_j = max(|X_j|)^alpha / max(|W_j|)^(1-alpha), exactly matching Equation 4. When alpha=0 all difficulty stays in activations; when alpha=1 all difficulty migrates to weights.",
+              "weight": 4,
+              "sub_tasks": [
+                {
+                  "id": "alpha-exponent-activation-term",
+                  "requirements": "The activation term max(|X_j|) is raised to the power alpha in the smoothing factor computation. Specifically, for each input channel j, the code computes max(|X_j|)**alpha (not max(|X_j|) * alpha or any other form), exactly matching the numerator of Equation 4: s_j = max(|X_j|)^alpha / max(|W_j|)^(1-alpha).",
+                  "weight": 4,
+                  "sub_tasks": [],
+                  "task_category": "Code Development",
+                  "finegrained_task_category": "Method Implementation"
+                },
+                {
+                  "id": "alpha-exponent-weight-term",
+                  "requirements": "The weight term max(|W_j|) is raised to the power (1-alpha) in the smoothing factor computation. Specifically, for each input channel j, the code computes max(|W_j|)**(1-alpha) (not max(|W_j|) * (1-alpha) or any other form), exactly matching the denominator of Equation 4: s_j = max(|X_j|)^alpha / max(|W_j|)^(1-alpha).",
+                  "weight": 4,
+                  "sub_tasks": [],
+                  "task_category": "Code Development",
+                  "finegrained_task_category": "Method Implementation"
+                },
+                {
+                  "id": "alpha-ratio-combination",
+                  "requirements": "The final smoothing factor s_j is computed as the ratio of the two exponentiated terms: s_j = max(|X_j|)^alpha / max(|W_j|)^(1-alpha), exactly matching Equation 4. The ratio form (not a product, sum, or other combination) must be used, so that when alpha=0, s_j = 1/max(|W_j|) (all difficulty pushed to activations) and when alpha=1, s_j = max(|X_j|) (all difficulty migrated to weights), as described in Section 4.",
+                  "weight": 6,
+                  "sub_tasks": [],
+                  "task_category": "Code Development",
+                  "finegrained_task_category": "Method Implementation"
+                },
+                {
+                  "id": "alpha-boundary-behavior",
+                  "requirements": "The implementation correctly handles the two boundary cases of alpha: when alpha=0, s_j reduces to max(|W_j|)^{-1} (equivalently 1/max(|W_j|)), leaving all quantization difficulty in activations (weights become easier, activations unchanged); when alpha=1, s_j reduces to max(|X_j|), migrating all quantization difficulty from activations to weights. Both boundary cases are consistent with the description in Section 4 of the paper.",
+                  "weight": 2,
+                  "sub_tasks": [
+                    {
+                      "id": "alpha-zero-boundary-weight-only-difficulty",
+                      "requirements": "When alpha=0, the smoothing factor formula s_j = max(|X_j|)^0 / max(|W_j|)^1 reduces to s_j = 1/max(|W_j|). The implementation correctly computes this boundary case: the activation channels are divided by 1/max(|W_j|), effectively scaling them up by max(|W_j|), pushing all quantization difficulty into activations while making weights trivially easy to quantize (each weight channel's maximum magnitude becomes 1 after scaling). This is consistent with the description in Section 4: 'we can also push all the quantization difficulty from weights to activations by choosing s_j = 1/max(|W_j|)'. The code must not special-case this; it must follow naturally from the formula with alpha=0.",
+                      "weight": 2,
+                      "sub_tasks": [
+                        {
+                          "id": "alpha-zero-formula-reduction",
+                          "requirements": "When alpha=0, the smoothing factor formula s_j = max(|X_j|)^0 / max(|W_j|)^1 reduces algebraically to s_j = 1/max(|W_j|). The implementation computes this value directly from the general Equation 4 formula by substituting alpha=0, without any special-casing or branching in the code. The numerator max(|X_j|)^0 evaluates to exactly 1.0 for all channels j, and the denominator max(|W_j|)^1 evaluates to max(|W_j|), yielding s_j = 1/max(|W_j|) per channel.",
+                          "weight": 1,
+                          "sub_tasks": [],
+                          "task_category": "Code Development",
+                          "finegrained_task_category": "Method Implementation"
+                        },
+                        {
+                          "id": "alpha-zero-activation-scaling-effect",
+                          "requirements": "With s_j = 1/max(|W_j|) (alpha=0), the smoothed activation X_hat = X * diag(s)^{-1} = X * diag(max(|W_j|)) scales each activation channel j up by max(|W_j|). This pushes all quantization difficulty into activations: each weight channel j's maximum magnitude becomes 1 after being multiplied by s_j = 1/max(|W_j|), making weights trivially easy to quantize (uniform magnitudes of 1 across channels), while activation channels become harder to quantize due to the amplification by max(|W_j|). This is consistent with Section 4's statement: 'we can also push all the quantization difficulty from weights to activations by choosing s_j = 1/max(|W_j|)'.",
+                          "weight": 2,
+                          "sub_tasks": [
+                            {
+                              "id": "alpha-zero-formula-reduction-to-inverse-weight-max",
+                              "requirements": "When alpha=0, the smoothing factor formula s_j = max(|X_j|)^0 / max(|W_j|)^1 reduces algebraically to s_j = 1/max(|W_j|). The implementation computes this value directly from the general Equation 4 formula by substituting alpha=0, without any special-casing or branching in the code. The numerator max(|X_j|)^0 evaluates to exactly 1.0 for all channels j, and the denominator max(|W_j|)^1 evaluates to max(|W_j|), yielding s_j = 1/max(|W_j|) per channel, consistent with Section 4's statement 'we can also push all the quantization difficulty from weights to activations by choosing s_j = 1/max(|W_j|)'.",
+                              "weight": 1,
+                              "sub_tasks": [],
+                              "task_category": "Code Development",
+                              "finegrained_task_category": "Method Implementation"
+                            },
+                            {
+                              "id": "alpha-zero-activation-amplification-effect",
+                              "requirements": "With s_j = 1/max(|W_j|) (alpha=0), the smoothed activation X_hat = X * diag(s)^{-1} = X * diag(max(|W_j|)) scales each activation channel j up by max(|W_j|). The implementation correctly applies this scaling so that activation channels are amplified (making them harder to quantize per-tensor), pushing all quantization difficulty into activations. This is consistent with Section 4's statement: 'we can also push all the quantization difficulty from weights to activations by choosing s_j = 1/max(|W_j|)'.",
+                              "weight": 3,
+                              "sub_tasks": [],
+                              "task_category": "Code Development",
+                              "finegrained_task_category": "Method Implementation"
+                            },
+                            {
+                              "id": "alpha-zero-weight-magnitude-becomes-one",
+                              "requirements": "After applying the alpha=0 smoothing to a linear layer, each weight channel j is multiplied by s_j = 1/max(|W_j|), so the per-channel maximum weight magnitude max(|W_hat_j|) = max(|s_j * W_j|) = max(|W_j|) * (1/max(|W_j|)) = 1.0 for every input channel j. The implementation produces weight channel maxima of exactly 1.0 (within floating-point precision) after transformation with alpha=0, demonstrating that weight quantization difficulty is fully eliminated, consistent with Section 4's description of this boundary case.",
+                              "weight": 3,
+                              "sub_tasks": [],
+                              "task_category": "Code Development",
+                              "finegrained_task_category": "Method Implementation"
+                            },
+                            {
+                              "id": "alpha-zero-accuracy-degradation-result",
+                              "requirements": "The alpha=0 boundary implementation leads to large quantization errors for activations (because activations are scaled up by max(|W_j|), making their per-tensor quantization much harder), consistent with Section 4's statement that this approach yields bad model performance. This matches Figure 10, which shows that OPT-175B LAMBADA accuracy degrades significantly when alpha is below 0.4 (approaching 0), confirming that the alpha=0 boundary is correctly implemented as the extreme 'all difficulty pushed to activations' case.",
+                              "weight": 4,
+                              "sub_tasks": [],
+                              "task_category": "Result Analysis",
+                              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                            }
+                          ],
+                          "task_category": null,
+                          "finegrained_task_category": null
+                        },
+                        {
+                          "id": "alpha-zero-weight-magnitude-normalization-check",
+                          "requirements": "After applying the alpha=0 smoothing to a linear layer, the per-channel maximum weight magnitude max(|W_hat_j|) = max(|s_j * W_j|) = max(|W_j|) / max(|W_j|) = 1.0 for every input channel j. A verification test confirms that all weight channel maxima are exactly 1.0 (within floating-point precision) after the transformation with alpha=0, demonstrating that the weight quantization difficulty has been fully eliminated, consistent with the mathematical description in Section 4.",
+                          "weight": 1,
+                          "sub_tasks": [],
+                          "task_category": "Code Development",
+                          "finegrained_task_category": "Method Implementation"
+                        },
+                        {
+                          "id": "alpha-zero-no-special-casing",
+                          "requirements": "The implementation does not contain any conditional branch, guard clause, or special-case logic that detects alpha=0 and handles it differently from other alpha values. The alpha=0 behavior must emerge naturally from evaluating the general formula s_j = max(|X_j|)**alpha / max(|W_j|)**(1-alpha) with alpha=0, consistent with Section 4's description of the boundary case as a natural limit of the migration strength hyperparameter rather than a distinct code path.",
+                          "weight": 1,
+                          "sub_tasks": [],
+                          "task_category": "Code Development",
+                          "finegrained_task_category": "Method Implementation"
+                        }
+                      ],
+                      "task_category": null,
+                      "finegrained_task_category": null
+                    },
+                    {
+                      "id": "alpha-one-boundary-activation-only-difficulty",
+                      "requirements": "When alpha=1, the smoothing factor formula s_j = max(|X_j|)^1 / max(|W_j|)^0 reduces to s_j = max(|X_j|). The implementation correctly computes this boundary case: the activation channels are divided by max(|X_j|), equalizing all activation channel magnitudes to 1 and fully migrating all quantization difficulty from activations to weights. This is consistent with the description in Section 4: 'a straight-forward choice is s_j = max(|X_j|)... However, this formula pushes all the quantization difficulties to the weights.' The code must not special-case this; it must follow naturally from the formula with alpha=1.",
+                      "weight": 3,
+                      "sub_tasks": [],
+                      "task_category": "Code Development",
+                      "finegrained_task_category": "Method Implementation"
+                    },
+                    {
+                      "id": "alpha-one-accuracy-degradation-verification",
+                      "requirements": "The implementation's behavior at alpha=1 leads to large quantization errors for weights (because weights are scaled up by max(|X_j|), making their magnitudes harder to quantize), consistent with Section 4's statement that migrating all difficulty to weights produces bad model performance. This is also consistent with Figure 10, which shows that alpha values above 0.6 (approaching 1) degrade OPT-175B LAMBADA accuracy significantly, confirming that the alpha=1 boundary is correctly implemented as the 'all difficulty in weights' extreme.",
+                      "weight": 4,
+                      "sub_tasks": [],
+                      "task_category": "Result Analysis",
+                      "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                    }
+                  ],
+                  "task_category": null,
+                  "finegrained_task_category": null
+                }
+              ],
+              "task_category": null,
+              "finegrained_task_category": null
+            },
+            {
+              "id": "smoothing-factor-alpha-range-validity",
+              "requirements": "The implementation enforces that alpha is a scalar in [0, 1]. The paper identifies the sweet-spot region for OPT-175B as alpha in [0.4, 0.6] (Figure 10): values below 0.4 leave activations too hard to quantize and values above 0.6 make weights too hard to quantize, producing large accuracy degradation in both cases.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "smoothing-factor-numerical-stability",
+              "requirements": "The smoothing factor computation handles the case where max(|W_j|) could be zero or very small (to avoid division by zero or numerically unstable large factors), e.g., by clamping the denominator to a minimum positive value, consistent with practical implementation requirements described in Section 4.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "migration-strength-alpha-defaults",
+          "requirements": "The migration strength alpha is set to 0.5 as the default for OPT and BLOOM models, 0.75 for GLM-130B (which has ~30% outliers making activation quantization more difficult), 0.8 for LLaMA-1 models, and model-specific values for newer architectures (e.g., alpha=0.85 for Llama-2-7B/13B, alpha=0.9 for Llama-2-70B, alpha=0.6 for Falcon-7B, alpha=0.7 for Falcon-40B, alpha=0.8 for Mistral-7B and Mixtral-8x7B) as reported in Table 7 and Section 5.1.",
+          "weight": 4,
+          "sub_tasks": [],
+          "task_category": "Code Development",
+          "finegrained_task_category": "Method Implementation"
+        },
+        {
+          "id": "offline-smoothing-factor-fusion",
+          "requirements": "The smoothing factors are computed and fused offline into the preceding layer's parameters (e.g., LayerNorm weight/bias, or a prior linear layer's output weights) so that no extra kernel call overhead is incurred at inference time. For the special case where the input comes from a residual add, an explicit scaling operation is added to the residual branch as described in Section 4.",
+          "weight": 6,
+          "sub_tasks": [],
+          "task_category": "Code Development",
+          "finegrained_task_category": "Method Implementation"
+        },
+        {
+          "id": "calibration-pile-512-sentences",
+          "requirements": "The per-channel activation statistics (max(|X_j|) for each input channel j) needed to compute the smoothing factors and static quantization step sizes are estimated once using 512 random sentences sampled from the Pile pre-training dataset validation set, as described in Section 5.1. The same smoothed and statically quantized model is then applied to all downstream evaluation tasks without re-calibration.",
+          "weight": 4,
+          "sub_tasks": [],
+          "task_category": "Code Development",
+          "finegrained_task_category": "Data Processing & Preparation"
+        },
+        {
+          "id": "alpha-grid-search-procedure",
+          "requirements": "A grid search over alpha values is implemented and executed on a subset of the Pile validation set to select a suitable alpha per model family, as described in Section 5.1. The grid search evaluates quantization quality (e.g., perplexity or zero-shot accuracy) across candidate alpha values and selects the value yielding the best quantized model accuracy.",
+          "weight": 3,
+          "sub_tasks": [],
+          "task_category": "Code Execution",
+          "finegrained_task_category": "Experimental Setup"
+        }
+      ],
+      "task_category": null,
+      "finegrained_task_category": null
+    },
+    {
+      "id": "quantization-settings",
+      "requirements": "The INT8 quantization primitives and the O1-O3 SmoothQuant quantization settings plus the transformer block precision mapping have been implemented as defined in Table 2 and Figure 6.",
+      "weight": 5,
+      "sub_tasks": [
+        {
+          "id": "int8-uniform-quantization-primitive",
+          "requirements": "The integer uniform quantization primitive from Equation 1 has been implemented: X_bar^INT8 = round(X^FP16 / Delta), where Delta = max(|X|) / (2^(N-1) - 1) with N=8, using symmetric quantization around 0. The implementation supports both symmetric (zero-point=0) and asymmetric (with zero-point, e.g. after ReLU) cases as described in Section 2.",
+          "weight": 3,
+          "sub_tasks": [
+            {
+              "id": "symmetric-quantization-step-size",
+              "requirements": "The symmetric quantization step size Delta = max(|X|) / (2^(N-1) - 1) with N=8 has been implemented, yielding Delta = max(|X|) / 127. This uses the maximum absolute value of the tensor to calculate Delta so that outliers in the activation are preserved, as described in Equation 1 and Section 2. The step size can be computed either offline from calibration samples (static) or at runtime (dynamic).",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "asymmetric-quantization-with-zero-point",
+              "requirements": "The asymmetric quantization variant with a zero-point offset has been implemented to handle cases such as post-ReLU activations (which are non-negative and not symmetric around 0), as described in Section 2. The asymmetric case adds a zero-point z to the quantization formula so that the quantized range can be shifted to cover [0, 255] or similar unsigned ranges, following the formulation of Jacob et al. (2018) referenced in Section 2.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "quantization-granularity-modes",
+          "requirements": "Four quantization granularity modes are implemented as defined in Section 2 and Figure 3: (1) per-tensor quantization using a single step size Delta for the entire matrix; (2) per-token quantization using a separate Delta for each of the T token rows of the activation matrix; (3) per-channel quantization using a separate Delta for each output channel of the weight matrix; and (4) group-wise quantization using a separate Delta for different channel groups within the weight matrix.",
+          "weight": 4,
+          "sub_tasks": [],
+          "task_category": "Code Development",
+          "finegrained_task_category": "Method Implementation"
+        },
+        {
+          "id": "static-vs-dynamic-quantization",
+          "requirements": "Both static and dynamic quantization modes are implemented: static quantization pre-computes the quantization step size Delta offline using calibration samples (512 Pile sentences) and stores it for reuse at inference, while dynamic quantization computes Delta at runtime using the actual activation statistics of each batch/token, as described in Section 2.",
+          "weight": 4,
+          "sub_tasks": [
+            {
+              "id": "static-quantization-offline-delta",
+              "requirements": "Static quantization mode is implemented: the quantization step size Delta is pre-computed offline using 512 random Pile calibration sentences and stored for reuse at inference time without any runtime Delta computation. This is used in SmoothQuant-O3 (per-tensor static activation quantization as shown in Table 2) and eliminates the runtime overhead of computing activation statistics, as described in Section 2 and Section 5.1.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "static-dynamic-calibration-execution",
+              "requirements": "The static quantization calibration procedure has been executed: 512 random sentences are sampled from the Pile pre-training dataset validation set, run through the smoothed model, and the per-tensor (or per-token for O1) activation maximum statistics are recorded and stored as the fixed Delta values for static quantization. The same stored Delta values are reused across all downstream evaluation tasks without re-calibration, as described in Section 5.1.",
+              "weight": 2,
+              "sub_tasks": [
+                {
+                  "id": "calibration-sample-collection",
+                  "requirements": "Exactly 512 random sentences are sampled from the Pile pre-training dataset validation set and used as the calibration corpus. The sampling is done once and the same 512 sentences are reused for all models and all downstream evaluation tasks, as described in Section 5.1: 'we calibrate the smoothing factors and the static quantization step sizes once with 512 random sentences from the pre-training dataset Pile'.",
+                  "weight": 2,
+                  "sub_tasks": [],
+                  "task_category": "Code Development",
+                  "finegrained_task_category": "Data Processing & Preparation"
+                }
+              ],
+              "task_category": null,
+              "finegrained_task_category": null
+            },
+            {
+              "id": "static-vs-dynamic-latency-comparison",
+              "requirements": "The latency difference between static and dynamic quantization is verified: static quantization (O3) achieves lower latency than dynamic quantization (O1, O2) because Delta does not need to be computed at runtime. Table 11 reports that for OPT-30B at sequence length 256, SmoothQuant-O3 has latency 227.6ms, O2 has 240.2ms, and O1 has 246.7ms, confirming that static quantization (O3) is the fastest among the three settings, as stated in Section 5.5.",
+              "weight": 2,
+              "sub_tasks": [
+                {
+                  "id": "static-vs-dynamic-latency-o3-vs-o2-opt30b",
+                  "requirements": "Table 11 reports that for OPT-30B at sequence length 256, SmoothQuant-O3 has latency 227.6ms and SmoothQuant-O2 has latency 240.2ms, confirming O3 is faster than O2.",
+                  "weight": 2,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                },
+                {
+                  "id": "static-vs-dynamic-latency-o2-vs-o1-opt30b",
+                  "requirements": "Table 11 reports that for OPT-30B at sequence length 256, SmoothQuant-O2 has latency 240.2ms and SmoothQuant-O1 has latency 246.7ms, confirming O2 is faster than O1.",
+                  "weight": 2,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                },
+                {
+                  "id": "static-vs-dynamic-latency-ordering-statement",
+                  "requirements": "It is verified that static quantization (O3) achieves lower latency than dynamic quantization (O1, O2) because Delta does not need to be computed at runtime, as stated in Section 5.5.",
+                  "weight": 1,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                }
+              ],
+              "task_category": null,
+              "finegrained_task_category": null
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "smoothquant-o1-setting",
+          "requirements": "SmoothQuant-O1 is implemented with per-tensor weight quantization and per-token dynamic activation quantization, exactly matching the O1 row of Table 2. All weight and activation values use INT8 representations, and the per-token dynamic quantization computes a separate Delta for each token at runtime.",
+          "weight": 4,
+          "sub_tasks": [],
+          "task_category": "Code Development",
+          "finegrained_task_category": "Method Implementation"
+        },
+        {
+          "id": "smoothquant-o2-setting",
+          "requirements": "SmoothQuant-O2 is implemented with per-tensor weight quantization and per-tensor dynamic activation quantization, exactly matching the O2 row of Table 2. All weight and activation values use INT8 representations, and the per-tensor dynamic quantization computes a single Delta for the entire activation matrix at runtime.",
+          "weight": 4,
+          "sub_tasks": [],
+          "task_category": "Code Development",
+          "finegrained_task_category": "Method Implementation"
+        },
+        {
+          "id": "smoothquant-o3-setting",
+          "requirements": "SmoothQuant-O3 is implemented with per-tensor weight quantization and per-tensor static activation quantization, exactly matching the O3 row of Table 2. All weight and activation values use INT8 representations, and the per-tensor static quantization uses Delta pre-computed offline from calibration data (no runtime Delta computation). This is the most hardware-efficient setting with the lowest latency among O1-O3.",
+          "weight": 5,
+          "sub_tasks": [],
+          "task_category": "Code Development",
+          "finegrained_task_category": "Method Implementation"
+        },
+        {
+          "id": "transformer-block-precision-mapping",
+          "requirements": "The transformer block quantization flow from Figure 6 has been implemented: inputs and weights of compute-heavy operators (linear layers and BMM in attention) are quantized to INT8, while lightweight element-wise operations including ReLU, Softmax, and LayerNorm keep their activations in FP16. This design applies W8A8 INT8 quantization to all GEMMs (self-attention linear projections, feed-forward linear layers) and to batched matrix multiplications (BMM) in attention, as described in Section 4.",
+          "weight": 5,
+          "sub_tasks": [
+            {
+              "id": "qkv-linear-projections-int8",
+              "requirements": "The Q, K, and V linear projection layers in the self-attention block are quantized to INT8 (W8A8): both the input activations and the weight matrices of the query, key, and value projection GEMMs are represented and computed in INT8 using CUTLASS INT8 GEMM kernels, as shown in Figure 6 and described in Section 4 ('quantize all linear layers with W8A8').",
+              "weight": 4,
+              "sub_tasks": [
+                {
+                  "id": "q-projection-int8",
+                  "requirements": "The query (Q) linear projection layer in the self-attention block is quantized to INT8 (W8A8): both the input activation tensor fed into the Q projection GEMM and the Q projection weight matrix are represented in INT8 and computed via CUTLASS INT8 GEMM kernels. The smoothing transformation is applied to the input activations of the Q projection before quantization, as shown in Figure 6 and described in Section 4 ('quantize all linear layers with W8A8').",
+                  "weight": 2,
+                  "sub_tasks": [],
+                  "task_category": "Code Development",
+                  "finegrained_task_category": "Method Implementation"
+                },
+                {
+                  "id": "k-projection-int8",
+                  "requirements": "The key (K) linear projection layer in the self-attention block is quantized to INT8 (W8A8): both the input activation tensor fed into the K projection GEMM and the K projection weight matrix are represented in INT8 and computed via CUTLASS INT8 GEMM kernels. The smoothing transformation is applied to the input activations of the K projection before quantization, as shown in Figure 6 and described in Section 4 ('quantize all linear layers with W8A8').",
+                  "weight": 2,
+                  "sub_tasks": [],
+                  "task_category": "Code Development",
+                  "finegrained_task_category": "Method Implementation"
+                },
+                {
+                  "id": "v-projection-int8",
+                  "requirements": "The value (V) linear projection layer in the self-attention block is quantized to INT8 (W8A8): both the input activation tensor fed into the V projection GEMM and the V projection weight matrix are represented in INT8 and computed via CUTLASS INT8 GEMM kernels. The smoothing transformation is applied to the input activations of the V projection before quantization, as shown in Figure 6 and described in Section 4 ('quantize all linear layers with W8A8').",
+                  "weight": 2,
+                  "sub_tasks": [],
+                  "task_category": "Code Development",
+                  "finegrained_task_category": "Method Implementation"
+                },
+                {
+                  "id": "qkv-shared-smoothing-factor-fusion",
+                  "requirements": "The per-channel smoothing factors for the Q, K, and V projections are fused offline into the preceding layer's parameters (e.g., the LayerNorm affine weight/bias that precedes the self-attention block) so that no extra kernel call overhead is incurred at inference time when computing the smoothed activations fed into the Q, K, and V GEMMs. This offline fusion is consistent with Section 4: 'we can easily fuse the smoothing factor into previous layers' parameters offline, which does not incur kernel call overhead from an extra scaling'.",
+                  "weight": 2,
+                  "sub_tasks": [],
+                  "task_category": "Code Development",
+                  "finegrained_task_category": "Method Implementation"
+                }
+              ],
+              "task_category": null,
+              "finegrained_task_category": null
+            },
+            {
+              "id": "qkt-bmm-int8",
+              "requirements": "The QK^T batched matrix multiplication (BMM) in the attention computation is quantized to INT8: the query and key tensors fed into this BMM are quantized to INT8 before the operation, so the QK^T dot-product is computed as an INT8 GEMM, as shown in Figure 6 and stated in Section 4 ('We also quantize BMM operators in the attention computation').",
+              "weight": 3,
+              "sub_tasks": [
+                {
+                  "id": "qkt-bmm-query-int8-quantization",
+                  "requirements": "The query (Q) tensor output from the Q projection (after dequantization back to FP16 and then re-quantized) is quantized to INT8 before being fed into the QK^T BMM operation. Specifically, a quantization step size Delta_Q is computed (per-tensor or per-token depending on the O1-O3 setting) from the Q tensor's statistics, and the Q tensor is converted to INT8 via the standard symmetric quantization formula (Equation 1) before the BMM kernel is invoked. This is consistent with Figure 6 and Section 4's statement 'We also quantize BMM operators in the attention computation'.",
+                  "weight": 2,
+                  "sub_tasks": [],
+                  "task_category": "Code Development",
+                  "finegrained_task_category": "Method Implementation"
+                },
+                {
+                  "id": "qkt-bmm-key-int8-quantization",
+                  "requirements": "The key (K) tensor output from the K projection (after dequantization back to FP16 and then re-quantized) is quantized to INT8 before being fed into the QK^T BMM operation. Specifically, a quantization step size Delta_K is computed from the K tensor's statistics, and the K tensor is converted to INT8 via the standard symmetric quantization formula (Equation 1) before the BMM kernel is invoked. This is consistent with Figure 6 and Section 4's statement 'We also quantize BMM operators in the attention computation'.",
+                  "weight": 2,
+                  "sub_tasks": [],
+                  "task_category": "Code Development",
+                  "finegrained_task_category": "Method Implementation"
+                },
+                {
+                  "id": "qkt-bmm-int8-gemm-execution",
+                  "requirements": "The QK^T dot-product is computed as an INT8 GEMM (using CUTLASS INT8 GEMM or equivalent INT8 BMM kernel) operating on the INT8-quantized Q and K tensors. The INT8 BMM replaces the original FP16 bmm function for this attention score computation, consistent with Section 5.1: 'We simply replace the original floating point (FP16) linear modules and the bmm function with our INT8 kernels as the INT8 model.' The output of the INT8 BMM is rescaled back to FP16 via post-GEMM outer-dimension scaling (Delta_Q and Delta_K applied after the GEMM) before the Softmax is applied in FP16, as shown in Figure 6.",
+                  "weight": 2,
+                  "sub_tasks": [],
+                  "task_category": "Code Development",
+                  "finegrained_task_category": "Method Implementation"
+                }
+              ],
+              "task_category": null,
+              "finegrained_task_category": null
+            },
+            {
+              "id": "softmax-fp16",
+              "requirements": "The Softmax operation in the attention block keeps its input and output activations in FP16 (not INT8). It is treated as a lightweight element-wise operation that is exempt from INT8 quantization, consistent with Figure 6 and Section 4's statement: 'keeping the activation as FP16 for other lightweight element-wise operations like ReLU, Softmax, and LayerNorm'.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": null
+            },
+            {
+              "id": "av-bmm-int8",
+              "requirements": "The attention-value BMM (i.e., softmax(QK^T) · V) in the attention computation is quantized to INT8: the attention weight tensor (post-softmax, re-quantized to INT8) and the value tensor are both represented in INT8 for this batched matrix multiplication, as shown in Figure 6 and covered by Section 4's statement that BMM operators in attention are quantized with INT8.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": null
+            },
+            {
+              "id": "output-projection-linear-int8",
+              "requirements": "The output projection linear layer of the self-attention block (the linear layer applied after the attention-value BMM to project back to the model dimension) is quantized to INT8 (W8A8): both its input activations and weight matrix are represented in INT8 and computed via INT8 GEMM, as shown in Figure 6 and covered by Section 4's statement to 'quantize all linear layers with W8A8'.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "layernorm-fp16",
+              "requirements": "The LayerNorm operations in the transformer block (both pre-attention and pre-FFN LayerNorms) keep their output activations in FP16. LayerNorm is classified as a lightweight element-wise operation exempt from INT8 quantization, consistent with Figure 6 and Section 4's statement: 'keeping the activation as FP16 for other lightweight element-wise operations like ReLU, Softmax, and LayerNorm'. The smoothing factors are fused offline into the LayerNorm's affine parameters (weight/bias) to avoid runtime overhead, as described in Section 4.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": null
+            },
+            {
+              "id": "ffn-linear-layers-int8",
+              "requirements": "Both feed-forward network (FFN) linear layers (the up-projection and down-projection, or first and second linear layers of the FFN sub-block) are quantized to INT8 (W8A8): their input activations and weight matrices are represented in INT8 and computed via INT8 GEMM, as shown in Figure 6 and covered by Section 4's statement to 'quantize all linear layers with W8A8' including feed-forward layers.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "ffn-activation-fp16",
+              "requirements": "The nonlinear activation function inside the FFN (e.g., ReLU or equivalent) keeps its output in FP16. It is treated as a lightweight element-wise operation exempt from INT8 quantization, consistent with Figure 6 and Section 4's statement: 'keeping the activation as FP16 for other lightweight element-wise operations like ReLU, Softmax, and LayerNorm'. The FP16 output is then re-quantized to INT8 before being fed into the second FFN linear layer.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": null
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "int8-gemm-kernel-integration",
+          "requirements": "INT8 linear modules and batched matrix multiplication (BMM) functions have been implemented using CUTLASS INT8 GEMM kernels in both the PyTorch Huggingface backend and the FasterTransformer backend. The original FP16 linear modules and bmm functions are replaced with INT8 kernel equivalents as described in Section 5.1.",
+          "weight": 5,
+          "sub_tasks": [],
+          "task_category": "Code Development",
+          "finegrained_task_category": "Method Implementation"
+        },
+        {
+          "id": "post-gemm-rescaling-equation2",
+          "requirements": "The hardware-compatible rescaling scheme from Equation 2 has been implemented: Y = diag(Delta_X^FP16) · (X_bar^INT8 · W_bar^INT8) · diag(Delta_W^FP16), where the per-token activation scale Delta_X and per-output-channel weight scale Delta_W are applied after the INT8 matrix multiplication completes (as outer dimension scalings), not inside the GEMM. This matches the hardware constraint that scaling can only be performed along the outer dimensions (T for activations, C_o for weights) as described in Section 3.",
+          "weight": 4,
+          "sub_tasks": [
+            {
+              "id": "int8-gemm-core-computation",
+              "requirements": "The core INT8 matrix multiplication X_bar^INT8 · W_bar^INT8 has been implemented and executes entirely in INT8 precision using CUTLASS INT8 GEMM kernels, with no FP16 scaling applied inside the GEMM operation itself. The quantized integer tensors X_bar^INT8 and W_bar^INT8 are the direct inputs to the INT8 kernel, matching the inner term of Equation 2: (X_bar^INT8 · W_bar^INT8).",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "post-gemm-activation-scale-outer-dim",
+              "requirements": "The per-token activation scale Delta_X^FP16 (a vector of length T, one scalar per token) is applied as a left-side outer-dimension scaling AFTER the INT8 GEMM completes, implemented as diag(Delta_X^FP16) · (INT8 GEMM result), not inside the GEMM. This corresponds to scaling along the token dimension T of the activation matrix (an outer dimension of the matmul), which is the only hardware-compatible placement for activation rescaling as described in Section 3 of the paper.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "post-gemm-weight-scale-outer-dim",
+              "requirements": "The per-output-channel weight scale Delta_W^FP16 (a vector of length C_o, one scalar per output channel) is applied as a right-side outer-dimension scaling AFTER the INT8 GEMM completes, implemented as (INT8 GEMM result) · diag(Delta_W^FP16), not inside the GEMM. This corresponds to scaling along the output channel dimension C_o of the weight matrix (an outer dimension of the matmul), which is the only hardware-compatible placement for weight rescaling as described in Section 3 of the paper.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        }
+      ],
+      "task_category": null,
+      "finegrained_task_category": null
+    },
+    {
+      "id": "baselines-implementation",
+      "requirements": "The four INT8 PTQ baselines (W8A8 naive, ZeroQuant, LLM.int8(), Outlier Suppression) have been implemented per their quantization schemes in Table 2 for comparison.",
+      "weight": 3,
+      "sub_tasks": [
+        {
+          "id": "w8a8-naive-baseline",
+          "requirements": "The W8A8 naive quantization baseline has been implemented with per-tensor weight quantization and per-tensor dynamic activation quantization, exactly matching the 'W8A8' row of Table 2. Both weights and activations use INT8 representations with a single per-tensor Delta computed dynamically at runtime for activations. No smoothing transformation is applied.",
+          "weight": 2,
+          "sub_tasks": [],
+          "task_category": "Code Development",
+          "finegrained_task_category": "Method Implementation"
+        },
+        {
+          "id": "zeroquant-baseline",
+          "requirements": "The ZeroQuant baseline has been implemented with group-wise weight quantization and per-token dynamic activation quantization, exactly matching the 'ZeroQuant' row of Table 2. All weight and activation values use INT8 representations; the per-token dynamic quantization computes a separate Delta for each token row of the activation matrix at runtime, and the group-wise weight quantization uses separate Delta values for different channel groups within the weight matrix, as described in Section 5.1 referencing Yao et al. (2022).",
+          "weight": 2,
+          "sub_tasks": [],
+          "task_category": "Code Development",
+          "finegrained_task_category": "Method Implementation"
+        },
+        {
+          "id": "llm-int8-baseline",
+          "requirements": "The LLM.int8() baseline has been implemented with per-channel weight quantization and per-token dynamic activation quantization combined with FP16 mixed-precision decomposition for outlier channels, exactly matching the 'LLM.int8()' row of Table 2. Outlier activation channels are kept in FP16 while non-outlier channels use INT8 per-token dynamic quantization, as described in Section 1 referencing Dettmers et al. (2022). The mixed-precision decomposition is acknowledged to incur large latency overhead compared to pure INT8 GEMM.",
+          "weight": 3,
+          "sub_tasks": [],
+          "task_category": "Code Development",
+          "finegrained_task_category": "Method Implementation"
+        },
+        {
+          "id": "outlier-suppression-baseline",
+          "requirements": "The Outlier Suppression baseline has been implemented with per-tensor weight quantization and per-tensor static activation quantization, exactly matching the 'Outlier Suppression' row of Table 2. All weight and activation values use INT8 representations, with a single per-tensor Delta pre-computed statically offline for activations. The baseline uses non-scaling LayerNorm and token-wise clipping to handle activation outliers, as described in Section 6 referencing Wei et al. (2022).",
+          "weight": 2,
+          "sub_tasks": [],
+          "task_category": "Code Development",
+          "finegrained_task_category": "Method Implementation"
+        },
+        {
+          "id": "baselines-execution",
+          "requirements": "All four INT8 PTQ baselines (W8A8 naive, ZeroQuant, LLM.int8(), Outlier Suppression) have been executed on the evaluation models (at minimum OPT-175B, OPT-6.7B/13B/30B/66B, BLOOM-176B, GLM-130B) across the designated zero-shot benchmarks to produce the comparison results reported in Tables 3 and 4.",
+          "weight": 3,
+          "sub_tasks": [],
+          "task_category": "Code Execution",
+          "finegrained_task_category": "Experimental Setup"
+        }
+      ],
+      "task_category": null,
+      "finegrained_task_category": null
+    },
+    {
+      "id": "experimental-setup",
+      "requirements": "The evaluation setup has been configured, including models (OPT, BLOOM, GLM-130B, etc.), datasets/tasks, lm-eval-harness usage, calibration with 512 Pile sentences, and alpha selection per model family.",
+      "weight": 3,
+      "sub_tasks": [
+        {
+          "id": "eval-models-opt-bloom-glm",
+          "requirements": "The evaluation models from Section 5.1 have been loaded and configured: OPT models at scales 6.7B, 13B, 30B, 66B, and 175B; BLOOM-176B; and GLM-130B. Each model must be loadable in FP16 and convertible to the smoothed W8A8 INT8 form using SmoothQuant. Model weights are sourced from their respective public releases (Meta OPT, BigScience BLOOM, GLM-130B checkpoint).",
+          "weight": 3,
+          "sub_tasks": [
+            {
+              "id": "eval-models-opt-scales-load",
+              "requirements": "OPT models at scales 6.7B, 13B, 30B, 66B, and 175B have been loaded in FP16 from their public Meta OPT releases and are convertible to the smoothed W8A8 INT8 form using SmoothQuant.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": null
+            },
+            {
+              "id": "eval-models-bloom-176b-load",
+              "requirements": "BLOOM-176B has been loaded in FP16 from its public BigScience release and is convertible to the smoothed W8A8 INT8 form using SmoothQuant.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Dataset and Model Acquisition"
+            },
+            {
+              "id": "eval-models-glm-130b-load",
+              "requirements": "GLM-130B has been loaded in FP16 from its public GLM-130B checkpoint and is convertible to the smoothed W8A8 INT8 form using SmoothQuant.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Dataset and Model Acquisition"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "eval-models-llama-falcon-mistral-mixtral",
+          "requirements": "The newer architecture evaluation models from Table 7 and Section 5.1 have been loaded and configured: LLaMA-1 (7B, 13B, 30B, 65B), Llama-2 (7B, 13B, 70B), Falcon (7B, 40B), Mistral-7B, and Mixtral-8x7B. Each model must be loadable in FP16 and convertible to the smoothed W8A8 INT8 form using SmoothQuant with the model-specific alpha values (e.g., alpha=0.85 for Llama-2-7B/13B, alpha=0.9 for Llama-2-70B, alpha=0.6 for Falcon-7B, alpha=0.7 for Falcon-40B, alpha=0.8 for Mistral-7B and Mixtral-8x7B) as reported in Table 7.",
+          "weight": 2,
+          "sub_tasks": [
+            {
+              "id": "table7-wikitext2-seqlen-2048-eval",
+              "requirements": "All Table 7 models are evaluated on WikiText-2 perplexity with a sequence length of 2048, as stated in the Table 7 caption: 'Results are perplexities on the WikiText-2 dataset with a sequence length of 2048.' This sequence length setting must be applied to all models in Table 7 (Llama-2-7B/13B/70B, Falcon-7B/40B, Mistral-7B, Mixtral-8x7B) for both the FP16 baseline and the W8A8 SmoothQuant evaluations.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "eval-datasets-zero-shot-tasks",
+          "requirements": "The zero-shot evaluation tasks used in Section 5.1 have been configured using the lm-eval-harness framework: LAMBADA (language modeling accuracy), HellaSwag (commonsense NLI), PIQA (physical intuition QA), WinoGrande (Winograd schema), OpenBookQA, RTE (textual entailment), and COPA (causal reasoning). Additionally, WikiText perplexity, MMLU (massive multitask language understanding), and MNLI/QNLI are included where reported. All tasks are evaluated in zero-shot setting using lm-eval-harness as stated in Section 5.1.",
+          "weight": 3,
+          "sub_tasks": [
+            {
+              "id": "lambada-task-config",
+              "requirements": "The LAMBADA task has been configured in lm-eval-harness for zero-shot evaluation. LAMBADA measures language modeling accuracy (the ability to predict the last word of a passage given its context). It is used as an evaluation benchmark for OPT, BLOOM, GLM-130B, MT-NLG 530B, LLaMA-1, Llama-2, Falcon, Mistral, and Mixtral models as reported across Tables 3, 4, 5, 6, 7, 9, and Figure 7.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "hellaswag-task-config",
+              "requirements": "The HellaSwag task has been configured in lm-eval-harness for zero-shot evaluation. HellaSwag measures commonsense natural language inference (selecting the most plausible continuation of a sentence). It is used as one of the 7 zero-shot benchmarks for OPT and BLOOM models as reported in Tables 3, 4, and Figure 7, and for MT-NLG 530B in Table 9.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "piqa-task-config",
+              "requirements": "The PIQA task has been configured in lm-eval-harness for zero-shot evaluation. PIQA measures physical intuition question answering (choosing the physically plausible solution to an everyday task). It is used as one of the 7 zero-shot benchmarks for OPT and BLOOM models as reported in Tables 3, 4, and Figure 7, and for MT-NLG 530B in Table 9.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "winogrande-task-config",
+              "requirements": "The WinoGrande task has been configured in lm-eval-harness for zero-shot evaluation. WinoGrande measures commonsense reasoning via Winograd schema challenges (pronoun resolution requiring world knowledge). It is used as one of the 7 zero-shot benchmarks for OPT and BLOOM models as reported in Tables 1, 3, 4, and Figure 7, and for MT-NLG 530B in Table 9.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "openbookqa-task-config",
+              "requirements": "The OpenBookQA task has been configured in lm-eval-harness for zero-shot evaluation. OpenBookQA measures open-book question answering requiring elementary science knowledge and broad common sense. It is used as one of the 7 zero-shot benchmarks for OPT and BLOOM models and appears exclusively in Table 3 (OPT-175B detailed results, FP16 baseline 34.0%) but not in the summarized Table 4 average. It is NOT used for GLM-130B evaluation because some of these benchmarks appear in GLM-130B's training set, as noted in Section 5.1.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "rte-task-config",
+              "requirements": "The RTE (Recognizing Textual Entailment) task has been configured in lm-eval-harness for zero-shot evaluation. RTE measures textual entailment (determining if a hypothesis can be inferred from a premise). It is one of the 7 zero-shot benchmarks used for OPT and BLOOM models and appears in Table 3 (OPT-175B detailed results, FP16 baseline 59.9%) but not in the Table 4 summary average (which uses only WinoGrande, HellaSwag, PIQA, and LAMBADA for OPT-175B/BLOOM-176B). It is NOT used for GLM-130B as noted in Section 5.1.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "copa-task-config",
+              "requirements": "The COPA (Choice of Plausible Alternatives) task has been configured in lm-eval-harness for zero-shot evaluation. COPA measures causal reasoning (selecting the most plausible cause or effect of a situation). It is one of the 7 zero-shot benchmarks used for OPT and BLOOM models and appears in Table 3 (OPT-175B detailed results, FP16 baseline 88.0%) but not in the Table 4 summary average. It is NOT used for GLM-130B as noted in Section 5.1.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "wikitext-perplexity-config",
+              "requirements": "The WikiText language modeling perplexity evaluation has been configured for OPT and BLOOM models. WikiText perplexity (lower is better) is reported alongside zero-shot accuracy benchmarks in Table 3 (OPT-175B, FP16 baseline perplexity 10.99), Table 5 (OPT-IML-30B, FP16 baseline 14.26), and Table 6 (LLaMA-1 models with sequence length 512). Table 7 uses WikiText-2 perplexity with sequence length 2048 for Llama-2, Falcon, Mistral, and Mixtral models. The perplexity metric uses the WikiText dataset (Merity et al., 2016) and is distinct from the zero-shot accuracy tasks evaluated via lm-eval-harness.",
+              "weight": 2,
+              "sub_tasks": [
+                {
+                  "id": "wikitext-ppl-opt175b-table3",
+                  "requirements": "WikiText perplexity (lower is better) has been evaluated for OPT-175B and all comparison methods as reported in Table 3. The FP16 baseline achieves perplexity 10.99. W8A8 naive quantization achieves 93080, ZeroQuant achieves 84648, LLM.int8() achieves 11.10, Outlier Suppression achieves 96151, SmoothQuant-O1 achieves 11.11, SmoothQuant-O2 achieves 11.14, and SmoothQuant-O3 achieves 11.17. The WikiText dataset (Merity et al., 2016) is used and perplexity is reported as a language modeling benchmark alongside the 7 zero-shot accuracy tasks.",
+                  "weight": 1,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                },
+                {
+                  "id": "wikitext-ppl-opt-iml-30b-table5",
+                  "requirements": "WikiText perplexity has been evaluated for OPT-IML-30B and reported in Table 5. The FP16 baseline achieves perplexity 14.26. W8A8 naive quantization achieves 576.53, ZeroQuant achieves 455.12, LLM.int8() achieves 14.27, Outlier Suppression achieves 9485.62, and SmoothQuant-O3 achieves 14.37. The evaluation confirms that SmoothQuant-O3 preserves accuracy on the instruction-tuned OPT-IML-30B model while all naive baselines (W8A8, ZeroQuant, Outlier Suppression) degrade perplexity severely.",
+                  "weight": 1,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                },
+                {
+                  "id": "wikitext-ppl-llama1-table6",
+                  "requirements": "WikiText-2 perplexity has been evaluated for LLaMA-1 models (7B, 13B, 30B, 65B) using sequence length 512 and per-token activation quantization with alpha=0.8, as specified in the Table 6 caption. The FP16 baselines are: 7B=11.51, 13B=10.05, 30B=7.53, 65B=6.17. The W8A8 SmoothQuant results are: 7B=11.56, 13B=10.08, 30B=7.56, 65B=6.20. Results demonstrate negligible performance degradation from SmoothQuant across all LLaMA-1 scales.",
+                  "weight": 2,
+                  "sub_tasks": [
+                    {
+                      "id": "wikitext-ppl-llama1-7b-table6",
+                      "requirements": "WikiText-2 perplexity has been evaluated for LLaMA-1 7B using sequence length 512 and per-token activation quantization with alpha=0.8. The FP16 baseline achieves 11.51 and W8A8 SmoothQuant achieves 11.56, as reported in Table 6.",
+                      "weight": 1,
+                      "sub_tasks": [],
+                      "task_category": "Result Analysis",
+                      "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                    },
+                    {
+                      "id": "wikitext-ppl-llama1-13b-table6",
+                      "requirements": "WikiText-2 perplexity has been evaluated for LLaMA-1 13B using sequence length 512 and per-token activation quantization with alpha=0.8. The FP16 baseline achieves 10.05 and W8A8 SmoothQuant achieves 10.08, as reported in Table 6.",
+                      "weight": 1,
+                      "sub_tasks": [],
+                      "task_category": "Result Analysis",
+                      "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                    },
+                    {
+                      "id": "wikitext-ppl-llama1-30b-table6",
+                      "requirements": "WikiText-2 perplexity has been evaluated for LLaMA-1 30B using sequence length 512 and per-token activation quantization with alpha=0.8. The FP16 baseline achieves 7.53 and W8A8 SmoothQuant achieves 7.56, as reported in Table 6.",
+                      "weight": 1,
+                      "sub_tasks": [],
+                      "task_category": "Result Analysis",
+                      "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                    },
+                    {
+                      "id": "wikitext-ppl-llama1-65b-table6",
+                      "requirements": "WikiText-2 perplexity has been evaluated for LLaMA-1 65B using sequence length 512 and per-token activation quantization with alpha=0.8. The FP16 baseline achieves 6.17 and W8A8 SmoothQuant achieves 6.20, as reported in Table 6.",
+                      "weight": 1,
+                      "sub_tasks": [],
+                      "task_category": "Result Analysis",
+                      "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                    }
+                  ],
+                  "task_category": null,
+                  "finegrained_task_category": null
+                },
+                {
+                  "id": "wikitext-ppl-newer-arch-table7",
+                  "requirements": "WikiText-2 perplexity has been evaluated for Llama-2, Falcon, Mistral, and Mixtral models using sequence length 2048, per-token activation quantization, and per-channel weight quantization as specified in the Table 7 caption. The FP16 and W8A8 SmoothQuant perplexities must match: Llama-2-7B FP16=5.474/SQ=5.515 (alpha=0.85), Llama-2-13B FP16=4.950/SQ=4.929 (alpha=0.85), Llama-2-70B FP16=3.320/SQ=3.359 (alpha=0.9), Falcon-7B FP16=6.590/SQ=6.629 (alpha=0.6), Falcon-40B FP16=5.228/SQ=5.255 (alpha=0.7), Mistral-7B FP16=5.253/SQ=5.277 (alpha=0.8), Mixtral-8x7B FP16=3.842/SQ=3.893 (alpha=0.8). All seven models must be evaluated with their respective alpha values.",
+                  "weight": 2,
+                  "sub_tasks": [
+                    {
+                      "id": "wikitext-ppl-llama2-7b-table7",
+                      "requirements": "WikiText-2 perplexity has been evaluated for Llama-2-7B using sequence length 2048, per-token activation quantization, and per-channel weight quantization. The FP16 baseline achieves perplexity 5.474 and W8A8 SmoothQuant (alpha=0.85) achieves 5.515, as reported in Table 7.",
+                      "weight": 1,
+                      "sub_tasks": [],
+                      "task_category": "Result Analysis",
+                      "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                    },
+                    {
+                      "id": "wikitext-ppl-llama2-13b-table7",
+                      "requirements": "WikiText-2 perplexity has been evaluated for Llama-2-13B using sequence length 2048, per-token activation quantization, and per-channel weight quantization. The FP16 baseline achieves perplexity 4.950 and W8A8 SmoothQuant (alpha=0.85) achieves 4.929, as reported in Table 7.",
+                      "weight": 1,
+                      "sub_tasks": [],
+                      "task_category": "Result Analysis",
+                      "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                    },
+                    {
+                      "id": "wikitext-ppl-llama2-70b-table7",
+                      "requirements": "WikiText-2 perplexity has been evaluated for Llama-2-70B using sequence length 2048, per-token activation quantization, and per-channel weight quantization. The FP16 baseline achieves perplexity 3.320 and W8A8 SmoothQuant (alpha=0.9) achieves 3.359, as reported in Table 7.",
+                      "weight": 1,
+                      "sub_tasks": [],
+                      "task_category": "Result Analysis",
+                      "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                    },
+                    {
+                      "id": "wikitext-ppl-falcon-7b-table7",
+                      "requirements": "WikiText-2 perplexity has been evaluated for Falcon-7B using sequence length 2048, per-token activation quantization, and per-channel weight quantization. The FP16 baseline achieves perplexity 6.590 and W8A8 SmoothQuant (alpha=0.6) achieves 6.629, as reported in Table 7.",
+                      "weight": 1,
+                      "sub_tasks": [],
+                      "task_category": "Result Analysis",
+                      "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                    },
+                    {
+                      "id": "wikitext-ppl-falcon-40b-table7",
+                      "requirements": "WikiText-2 perplexity has been evaluated for Falcon-40B using sequence length 2048, per-token activation quantization, and per-channel weight quantization. The FP16 baseline achieves perplexity 5.228 and W8A8 SmoothQuant (alpha=0.7) achieves 5.255, as reported in Table 7.",
+                      "weight": 1,
+                      "sub_tasks": [],
+                      "task_category": "Result Analysis",
+                      "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                    },
+                    {
+                      "id": "wikitext-ppl-mistral-7b-table7",
+                      "requirements": "WikiText-2 perplexity has been evaluated for Mistral-7B using sequence length 2048, per-token activation quantization, and per-channel weight quantization. The FP16 baseline achieves perplexity 5.253 and W8A8 SmoothQuant (alpha=0.8) achieves 5.277, as reported in Table 7.",
+                      "weight": 1,
+                      "sub_tasks": [],
+                      "task_category": "Result Analysis",
+                      "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                    },
+                    {
+                      "id": "wikitext-ppl-mixtral-8x7b-table7",
+                      "requirements": "WikiText-2 perplexity has been evaluated for Mixtral-8x7B using sequence length 2048, per-token activation quantization, and per-channel weight quantization. The FP16 baseline achieves perplexity 3.842 and W8A8 SmoothQuant (alpha=0.8) achieves 3.893, as reported in Table 7.",
+                      "weight": 1,
+                      "sub_tasks": [],
+                      "task_category": "Result Analysis",
+                      "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                    }
+                  ],
+                  "task_category": null,
+                  "finegrained_task_category": null
+                },
+                {
+                  "id": "wikitext-dataset-setup",
+                  "requirements": "The WikiText language modeling dataset (Merity et al., 2016) has been downloaded and configured for perplexity evaluation. For OPT-175B (Table 3) and OPT-IML-30B (Table 5), the WikiText dataset is used with the sequence length implied by those evaluations. For LLaMA-1 models (Table 6), WikiText-2 is used with sequence length 512. For Llama-2, Falcon, Mistral, and Mixtral models (Table 7), WikiText-2 is used with sequence length 2048. The perplexity computation uses the standard next-token prediction log-likelihood averaged over the test set, and is evaluated separately from the lm-eval-harness zero-shot accuracy tasks.",
+                  "weight": 2,
+                  "sub_tasks": [
+                    {
+                      "id": "wikitext-dataset-download-and-split",
+                      "requirements": "The WikiText dataset (Merity et al., 2016) has been downloaded and the test split is accessible for perplexity evaluation. Specifically, WikiText-2 is required for Tables 6 and 7 evaluations. The dataset must be loadable in a form that allows tokenizing the full test set and sliding a fixed-length context window over it for perplexity computation.",
+                      "weight": 1,
+                      "sub_tasks": [],
+                      "task_category": "Code Development",
+                      "finegrained_task_category": "Dataset and Model Acquisition"
+                    },
+                    {
+                      "id": "wikitext-ppl-computation-pipeline",
+                      "requirements": "The perplexity computation pipeline has been implemented: the model performs a forward pass over the WikiText test set chunked into fixed-length windows, computes the per-token cross-entropy (negative log-likelihood) loss at each position, and returns exp(mean(loss)) as the scalar perplexity score. The pipeline is compatible with both FP16 baseline models and INT8 SmoothQuant-smoothed models. It must be separate from the lm-eval-harness zero-shot accuracy pipeline used for LAMBADA, HellaSwag, PIQA, WinoGrande, OpenBookQA, RTE, and COPA, as described in Section 5.1.",
+                      "weight": 1,
+                      "sub_tasks": [],
+                      "task_category": "Code Development",
+                      "finegrained_task_category": null
+                    },
+                    {
+                      "id": "wikitext-ppl-opt175b-iml-implicit-seqlen",
+                      "requirements": "For OPT-175B (Table 3) and OPT-IML-30B (Table 5), the WikiText perplexity evaluation uses the WikiText dataset (not necessarily WikiText-2) with the sequence length implied by those evaluations (the paper does not specify an explicit sequence length for these tables, so the standard default used in the OPT literature applies). The FP16 baseline perplexity for OPT-175B is 10.99 (Table 3) and for OPT-IML-30B is 14.26 (Table 5). The evaluation pipeline must be configured and executed to reproduce these FP16 baselines before applying SmoothQuant quantization.",
+                      "weight": 1,
+                      "sub_tasks": [],
+                      "task_category": "Code Execution",
+                      "finegrained_task_category": "Experimental Setup"
+                    }
+                  ],
+                  "task_category": null,
+                  "finegrained_task_category": null
+                }
+              ],
+              "task_category": null,
+              "finegrained_task_category": null
+            },
+            {
+              "id": "mmlu-task-config",
+              "requirements": "The MMLU (Massive Multitask Language Understanding) task has been configured for GLM-130B evaluation using GLM-130B's official evaluation repository (not lm-eval-harness, as stated in Section 5.1: 'GLM-130B's official repo for its own evaluation'). MMLU measures academic-domain knowledge across 57 subjects. It is one of the four evaluation benchmarks used for GLM-130B (alongside LAMBADA, MNLI, and QNLI) as reported in Table 4 (GLM-130B column, FP16 average 73.8%), replacing the OPT/BLOOM benchmarks that appear in GLM-130B's training set.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "mnli-qnli-task-config",
+              "requirements": "The MNLI (Multi-Genre Natural Language Inference) and QNLI (Question Natural Language Inference) tasks have been configured for GLM-130B evaluation using GLM-130B's official evaluation repository. Both tasks measure natural language inference capabilities. Together with LAMBADA and MMLU, they form the four evaluation benchmarks used specifically for GLM-130B (Table 4, FP16 average 73.8%), chosen because the standard OPT/BLOOM benchmarks (HellaSwag, PIQA, WinoGrande, OpenBookQA, RTE, COPA) appear in GLM-130B's training set, as stated in Section 5.1.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "zero-shot-evaluation-execution",
+              "requirements": "All configured zero-shot evaluation tasks have been executed via lm-eval-harness (for OPT/BLOOM/LLaMA models) and GLM-130B's official repo (for GLM-130B) for both FP16 baselines and all SmoothQuant O1-O3 quantized variants across the designated model scales. The execution produces per-task accuracy scores and WikiText perplexity values matching the reported values across Tables 3, 4, 5, 6, 7, and 9.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "lm-eval-harness-integration",
+          "requirements": "The lm-eval-harness framework has been integrated as the evaluation harness for all zero-shot accuracy benchmarks, as stated in Section 5.1. The smoothed and quantized models (FP16 baseline and INT8 SmoothQuant variants O1-O3) are wrapped to be compatible with lm-eval-harness's model interface, and each benchmark task is executed through the harness to produce accuracy or perplexity scores matching the reported values in Tables 3-7.",
+          "weight": 1,
+          "sub_tasks": [],
+          "task_category": "Code Development",
+          "finegrained_task_category": "Environment & Infrastructure Setup"
+        },
+        {
+          "id": "calibration-512-pile-sentences-setup",
+          "requirements": "The calibration pipeline using 512 random sentences from the Pile pre-training dataset validation set has been implemented and executed. The 512 sentences are sampled once from the Pile validation split, run through the smoothed model in a single forward pass to collect per-layer per-channel activation maximum statistics (max(|X_j|) for each input channel j of every quantized linear/BMM layer), and the resulting statistics are stored as fixed Delta values for static quantization (O3) and as smoothing factor inputs (Equation 4). The same 512-sentence calibration is used for all models and all downstream evaluation tasks without re-calibration, as stated in Section 5.1.",
+          "weight": 1,
+          "sub_tasks": [],
+          "task_category": "Code Execution",
+          "finegrained_task_category": "Data Processing & Preparation"
+        },
+        {
+          "id": "alpha-selection-per-model-family",
+          "requirements": "The migration strength alpha has been selected and hardcoded per model family as described in Section 5.1 and Table 7: alpha=0.5 for OPT and BLOOM models, alpha=0.75 for GLM-130B (which has approximately 30% outlier channels making activation quantization more difficult), alpha=0.8 for LLaMA-1 models, alpha=0.85 for Llama-2-7B and Llama-2-13B, alpha=0.9 for Llama-2-70B, alpha=0.6 for Falcon-7B, alpha=0.7 for Falcon-40B, alpha=0.8 for Mistral-7B and Mixtral-8x7B. Each model family's alpha was selected via grid search on a subset of the Pile validation set to maximize quantized model accuracy, as described in Section 5.1.",
+          "weight": 2,
+          "sub_tasks": [
+            {
+              "id": "alpha-opt-bloom-glm",
+              "requirements": "The migration strength alpha has been set to 0.5 for OPT and BLOOM models, and to 0.75 for GLM-130B (which has approximately 30% outlier channels), as described in Section 5.1.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "alpha-llama1",
+              "requirements": "The migration strength alpha has been set to 0.8 for all LLaMA-1 models (7B, 13B, 30B, 65B), as described in Table 6 and Section 5.2.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "alpha-llama2-7b-13b",
+              "requirements": "The migration strength alpha has been set to 0.85 for Llama-2-7B and Llama-2-13B, as reported in Table 7.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "alpha-llama2-70b",
+              "requirements": "The migration strength alpha has been set to 0.9 for Llama-2-70B, as reported in Table 7.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "alpha-falcon-7b",
+              "requirements": "The migration strength alpha has been set to 0.6 for Falcon-7B, as reported in Table 7.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "alpha-falcon-40b",
+              "requirements": "The migration strength alpha has been set to 0.7 for Falcon-40B, as reported in Table 7.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "alpha-mistral-mixtral",
+              "requirements": "The migration strength alpha has been set to 0.8 for Mistral-7B and Mixtral-8x7B, as reported in Table 7.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Experimental Setup"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        }
+      ],
+      "task_category": null,
+      "finegrained_task_category": null
+    },
+    {
+      "id": "quantization-difficulty-analysis",
+      "requirements": "The activation quantization difficulty analysis, including the simulated per-channel vs per-tensor vs per-token accuracy comparison, has been reproduced matching Table 1.",
+      "weight": 3,
+      "sub_tasks": [
+        {
+          "id": "quant-difficulty-model-loading",
+          "requirements": "The OPT models at scales 6.7B, 13B, 30B, 66B, and 175B have been loaded in FP16 for the quantization difficulty analysis experiment reported in Table 1. The models must be loadable from their public checkpoints and capable of being evaluated on the four zero-shot benchmarks (WinoGrande, HellaSwag, PIQA, LAMBADA) used to compute the Table 1 average accuracy.",
+          "weight": 1,
+          "sub_tasks": [],
+          "task_category": "Code Development",
+          "finegrained_task_category": "Dataset and Model Acquisition"
+        },
+        {
+          "id": "quant-difficulty-fp16-baseline",
+          "requirements": "The FP16 baseline average accuracy across WinoGrande, HellaSwag, PIQA, and LAMBADA has been evaluated for all five OPT model scales. Table 1 reports: OPT-6.7B=64.9%, OPT-13B=65.6%, OPT-30B=67.9%, OPT-66B=69.5%, OPT-175B=71.6%.",
+          "weight": 2,
+          "sub_tasks": [],
+          "task_category": "Result Analysis",
+          "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+        },
+        {
+          "id": "quant-difficulty-per-tensor-implementation",
+          "requirements": "INT8 per-tensor quantization has been implemented for activations: a single scalar Delta = max(|X|) / 127 is computed over the entire activation matrix (all tokens and all channels) and used to quantize activations to INT8. This is the standard per-tensor scheme from Equation 1 applied uniformly across the full activation tensor, with no per-token or per-channel granularity. Weights are also quantized per-tensor. No SmoothQuant smoothing is applied.",
+          "weight": 3,
+          "sub_tasks": [],
+          "task_category": "Code Development",
+          "finegrained_task_category": "Method Implementation"
+        },
+        {
+          "id": "quant-difficulty-per-token-implementation",
+          "requirements": "INT8 per-token quantization has been implemented for activations: a separate scalar Delta_t = max(|X_t|) / 127 is computed for each token row t of the activation matrix (varying across the T token dimension but shared across all C channels of that token), and used to quantize that token's activations to INT8. Weights are quantized per-tensor. No SmoothQuant smoothing is applied.",
+          "weight": 3,
+          "sub_tasks": [],
+          "task_category": "Code Development",
+          "finegrained_task_category": "Method Implementation"
+        },
+        {
+          "id": "quant-difficulty-per-channel-implementation",
+          "requirements": "Simulated INT8 per-channel quantization has been implemented for activations: a separate scalar Delta_j = max(|X_j|) / 127 is computed for each input channel j of the activation matrix (varying across the C_i channel dimension but shared across all T tokens in that channel), and used to quantize that channel's activations to INT8. This scheme cannot map to hardware-accelerated INT8 GEMM kernels (as stated in Section 3) and is implemented as a simulation only. Weights are quantized per-tensor. No SmoothQuant smoothing is applied.",
+          "weight": 4,
+          "sub_tasks": [],
+          "task_category": "Code Development",
+          "finegrained_task_category": "Method Implementation"
+        },
+        {
+          "id": "quant-difficulty-per-tensor-accuracy-results",
+          "requirements": "The INT8 per-tensor activation quantization scheme has been evaluated on all five OPT model scales, producing the average accuracy across WinoGrande, HellaSwag, PIQA, and LAMBADA. Table 1 reports: OPT-6.7B=39.9%, OPT-13B=33.0%, OPT-30B=32.8%, OPT-66B=33.1%, OPT-175B=32.3%, demonstrating that per-tensor quantization severely degrades accuracy due to outlier-dominated Delta values.",
+          "weight": 3,
+          "sub_tasks": [],
+          "task_category": "Result Analysis",
+          "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+        },
+        {
+          "id": "quant-difficulty-per-token-accuracy-results",
+          "requirements": "The INT8 per-token activation quantization scheme has been evaluated on all five OPT model scales, producing the average accuracy across WinoGrande, HellaSwag, PIQA, and LAMBADA. Table 1 reports: OPT-6.7B=42.5%, OPT-13B=33.0%, OPT-30B=33.1%, OPT-66B=32.9%, OPT-175B=31.7%, demonstrating that per-token quantization provides only marginal improvement over per-tensor and still fails to address activation quantization difficulty.",
+          "weight": 3,
+          "sub_tasks": [],
+          "task_category": "Result Analysis",
+          "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+        },
+        {
+          "id": "quant-difficulty-per-channel-accuracy-results",
+          "requirements": "The simulated INT8 per-channel activation quantization scheme has been evaluated on all five OPT model scales, producing the average accuracy across WinoGrande, HellaSwag, PIQA, and LAMBADA. Table 1 reports: OPT-6.7B=64.8%, OPT-13B=65.6%, OPT-30B=68.0%, OPT-66B=69.4%, OPT-175B=71.4%, demonstrating that per-channel quantization successfully bridges the accuracy gap with the FP16 baseline, consistent with Bondarenko et al.'s findings cited in Section 3.",
+          "weight": 4,
+          "sub_tasks": [],
+          "task_category": "Result Analysis",
+          "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+        },
+        {
+          "id": "quant-difficulty-per-channel-hardware-incompatibility-note",
+          "requirements": "The analysis confirms and documents that per-channel activation quantization (the only scheme that preserves accuracy in Table 1) is marked as not compatible with INT8 GEMM kernels (indicated by gray marking in Table 1), because hardware-accelerated GEMM kernels only allow scaling along the outer dimensions of the matrix multiplication (token dimension T for activations, output channel dimension C_o for weights per Equation 2), not along the inner channel dimension C_i. This incompatibility motivates the SmoothQuant approach and is stated in Section 3.",
+          "weight": 3,
+          "sub_tasks": [
+            {
+              "id": "quant-difficulty-per-channel-gray-marking",
+              "requirements": "The analysis confirms that per-channel activation quantization is marked as not compatible with INT8 GEMM kernels in Table 1 (indicated by gray marking), meaning it cannot be used in practice despite preserving accuracy.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": null
+            },
+            {
+              "id": "quant-difficulty-per-channel-hardware-reason",
+              "requirements": "The analysis documents that hardware-accelerated GEMM kernels only allow scaling along the outer dimensions of the matrix multiplication (token dimension T for activations, output channel dimension C_o for weights per Equation 2), not along the inner channel dimension C_i, making per-channel activation quantization incompatible with INT8 GEMM.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": null
+            },
+            {
+              "id": "quant-difficulty-per-channel-motivates-smoothquant",
+              "requirements": "The analysis states that the hardware incompatibility of per-channel activation quantization motivates the SmoothQuant approach, as described in Section 3.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": null
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        }
+      ],
+      "task_category": null,
+      "finegrained_task_category": null
+    },
+    {
+      "id": "accuracy-results",
+      "requirements": "The accuracy-preservation experiments have been reproduced across OPT-175B, different 100B+ LLMs, different OPT scales, instruction-tuned and various recent architectures, matching Tables 3-7 and Figure 7.",
+      "weight": 5,
+      "sub_tasks": [
+        {
+          "id": "opt-175b-accuracy-table3",
+          "requirements": "The OPT-175B accuracy experiment has been reproduced matching all rows and columns of Table 3. The following results must be produced: FP16 baseline (LAMBADA=74.7%, HellaSwag=59.3%, PIQA=79.7%, WinoGrande=72.6%, OpenBookQA=34.0%, RTE=59.9%, COPA=88.0%, Average=66.9%, WikiText=10.99), W8A8 naive (LAMBADA=0.0%, HellaSwag=25.6%, PIQA=53.4%, WinoGrande=50.3%, OpenBookQA=14.0%, RTE=49.5%, COPA=56.0%, Average=35.5%, WikiText=93080), ZeroQuant (LAMBADA=0.0%, HellaSwag=26.0%, PIQA=51.7%, WinoGrande=49.3%, OpenBookQA=17.8%, RTE=50.9%, COPA=55.0%, Average=35.8%, WikiText=84648), LLM.int8() (LAMBADA=74.7%, HellaSwag=59.2%, PIQA=79.7%, WinoGrande=72.1%, OpenBookQA=34.2%, RTE=60.3%, COPA=87.0%, Average=66.7%, WikiText=11.10), Outlier Suppression (LAMBADA=0.00%, HellaSwag=25.8%, PIQA=52.5%, WinoGrande=48.6%, OpenBookQA=16.6%, RTE=53.4%, COPA=55.0%, Average=36.0%, WikiText=96151), SmoothQuant-O1 (LAMBADA=74.7%, HellaSwag=59.2%, PIQA=79.7%, WinoGrande=71.2%, OpenBookQA=33.4%, RTE=58.1%, COPA=89.0%, Average=66.5%, WikiText=11.11), SmoothQuant-O2 (LAMBADA=75.0%, HellaSwag=59.0%, PIQA=79.2%, WinoGrande=71.2%, OpenBookQA=33.0%, RTE=59.6%, COPA=88.0%, Average=66.4%, WikiText=11.14), SmoothQuant-O3 (LAMBADA=74.6%, HellaSwag=58.9%, PIQA=79.7%, WinoGrande=71.2%, OpenBookQA=33.4%, RTE=59.9%, COPA=90.0%, Average=66.8%, WikiText=11.17).",
+          "weight": 5,
+          "sub_tasks": [
+            {
+              "id": "opt-175b-fp16-baseline-table3",
+              "requirements": "The FP16 baseline row of Table 3 for OPT-175B has been reproduced: LAMBADA=74.7%, HellaSwag=59.3%, PIQA=79.7%, WinoGrande=72.6%, OpenBookQA=34.0%, RTE=59.9%, COPA=88.0%, Average=66.9%, WikiText=10.99.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": null
+            },
+            {
+              "id": "opt-175b-w8a8-naive-table3",
+              "requirements": "The W8A8 naive row of Table 3 for OPT-175B has been reproduced: LAMBADA=0.0%, HellaSwag=25.6%, PIQA=53.4%, WinoGrande=50.3%, OpenBookQA=14.0%, RTE=49.5%, COPA=56.0%, Average=35.5%, WikiText=93080.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": null
+            },
+            {
+              "id": "opt-175b-zeroquant-table3",
+              "requirements": "The ZeroQuant row of Table 3 for OPT-175B has been reproduced: LAMBADA=0.0%, HellaSwag=26.0%, PIQA=51.7%, WinoGrande=49.3%, OpenBookQA=17.8%, RTE=50.9%, COPA=55.0%, Average=35.8%, WikiText=84648.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": null
+            },
+            {
+              "id": "opt-175b-llmint8-table3",
+              "requirements": "The LLM.int8() row of Table 3 for OPT-175B has been reproduced: LAMBADA=74.7%, HellaSwag=59.2%, PIQA=79.7%, WinoGrande=72.1%, OpenBookQA=34.2%, RTE=60.3%, COPA=87.0%, Average=66.7%, WikiText=11.10.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": null
+            },
+            {
+              "id": "opt-175b-outlier-suppression-table3",
+              "requirements": "The Outlier Suppression row of Table 3 for OPT-175B has been reproduced: LAMBADA=0.00%, HellaSwag=25.8%, PIQA=52.5%, WinoGrande=48.6%, OpenBookQA=16.6%, RTE=53.4%, COPA=55.0%, Average=36.0%, WikiText=96151.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": null
+            },
+            {
+              "id": "opt-175b-smoothquant-o1-table3",
+              "requirements": "The SmoothQuant-O1 row of Table 3 for OPT-175B has been reproduced: LAMBADA=74.7%, HellaSwag=59.2%, PIQA=79.7%, WinoGrande=71.2%, OpenBookQA=33.4%, RTE=58.1%, COPA=89.0%, Average=66.5%, WikiText=11.11.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": null
+            },
+            {
+              "id": "opt-175b-smoothquant-o2-table3",
+              "requirements": "The SmoothQuant-O2 row of Table 3 for OPT-175B has been reproduced: LAMBADA=75.0%, HellaSwag=59.0%, PIQA=79.2%, WinoGrande=71.2%, OpenBookQA=33.0%, RTE=59.6%, COPA=88.0%, Average=66.4%, WikiText=11.14.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": null
+            },
+            {
+              "id": "opt-175b-smoothquant-o3-table3",
+              "requirements": "The SmoothQuant-O3 row of Table 3 for OPT-175B has been reproduced: LAMBADA=74.6%, HellaSwag=58.9%, PIQA=79.7%, WinoGrande=71.2%, OpenBookQA=33.4%, RTE=59.9%, COPA=90.0%, Average=66.8%, WikiText=11.17.",
+              "weight": 5,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": null
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "multi-llm-accuracy-table4",
+          "requirements": "The multi-LLM accuracy experiment has been reproduced matching all rows and columns of Table 4. The following results must be produced (average accuracy on WinoGrande, HellaSwag, PIQA, LAMBADA for OPT-175B/BLOOM-176B; and LAMBADA, MMLU, MNLI, QNLI for GLM-130B): FP16 (OPT-175B=71.6%, BLOOM-176B=68.2%, GLM-130B=73.8%), W8A8 naive (OPT-175B=32.3%, BLOOM-176B=64.2%, GLM-130B=26.9%), ZeroQuant (OPT-175B=31.7%, BLOOM-176B=67.4%, GLM-130B=26.7%), LLM.int8() (OPT-175B=71.4%, BLOOM-176B=68.0%, GLM-130B=73.8%), Outlier Suppression (OPT-175B=31.7%, BLOOM-176B=54.1%, GLM-130B=63.5%), SmoothQuant-O1 (OPT-175B=71.2%, BLOOM-176B=68.3%, GLM-130B=73.7%), SmoothQuant-O2 (OPT-175B=71.1%, BLOOM-176B=68.4%, GLM-130B=72.5%), SmoothQuant-O3 (OPT-175B=71.1%, BLOOM-176B=67.4%, GLM-130B=72.8%). Note that GLM-130B accuracy is not column-wise comparable due to different evaluation datasets.",
+          "weight": 4,
+          "sub_tasks": [
+            {
+              "id": "multi-llm-fp16-table4",
+              "requirements": "The FP16 row of Table 4 has been reproduced: OPT-175B=71.6%, BLOOM-176B=68.2%, GLM-130B=73.8%.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": null
+            },
+            {
+              "id": "multi-llm-w8a8-naive-table4",
+              "requirements": "The W8A8 naive row of Table 4 has been reproduced: OPT-175B=32.3%, BLOOM-176B=64.2%, GLM-130B=26.9%.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": null
+            },
+            {
+              "id": "multi-llm-zeroquant-table4",
+              "requirements": "The ZeroQuant row of Table 4 has been reproduced: OPT-175B=31.7%, BLOOM-176B=67.4%, GLM-130B=26.7%.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": null
+            },
+            {
+              "id": "multi-llm-llmint8-table4",
+              "requirements": "The LLM.int8() row of Table 4 has been reproduced: OPT-175B=71.4%, BLOOM-176B=68.0%, GLM-130B=73.8%.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": null
+            },
+            {
+              "id": "multi-llm-outlier-suppression-table4",
+              "requirements": "The Outlier Suppression row of Table 4 has been reproduced: OPT-175B=31.7%, BLOOM-176B=54.1%, GLM-130B=63.5%.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": null
+            },
+            {
+              "id": "multi-llm-smoothquant-o1-table4",
+              "requirements": "The SmoothQuant-O1 row of Table 4 has been reproduced: OPT-175B=71.2%, BLOOM-176B=68.3%, GLM-130B=73.7%.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": null
+            },
+            {
+              "id": "multi-llm-smoothquant-o2-table4",
+              "requirements": "The SmoothQuant-O2 row of Table 4 has been reproduced: OPT-175B=71.1%, BLOOM-176B=68.4%, GLM-130B=72.5%.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": null
+            },
+            {
+              "id": "multi-llm-smoothquant-o3-table4",
+              "requirements": "The SmoothQuant-O3 row of Table 4 has been reproduced: OPT-175B=71.1%, BLOOM-176B=67.4%, GLM-130B=72.8%.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": null
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "opt-multi-scale-figure7",
+          "requirements": "The OPT multi-scale accuracy experiment has been reproduced and Figure 7 has been generated, showing that SmoothQuant matches FP16 accuracy with INT8 quantization consistently across all OPT model scales (at minimum 6.7B, 13B, 30B, 66B, 175B). The figure must show per-scale performance (average accuracy on WinoGrande, HellaSwag, PIQA, LAMBADA) for FP16, W8A8 naive, and SmoothQuant (at least one of O1-O3), demonstrating that SmoothQuant closes the gap between W8A8 naive and FP16 at every scale.",
+          "weight": 4,
+          "sub_tasks": [],
+          "task_category": "Result Analysis",
+          "finegrained_task_category": "Logging, Analysis & Presentation"
+        },
+        {
+          "id": "opt-iml-30b-accuracy-table5",
+          "requirements": "The OPT-IML-30B instruction-tuned LLM accuracy experiment has been reproduced matching all rows of Table 5. The following results must be produced: FP16 (LAMBADA=69.12%, WikiText=14.26), W8A8 naive (LAMBADA=4.21%, WikiText=576.53), ZeroQuant (LAMBADA=5.12%, WikiText=455.12), LLM.int8() (LAMBADA=69.14%, WikiText=14.27), Outlier Suppression (LAMBADA=0.00%, WikiText=9485.62), SmoothQuant-O3 (LAMBADA=69.77%, WikiText=14.37). The results confirm SmoothQuant-O3 preserves accuracy on instruction-tuned models while naive baselines degrade severely.",
+          "weight": 3,
+          "sub_tasks": [
+            {
+              "id": "opt-iml-30b-fp16-table5",
+              "requirements": "The FP16 row of Table 5 for OPT-IML-30B has been reproduced: LAMBADA=69.12%, WikiText=14.26.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": null
+            },
+            {
+              "id": "opt-iml-30b-w8a8-naive-table5",
+              "requirements": "The W8A8 naive row of Table 5 for OPT-IML-30B has been reproduced: LAMBADA=4.21%, WikiText=576.53.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": null
+            },
+            {
+              "id": "opt-iml-30b-zeroquant-table5",
+              "requirements": "The ZeroQuant row of Table 5 for OPT-IML-30B has been reproduced: LAMBADA=5.12%, WikiText=455.12.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": null
+            },
+            {
+              "id": "opt-iml-30b-llmint8-table5",
+              "requirements": "The LLM.int8() row of Table 5 for OPT-IML-30B has been reproduced: LAMBADA=69.14%, WikiText=14.27.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": null
+            },
+            {
+              "id": "opt-iml-30b-outlier-suppression-table5",
+              "requirements": "The Outlier Suppression row of Table 5 for OPT-IML-30B has been reproduced: LAMBADA=0.00%, WikiText=9485.62.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": null
+            },
+            {
+              "id": "opt-iml-30b-smoothquant-o3-table5",
+              "requirements": "The SmoothQuant-O3 row of Table 5 for OPT-IML-30B has been reproduced: LAMBADA=69.77%, WikiText=14.37.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": null
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "llama1-accuracy-table6",
+          "requirements": "The LLaMA-1 W8A8 quantization accuracy experiment has been reproduced matching all rows and columns of Table 6. WikiText-2 perplexity is evaluated with sequence length 512 and per-token activation quantization with alpha=0.8. The following results must be produced: FP16 (7B=11.51, 13B=10.05, 30B=7.53, 65B=6.17), W8A8 SmoothQuant (7B=11.56, 13B=10.08, 30B=7.56, 65B=6.20). Results demonstrate negligible performance degradation across all LLaMA-1 scales.",
+          "weight": 3,
+          "sub_tasks": [
+            {
+              "id": "llama1-fp16-table6",
+              "requirements": "The FP16 row of Table 6 for LLaMA-1 WikiText-2 perplexity (sequence length 512) has been reproduced: 7B=11.51, 13B=10.05, 30B=7.53, 65B=6.17.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": null
+            },
+            {
+              "id": "llama1-w8a8-smoothquant-table6",
+              "requirements": "The W8A8 SmoothQuant row of Table 6 for LLaMA-1 WikiText-2 perplexity (sequence length 512, per-token activation quantization, alpha=0.8) has been reproduced: 7B=11.56, 13B=10.08, 30B=7.56, 65B=6.20.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": null
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "newer-arch-accuracy-table7",
+          "requirements": "The Llama-2, Falcon, Mistral, and Mixtral W8A8 quantization accuracy experiment has been reproduced matching all rows and columns of Table 7. WikiText-2 perplexity is evaluated with sequence length 2048, per-token activation quantization, and per-channel weight quantization. The following FP16 and W8A8 SmoothQuant perplexities must be produced with their respective alpha values: Llama-2-7B (FP16=5.474, SQ=5.515, alpha=0.85), Llama-2-13B (FP16=4.950, SQ=4.929, alpha=0.85), Llama-2-70B (FP16=3.320, SQ=3.359, alpha=0.9), Falcon-7B (FP16=6.590, SQ=6.629, alpha=0.6), Falcon-40B (FP16=5.228, SQ=5.255, alpha=0.7), Mistral-7B (FP16=5.253, SQ=5.277, alpha=0.8), Mixtral-8x7B (FP16=3.842, SQ=3.893, alpha=0.8).",
+          "weight": 4,
+          "sub_tasks": [
+            {
+              "id": "llama2-7b-table7",
+              "requirements": "The Llama-2-7B rows of Table 7 have been reproduced: FP16 PPL=5.474, W8A8 SQ PPL=5.515, alpha=0.85.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": null
+            },
+            {
+              "id": "llama2-13b-table7",
+              "requirements": "The Llama-2-13B rows of Table 7 have been reproduced: FP16 PPL=4.950, W8A8 SQ PPL=4.929, alpha=0.85.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": null
+            },
+            {
+              "id": "llama2-70b-table7",
+              "requirements": "The Llama-2-70B rows of Table 7 have been reproduced: FP16 PPL=3.320, W8A8 SQ PPL=3.359, alpha=0.9.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": null
+            },
+            {
+              "id": "falcon-7b-table7",
+              "requirements": "The Falcon-7B rows of Table 7 have been reproduced: FP16 PPL=6.590, W8A8 SQ PPL=6.629, alpha=0.6.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": null
+            },
+            {
+              "id": "falcon-40b-table7",
+              "requirements": "The Falcon-40B rows of Table 7 have been reproduced: FP16 PPL=5.228, W8A8 SQ PPL=5.255, alpha=0.7.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": null
+            },
+            {
+              "id": "mistral-7b-table7",
+              "requirements": "The Mistral-7B rows of Table 7 have been reproduced: FP16 PPL=5.253, W8A8 SQ PPL=5.277, alpha=0.8.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": null
+            },
+            {
+              "id": "mixtral-8x7b-table7",
+              "requirements": "The Mixtral-8x7B rows of Table 7 have been reproduced: FP16 PPL=3.842, W8A8 SQ PPL=3.893, alpha=0.8.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": null
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "bloom-quantization-difficulty-analysis",
+          "requirements": "The BLOOM-176B quantization difficulty analysis has been reproduced and compared against OPT-175B and GLM-130B as discussed in Section 5.2. The results confirm that BLOOM-176B is easier to quantize than OPT-175B: W8A8 naive degrades BLOOM-176B accuracy by only ~4% (from 68.2% to 64.2%) versus near-total collapse for OPT-175B (from 71.6% to 32.3%), and SmoothQuant-O1 and O2 match FP16 accuracy for BLOOM-176B while SmoothQuant-O3 degrades accuracy by 0.8% (from 68.2% to 67.4%), consistent with Table 4 and Section 5.2.",
+          "weight": 3,
+          "sub_tasks": [],
+          "task_category": "Result Analysis",
+          "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+        },
+        {
+          "id": "glm130b-clipping-config",
+          "requirements": "For GLM-130B static quantization (O3 setting), the top 2% of activation tokens are clipped when calibrating the static quantization step sizes, following Wei et al. (2022) as stated in Section 5.2: 'we clip the top 2% tokens when calibrating the static quantization step sizes for GLM-130B.' This clipping is applied only to GLM-130B (not to OPT or BLOOM models) and is implemented as part of the static calibration forward pass pipeline for GLM-130B.",
+          "weight": 1,
+          "sub_tasks": [],
+          "task_category": "Code Development",
+          "finegrained_task_category": "Method Implementation"
+        },
+        {
+          "id": "smoothquant-o3-table3-accuracy-match-claim",
+          "requirements": "The result that SmoothQuant-O3 (the most aggressive and most hardware-efficient setting) matches FP16 accuracy on OPT-175B across all 7 zero-shot benchmarks and WikiText perplexity has been verified from the reproduced Table 3 results. SmoothQuant-O3 achieves Average=66.8% vs FP16 Average=66.9% (delta <0.1%), and WikiText perplexity 11.17 vs 11.00 (delta <0.2), confirming the paper's central claim in Section 5.2 that 'SmoothQuant can match the FP16 accuracy on all evaluation datasets with all quantization schemes'.",
+          "weight": 5,
+          "sub_tasks": [],
+          "task_category": "Result Analysis",
+          "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+        }
+      ],
+      "task_category": null,
+      "finegrained_task_category": null
+    },
+    {
+      "id": "speedup-memory-results",
+      "requirements": "The measured speedup and memory-saving experiments for SmoothQuant-O3 in PyTorch and FasterTransformer, including context and decoding stages, have been reproduced matching Figures 8-9 and Tables 8, 11.",
+      "weight": 5,
+      "sub_tasks": [
+        {
+          "id": "pytorch-context-stage-setup",
+          "requirements": "The PyTorch context-stage benchmark infrastructure has been set up: end-to-end inference latency is measured for generating all hidden states for a batch of 4 sentences in one pass, with aggregated peak GPU memory usage recorded. Experiments run on NVIDIA A100 80GB GPUs using Huggingface transformers without model parallelism (single GPU only). The three models evaluated are OPT-6.7B, OPT-13B, and OPT-30B. The three methods compared are: FP16 baseline, LLM.int8(), and SmoothQuant-O3 integrated into PyTorch.",
+          "weight": 3,
+          "sub_tasks": [],
+          "task_category": "Code Development",
+          "finegrained_task_category": "Experimental Setup"
+        },
+        {
+          "id": "pytorch-context-stage-latency-execution",
+          "requirements": "The PyTorch context-stage latency benchmarks have been executed for OPT-6.7B, OPT-13B, and OPT-30B at multiple sequence lengths (including at minimum sequence length 256) for FP16, LLM.int8(), and SmoothQuant-O3. Results are recorded so that speedup ratios relative to FP16 can be computed per model and sequence length, reproducing the latency panel of Figure 8.",
+          "weight": 3,
+          "sub_tasks": [],
+          "task_category": "Code Execution",
+          "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+        },
+        {
+          "id": "pytorch-context-stage-latency-results",
+          "requirements": "The PyTorch context-stage latency results match Figure 8 (latency panel): SmoothQuant-O3 is consistently faster than the FP16 baseline across OPT-6.7B, OPT-13B, and OPT-30B, achieving up to 1.51x speedup on OPT-30B at sequence length 256. The trend shows that larger models yield more significant acceleration. LLM.int8() is almost always slower than the FP16 baseline due to the large overhead of mixed-precision activation representation.",
+          "weight": 4,
+          "sub_tasks": [
+            {
+              "id": "pytorch-context-stage-speedup-smoothquant",
+              "requirements": "SmoothQuant-O3 is consistently faster than the FP16 baseline across OPT-6.7B, OPT-13B, and OPT-30B in the PyTorch context-stage latency results (Figure 8 latency panel), achieving up to 1.51x speedup on OPT-30B at sequence length 256.",
+              "weight": 5,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": null
+            },
+            {
+              "id": "pytorch-context-stage-trend-larger-model",
+              "requirements": "The PyTorch context-stage latency results (Figure 8 latency panel) show a trend that larger models yield more significant acceleration from SmoothQuant-O3.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": null
+            },
+            {
+              "id": "pytorch-context-stage-llmint8-slower",
+              "requirements": "LLM.int8() is almost always slower than the FP16 baseline in the PyTorch context-stage latency results (Figure 8 latency panel) due to the large overhead of mixed-precision activation representation.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": null
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "pytorch-context-stage-memory-results",
+          "requirements": "The PyTorch context-stage peak GPU memory usage results match Figure 8 (memory panel): both SmoothQuant-O3 and LLM.int8() nearly halve the peak memory usage of the FP16 baseline for OPT-6.7B, OPT-13B, and OPT-30B. SmoothQuant-O3 saves slightly more memory than LLM.int8() because it uses fully INT8 GEMMs (no mixed-precision decomposition), consistent with Section 5.3.",
+          "weight": 3,
+          "sub_tasks": [],
+          "task_category": "Result Analysis",
+          "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+        },
+        {
+          "id": "fastertransformer-context-stage-setup",
+          "requirements": "The FasterTransformer context-stage benchmark infrastructure has been set up with SmoothQuant-O3 integrated into FasterTransformer. The benchmark compares FasterTransformer's FP16 implementation of OPT against SmoothQuant-O3. Models evaluated include OPT-13B and OPT-30B on single GPU, OPT-66B on 1 GPU vs 2 GPUs (Tensor Parallelism), and OPT-175B on 4 GPUs vs 8 GPUs. All experiments run on NVIDIA A100 80GB GPU servers. Tensor Parallelism (Shoeybi et al., 2019) is used for multi-GPU configurations.",
+          "weight": 3,
+          "sub_tasks": [],
+          "task_category": "Code Development",
+          "finegrained_task_category": "Experimental Setup"
+        },
+        {
+          "id": "fastertransformer-context-stage-latency-results",
+          "requirements": "The FasterTransformer context-stage latency results match Figure 9 (top panel): SmoothQuant-O3 reduces execution latency of OPT-13B and OPT-30B by up to 1.56x compared to FasterTransformer FP16 on a single GPU. For multi-GPU configurations, SmoothQuant-O3 achieves similar or better latency using half the number of GPUs: OPT-66B runs on 1 GPU with SmoothQuant vs 2 GPUs for FP16, and OPT-175B runs on 4 GPUs with SmoothQuant vs 8 GPUs for FP16, consistent with Section 5.3.",
+          "weight": 5,
+          "sub_tasks": [
+            {
+              "id": "fastertransformer-single-gpu-latency-reduction",
+              "requirements": "The FasterTransformer context-stage latency results for single-GPU configurations match Figure 9 (top panel): SmoothQuant-O3 reduces execution latency of OPT-13B and OPT-30B by up to 1.56x compared to FasterTransformer's FP16 implementation on a single GPU. The paper states this is challenging since FasterTransformer is already more than 3x faster than the PyTorch implementation for OPT-30B, making the additional 1.56x speedup significant, consistent with Section 5.3.",
+              "weight": 4,
+              "sub_tasks": [
+                {
+                  "id": "ft-single-gpu-latency-opt13b-opt30b",
+                  "requirements": "SmoothQuant-O3 reduces execution latency of OPT-13B and OPT-30B by up to 1.56x compared to FasterTransformer FP16 on a single GPU, as shown in Figure 9 (top panel).",
+                  "weight": 4,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": null
+                },
+                {
+                  "id": "ft-single-gpu-notable-because-3x-faster",
+                  "requirements": "The FasterTransformer context-stage latency result in Figure 9 (top panel) is notable because FasterTransformer is already more than 3x faster than the PyTorch implementation for OPT-30B, making the additional 1.56x speedup significant, consistent with Section 5.3.",
+                  "weight": 2,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": null
+                }
+              ],
+              "task_category": null,
+              "finegrained_task_category": null
+            },
+            {
+              "id": "fastertransformer-opt66b-half-gpu-latency",
+              "requirements": "The FasterTransformer context-stage latency result for OPT-66B matches Figure 9 (top panel): SmoothQuant-O3 running OPT-66B on 1 GPU achieves similar or better latency compared to FasterTransformer FP16 running OPT-66B on 2 GPUs (i.e., half the number of GPUs), consistent with Section 5.3's statement 'SmoothQuant achieves similar or even better latency using only half the number of GPUs (1 GPU instead of 2 for OPT-66B)'.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "fastertransformer-opt175b-half-gpu-latency",
+              "requirements": "The FasterTransformer context-stage latency result for OPT-175B matches Figure 9 (top panel): SmoothQuant-O3 running OPT-175B on 4 GPUs achieves similar or better latency compared to FasterTransformer FP16 running OPT-175B on 8 GPUs (i.e., half the number of GPUs), consistent with Section 5.3's statement 'SmoothQuant achieves similar or even better latency using only half the number of GPUs (4 GPUs instead of 8 for OPT-175B)'. This enables serving OPT-175B using half the hardware cost at no latency penalty.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "fastertransformer-context-stage-memory-results",
+          "requirements": "The FasterTransformer context-stage memory usage results match Figure 9 (bottom panel): the amount of memory needed when using SmoothQuant-O3 in FasterTransformer is reduced by a factor of almost 2x compared to the FP16 FasterTransformer baseline, for OPT-13B, OPT-30B, OPT-66B, and OPT-175B, consistent with Section 5.3.",
+          "weight": 4,
+          "sub_tasks": [
+            {
+              "id": "ft-memory-measurement-implementation",
+              "requirements": "The peak GPU memory measurement infrastructure has been implemented for the FasterTransformer benchmark, recording the aggregated peak GPU memory usage across all GPUs during the context-stage forward pass (generating all hidden states for a batch of sentences in one pass). The measurement correctly captures peak memory including model weights, activations, and any temporary buffers, producing the data shown in Figure 9 (bottom panel) for both FP16 and SmoothQuant-O3 configurations.",
+              "weight": 3,
+              "sub_tasks": [
+                {
+                  "id": "ft-memory-aggregated-peak-measurement-code",
+                  "requirements": "Code has been implemented to record the aggregated peak GPU memory usage across all GPUs during the FasterTransformer context-stage forward pass. The measurement queries peak memory (e.g., via torch.cuda.max_memory_allocated() or equivalent FasterTransformer/CUDA memory profiling API) for each participating GPU and sums or reports these values to produce the total aggregated peak memory figure. The measurement is triggered after a warm-up pass and captures the true peak including model weights, INT8 or FP16 activations, attention buffers, and any temporary workspace buffers allocated by the CUTLASS INT8 GEMM kernels.",
+                  "weight": 3,
+                  "sub_tasks": [],
+                  "task_category": "Code Development",
+                  "finegrained_task_category": null
+                },
+                {
+                  "id": "ft-memory-model-weights-captured",
+                  "requirements": "The peak memory measurement correctly captures memory consumed by model weight tensors (stored in FP16 for the baseline and INT8 for SmoothQuant-O3). For FP16 OPT-175B on 8 GPUs the total weight memory dominates the 1040+ GB footprint reported in Table 10, while for INT8 SmoothQuant-O3 on 4 GPUs the weight memory is approximately halved to the ~527-545 GB range, confirming that INT8 weight storage (half the bytes of FP16) is the primary driver of the 2x memory reduction shown in Figure 9 (bottom panel).",
+                  "weight": 3,
+                  "sub_tasks": [
+                    {
+                      "id": "ft-memory-fp16-weight-dominates",
+                      "requirements": "For FP16 OPT-175B on 8 GPUs, the total weight memory dominates the 1040+ GB footprint reported in Table 10, confirming that model weights are correctly captured in the peak memory measurement.",
+                      "weight": 2,
+                      "sub_tasks": [],
+                      "task_category": "Result Analysis",
+                      "finegrained_task_category": null
+                    },
+                    {
+                      "id": "ft-memory-int8-weight-halved",
+                      "requirements": "For INT8 SmoothQuant-O3 on 4 GPUs (OPT-175B), the weight memory is approximately halved to the ~527-545 GB range (as reported in Table 10), confirming that INT8 weight storage is the primary driver of the 2x memory reduction shown in Figure 9 (bottom panel).",
+                      "weight": 3,
+                      "sub_tasks": [],
+                      "task_category": "Result Analysis",
+                      "finegrained_task_category": null
+                    }
+                  ],
+                  "task_category": null,
+                  "finegrained_task_category": null
+                },
+                {
+                  "id": "ft-memory-activations-and-buffers-captured",
+                  "requirements": "The peak memory measurement captures memory consumed by intermediate activation tensors and temporary buffers (e.g., attention score matrices, key-value cache, GEMM workspace buffers) during the context-stage forward pass in addition to model weights. The measurement is taken at the point of maximum aggregate memory usage during the full forward pass over the input batch, not just at model load time, so that transient peak memory from activations and CUTLASS workspace is included in the reported value.",
+                  "weight": 2,
+                  "sub_tasks": [],
+                  "task_category": "Code Development",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                }
+              ],
+              "task_category": null,
+              "finegrained_task_category": null
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "decoding-stage-latency-setup",
+          "requirements": "The decoding-stage benchmark infrastructure has been set up to measure per-token autoregressive decoding latency. The benchmark compares FP16 baseline against SmoothQuant-O3 for autoregressive generation, recording per-token latency (latency per generated token) and memory footprint, reproducing the measurements reported in Table 8. The benchmarks are run on NVIDIA A100 80GB GPU servers.",
+          "weight": 3,
+          "sub_tasks": [],
+          "task_category": "Code Development",
+          "finegrained_task_category": "Experimental Setup"
+        },
+        {
+          "id": "decoding-stage-latency-results-table8",
+          "requirements": "The decoding-stage latency and memory results have been executed and match Table 8: SmoothQuant-O3 consistently reduces per-token decoding latency compared to FP16, achieving up to 1.42x speedup. Additionally, SmoothQuant-O3 halves the memory footprints for LLM inference compared to FP16 across the model scales reported in Table 8, enabling deployment at significantly lower cost, consistent with Section 5.3.",
+          "weight": 4,
+          "sub_tasks": [
+            {
+              "id": "decoding-stage-latency-speedup-table8",
+              "requirements": "SmoothQuant-O3 consistently reduces per-token decoding latency compared to FP16, achieving up to 1.42x speedup, as reported in Table 8.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": null
+            },
+            {
+              "id": "decoding-stage-memory-halved-table8",
+              "requirements": "SmoothQuant-O3 halves the memory footprints for LLM inference compared to FP16 across the model scales (OPT-30B and OPT-175B) reported in Table 8, consistent with Section 5.3.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": null
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "o1-o2-o3-latency-comparison-table11",
+          "requirements": "The latency comparison across O1, O2, and O3 quantization settings has been benchmarked and results match Table 11: for OPT-30B at sequence length 256, SmoothQuant-O3 achieves 227.6ms latency, SmoothQuant-O2 achieves 240.2ms, and SmoothQuant-O1 achieves 246.7ms. This confirms that static quantization (O3) is the fastest among the three settings because per-tensor static activation quantization eliminates the runtime overhead of computing activation statistics, consistent with Section 5.3 and Section 5.5.",
+          "weight": 4,
+          "sub_tasks": [
+            {
+              "id": "table11-opt30b-seq256-latencies",
+              "requirements": "For OPT-30B at sequence length 256, Table 11 reports SmoothQuant-O3 latency of 227.6ms, SmoothQuant-O2 latency of 240.2ms, and SmoothQuant-O1 latency of 246.7ms.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": null
+            },
+            {
+              "id": "table11-opt13b-seq256-latencies",
+              "requirements": "For OPT-13B at sequence length 256, Table 11 reports FP16 latency of 152.6ms, LLM.int8() latency of 237.1ms, SmoothQuant-O1 latency of 124.5ms, SmoothQuant-O2 latency of 120.5ms, and SmoothQuant-O3 latency of 112.1ms.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": null
+            },
+            {
+              "id": "table11-static-quantization-fastest-explanation",
+              "requirements": "Table 11 confirms that static quantization (O3) is the fastest among the three SmoothQuant settings because per-tensor static activation quantization eliminates the runtime overhead of computing activation statistics, consistent with Section 5.3 and Section 5.5.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": null
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "figure8-figure9-plotting",
+          "requirements": "Figures 8 and 9 have been generated as plots: Figure 8 shows the PyTorch-based inference latency and peak memory usage across OPT-6.7B, OPT-13B, and OPT-30B comparing FP16, LLM.int8(), and SmoothQuant-O3 at multiple sequence lengths. Figure 9 shows two panels: (top) FasterTransformer latency comparison across OPT-13B, OPT-30B, OPT-66B, and OPT-175B for FP16 vs SmoothQuant-O3 at single and multi-GPU configurations, and (bottom) the corresponding memory reduction results.",
+          "weight": 4,
+          "sub_tasks": [
+            {
+              "id": "figure8-pytorch-latency-plot",
+              "requirements": "Figure 8 (latency panel) has been generated as a plot showing the PyTorch-based inference latency for generating all hidden states for a batch of 4 sentences in one forward pass (context stage), comparing FP16, LLM.int8(), and SmoothQuant-O3 across OPT-6.7B, OPT-13B, and OPT-30B at multiple sequence lengths. The plot must show that SmoothQuant-O3 is consistently faster than the FP16 baseline (up to 1.51x speedup on OPT-30B at sequence length 256) and that LLM.int8() is almost always slower than FP16 due to mixed-precision overhead, as described in Section 5.3.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Logging, Analysis & Presentation"
+            },
+            {
+              "id": "figure8-pytorch-memory-plot",
+              "requirements": "Figure 8 (memory panel) has been generated as a plot showing the aggregated peak GPU memory usage for the PyTorch context-stage benchmark, comparing FP16, LLM.int8(), and SmoothQuant-O3 across OPT-6.7B, OPT-13B, and OPT-30B at multiple sequence lengths. The plot must show that both SmoothQuant-O3 and LLM.int8() nearly halve the peak memory usage of the FP16 baseline, with SmoothQuant-O3 saving slightly more memory than LLM.int8() because it uses fully INT8 GEMMs with no mixed-precision decomposition, as described in Section 5.3.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Logging, Analysis & Presentation"
+            },
+            {
+              "id": "figure8-pytorch-benchmark-execution",
+              "requirements": "The PyTorch context-stage benchmarks underlying Figure 8 have been executed: end-to-end latency and peak GPU memory usage are measured for a batch of 4 sentences in one forward pass on OPT-6.7B, OPT-13B, and OPT-30B at multiple sequence lengths (at minimum sequence lengths 128 and 256), for FP16, LLM.int8(), and SmoothQuant-O3 using a single NVIDIA A100 80GB GPU. The raw latency and memory numbers are recorded so that speedup ratios and memory saving factors can be computed to populate both panels of Figure 8.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "figure9-fastertransformer-benchmark-execution",
+              "requirements": "The FasterTransformer context-stage benchmarks underlying Figure 9 have been executed for all four model configurations: OPT-13B (single GPU), OPT-30B (single GPU), OPT-66B (1 GPU for SmoothQuant-O3 vs 2 GPUs for FP16 using Tensor Parallelism), and OPT-175B (4 GPUs for SmoothQuant-O3 vs 8 GPUs for FP16 using Tensor Parallelism), comparing FasterTransformer FP16 against SmoothQuant-O3 integrated into FasterTransformer. All experiments are conducted on NVIDIA A100 80GB GPU servers. Raw latency and peak GPU memory are recorded for both top and bottom panels of Figure 9.",
+              "weight": 5,
+              "sub_tasks": [
+                {
+                  "id": "ft-context-opt13b-single-gpu-execution",
+                  "requirements": "The FasterTransformer context-stage benchmark has been executed for OPT-13B on a single NVIDIA A100 80GB GPU, comparing FasterTransformer FP16 against SmoothQuant-O3 integrated into FasterTransformer. Raw latency (in ms) and peak GPU memory usage are recorded at all evaluated sequence lengths, producing the OPT-13B data points in both the top (latency) and bottom (memory) panels of Figure 9.",
+                  "weight": 3,
+                  "sub_tasks": [],
+                  "task_category": "Code Execution",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                },
+                {
+                  "id": "ft-context-opt30b-single-gpu-execution",
+                  "requirements": "The FasterTransformer context-stage benchmark has been executed for OPT-30B on a single NVIDIA A100 80GB GPU, comparing FasterTransformer FP16 against SmoothQuant-O3 integrated into FasterTransformer. Raw latency and peak GPU memory are recorded at all evaluated sequence lengths. The results must show that SmoothQuant-O3 reduces latency by up to 1.56x compared to FasterTransformer FP16 on OPT-30B, as stated in Section 5.3, producing the OPT-30B data points for both panels of Figure 9.",
+                  "weight": 4,
+                  "sub_tasks": [],
+                  "task_category": "Code Execution",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                },
+                {
+                  "id": "ft-context-opt66b-tensor-parallel-execution",
+                  "requirements": "The FasterTransformer context-stage benchmark has been executed for OPT-66B using Tensor Parallelism (Shoeybi et al., 2019): SmoothQuant-O3 runs on 1 GPU while the FP16 FasterTransformer baseline runs on 2 GPUs. Raw latency and aggregated peak GPU memory across all participating GPUs are recorded at all evaluated sequence lengths. The results must confirm that SmoothQuant-O3 on 1 GPU achieves similar or better latency than FP16 on 2 GPUs, and that total memory is reduced by approximately 2x, as stated in Section 5.3 ('1 GPU instead of 2 for OPT-66B'). These measurements populate the OPT-66B data points in both panels of Figure 9.",
+                  "weight": 4,
+                  "sub_tasks": [],
+                  "task_category": "Code Execution",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                },
+                {
+                  "id": "ft-context-opt175b-tensor-parallel-execution",
+                  "requirements": "The FasterTransformer context-stage benchmark has been executed for OPT-175B using Tensor Parallelism (Shoeybi et al., 2019): SmoothQuant-O3 runs on 4 NVIDIA A100 80GB GPUs while the FP16 FasterTransformer baseline runs on 8 GPUs. Raw latency and aggregated peak GPU memory across all participating GPUs are recorded at all evaluated sequence lengths. The results must confirm that SmoothQuant-O3 on 4 GPUs achieves similar or better latency than FP16 on 8 GPUs, and that total memory is reduced by approximately 2x, as stated in Section 5.3 ('4 GPUs instead of 8 for OPT-175B'). These measurements populate the OPT-175B data points in both panels of Figure 9.",
+                  "weight": 4,
+                  "sub_tasks": [],
+                  "task_category": "Code Execution",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                },
+                {
+                  "id": "ft-context-tensor-parallelism-integration",
+                  "requirements": "SmoothQuant-O3 has been integrated into FasterTransformer with Tensor Parallelism (Shoeybi et al., 2019) support, so that INT8 GEMM kernels and the per-channel smoothing transformation operate correctly across multi-GPU sharded model configurations. The integration supports the OPT-66B (1 vs 2 GPU) and OPT-175B (4 vs 8 GPU) configurations used in Figure 9, as described in Section 5.3: 'In the FasterTransformer library, SmoothQuant can seamlessly work with Tensor Parallelism.'",
+                  "weight": 4,
+                  "sub_tasks": [],
+                  "task_category": "Code Development",
+                  "finegrained_task_category": "Method Implementation"
+                },
+                {
+                  "id": "ft-context-latency-figure9-top-panel-result",
+                  "requirements": "The FasterTransformer context-stage latency results from all four model configurations (OPT-13B single GPU, OPT-30B single GPU, OPT-66B 1 vs 2 GPUs, OPT-175B 4 vs 8 GPUs) have been analyzed and match the top panel of Figure 9: SmoothQuant-O3 reduces execution latency of OPT-13B and OPT-30B by up to 1.56x on single GPU, and achieves similar or better latency using half the number of GPUs for OPT-66B and OPT-175B, consistent with Section 5.3's statement that this is notable because FasterTransformer is already more than 3x faster than the PyTorch implementation for OPT-30B.",
+                  "weight": 4,
+                  "sub_tasks": [
+                    {
+                      "id": "ft-latency-single-gpu-result",
+                      "requirements": "SmoothQuant-O3 reduces execution latency of OPT-13B and OPT-30B by up to 1.56x compared to FasterTransformer FP16 on a single GPU, as shown in Figure 9 (top panel), and this is notable because FasterTransformer is already more than 3x faster than the PyTorch implementation for OPT-30B.",
+                      "weight": 4,
+                      "sub_tasks": [],
+                      "task_category": "Result Analysis",
+                      "finegrained_task_category": null
+                    },
+                    {
+                      "id": "ft-latency-half-gpu-result",
+                      "requirements": "SmoothQuant-O3 achieves similar or better latency using half the number of GPUs for OPT-66B (1 GPU vs 2 GPUs) and OPT-175B (4 GPUs vs 8 GPUs), as shown in Figure 9 (top panel), consistent with Section 5.3.",
+                      "weight": 4,
+                      "sub_tasks": [],
+                      "task_category": "Result Analysis",
+                      "finegrained_task_category": null
+                    }
+                  ],
+                  "task_category": null,
+                  "finegrained_task_category": null
+                },
+                {
+                  "id": "ft-context-memory-figure9-bottom-panel-result",
+                  "requirements": "The FasterTransformer context-stage peak GPU memory results from all four model configurations (OPT-13B single GPU, OPT-30B single GPU, OPT-66B on 1 vs 2 GPUs, OPT-175B on 4 vs 8 GPUs) have been analyzed and match the bottom panel of Figure 9: SmoothQuant-O3 reduces total peak memory by a factor of almost 2x compared to the FP16 FasterTransformer baseline across all four model scales, consistent with Section 5.3's statement 'the amount of memory needed when using SmoothQuant-O3 in FasterTransformer is reduced by a factor of almost 2x'.",
+                  "weight": 3,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                }
+              ],
+              "task_category": null,
+              "finegrained_task_category": null
+            },
+            {
+              "id": "figure8-figure9-plotting-code",
+              "requirements": "Code exists to read the raw benchmark results (latency and memory measurements from the PyTorch and FasterTransformer benchmark runs) and generate Figure 8 (two panels: latency and memory for PyTorch on OPT-6.7B/13B/30B) and Figure 9 (two panels: FasterTransformer latency and memory for OPT-13B/30B/66B/175B) as publication-quality plots. The plots must include all three methods in Figure 8 (FP16, LLM.int8(), SmoothQuant-O3) and two methods in Figure 9 (FP16 and SmoothQuant-O3) with appropriate axis labels, model labels, and GPU-count annotations.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Logging, Analysis & Presentation"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        }
+      ],
+      "task_category": null,
+      "finegrained_task_category": null
+    },
+    {
+      "id": "scaling-530b",
+      "requirements": "The scaling-up experiment quantizing MT-NLG 530B to W8A8 and serving it within a single 8-GPU node has been reproduced matching Tables 9 and 10.",
+      "weight": 5,
+      "sub_tasks": [
+        {
+          "id": "mt-nlg-530b-model-acquisition",
+          "requirements": "The MT-NLG 530B model (Smith et al., 2022) has been loaded and configured for W8A8 quantization. The model weights must be accessible and the model must be loadable in FP16 across multiple GPUs (16 GPUs for FP16, reducible to 8 GPUs for INT8 SmoothQuant) using the multi-GPU infrastructure described in Section 5.4.",
+          "weight": 2,
+          "sub_tasks": [],
+          "task_category": "Code Development",
+          "finegrained_task_category": "Dataset and Model Acquisition"
+        },
+        {
+          "id": "mt-nlg-530b-smoothquant-quantization",
+          "requirements": "SmoothQuant W8A8 quantization has been applied to the MT-NLG 530B model: per-channel smoothing factors are computed from 512 Pile calibration sentences, fused offline into the model parameters, and the model is converted to INT8 for all linear layers and BMM operators in the transformer blocks, as described in Section 5.4 ('SmoothQuant enables W8A8 quantization of the 530B model').",
+          "weight": 5,
+          "sub_tasks": [
+            {
+              "id": "mt-nlg-530b-smoothing-factor-calibration",
+              "requirements": "Per-channel smoothing factors for MT-NLG 530B have been computed by running 512 random sentences from the Pile pre-training dataset validation set through the model in a forward pass, collecting per-channel activation maximum statistics (max(|X_j|) for each input channel j of every linear and BMM layer). The migration strength alpha is selected via grid search on a subset of the Pile validation set, consistent with the general calibration procedure described in Section 5.1 and applied to MT-NLG 530B in Section 5.4.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Data Processing & Preparation"
+            },
+            {
+              "id": "mt-nlg-530b-offline-smoothing-factor-fusion",
+              "requirements": "The per-channel smoothing factors computed from the 512 Pile calibration sentences have been fused offline into the MT-NLG 530B model parameters (e.g., into the preceding LayerNorm affine weights/biases or prior linear layer output weights) so that no extra kernel call overhead is incurred at inference time. This offline fusion is applied to every self-attention and feed-forward sub-block in the 530B transformer, consistent with Section 4's description: 'we can easily fuse the smoothing factor into previous layers' parameters offline, which does not incur kernel call overhead from an extra scaling'.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "mt-nlg-530b-int8-linear-conversion",
+              "requirements": "All linear (GEMM) layers in the MT-NLG 530B transformer blocks have been converted from FP16 to INT8 (W8A8): both weight matrices and input activations are quantized to INT8 and computed via CUTLASS INT8 GEMM kernels. The original FP16 linear modules are replaced with INT8 equivalents across all transformer layers of the 530B model, consistent with Section 5.1's implementation procedure and Section 5.4's statement that SmoothQuant enables W8A8 quantization of the 530B model.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "mt-nlg-530b-int8-bmm-conversion",
+              "requirements": "All BMM (batched matrix multiplication) operators in the MT-NLG 530B attention computation (both the QK^T attention score BMM and the attention-value AV BMM) have been converted to INT8: the inputs to each BMM are quantized to INT8 before the operation and computed via INT8 BMM kernels, with post-GEMM rescaling applied along the outer dimensions consistent with Equation 2. This replaces the original FP16 bmm functions across all attention layers in the 530B model, as stated in Section 4 ('We also quantize BMM operators in the attention computation') and applied to MT-NLG 530B in Section 5.4.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "mt-nlg-530b-multi-gpu-deployment",
+              "requirements": "The quantized MT-NLG 530B INT8 model has been deployed using 8 NVIDIA A100 80GB GPUs (a single node) via Tensor Parallelism, whereas the FP16 baseline requires 16 GPUs. The 8-GPU INT8 deployment reduces total memory from approximately 1040-1095GB (FP16 on 16 GPUs) to approximately 527-570GB (INT8 on 8 GPUs) across the sequence lengths tested in Table 10, enabling the 530B model to be served within a single node, as stated in Section 5.4.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "mt-nlg-530b-table10-latency-memory-results",
+              "requirements": "The latency and memory measurements for the MT-NLG 530B serving experiment match all rows of Table 10: (SeqLen=128): FP16 on 16 GPUs latency=232ms/memory=1040GB, INT8 on 8 GPUs latency=253ms/memory=527GB; (SeqLen=256): FP16=451ms/1054GB, INT8=434ms/533GB; (SeqLen=512): FP16=838ms/1068GB, INT8=839ms/545GB; (SeqLen=1024): FP16=1707ms/1095GB, INT8=1689ms/570GB. The results confirm that SmoothQuant INT8 on 8 GPUs achieves similar latency to FP16 on 16 GPUs while reducing memory by approximately half, enabling single-node serving of a 530B model.",
+              "weight": 5,
+              "sub_tasks": [
+                {
+                  "id": "mt-nlg-530b-table10-seqlen128-fp16-latency-memory",
+                  "requirements": "Table 10 row SeqLen=128: FP16 on 16 GPUs latency=232ms and memory=1040GB are reproduced.",
+                  "weight": 2,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                },
+                {
+                  "id": "mt-nlg-530b-table10-seqlen128-int8-latency-memory",
+                  "requirements": "Table 10 row SeqLen=128: INT8 on 8 GPUs latency=253ms and memory=527GB are reproduced.",
+                  "weight": 2,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                },
+                {
+                  "id": "mt-nlg-530b-table10-seqlen256-fp16-latency-memory",
+                  "requirements": "Table 10 row SeqLen=256: FP16 on 16 GPUs latency=451ms and memory=1054GB are reproduced.",
+                  "weight": 2,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                },
+                {
+                  "id": "mt-nlg-530b-table10-seqlen256-int8-latency-memory",
+                  "requirements": "Table 10 row SeqLen=256: INT8 on 8 GPUs latency=434ms and memory=533GB are reproduced.",
+                  "weight": 2,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                },
+                {
+                  "id": "mt-nlg-530b-table10-seqlen512-fp16-latency-memory",
+                  "requirements": "Table 10 row SeqLen=512: FP16 on 16 GPUs latency=838ms and memory=1068GB are reproduced.",
+                  "weight": 2,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                },
+                {
+                  "id": "mt-nlg-530b-table10-seqlen512-int8-latency-memory",
+                  "requirements": "Table 10 row SeqLen=512: INT8 on 8 GPUs latency=839ms and memory=545GB are reproduced.",
+                  "weight": 2,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                },
+                {
+                  "id": "mt-nlg-530b-table10-seqlen1024-fp16-latency-memory",
+                  "requirements": "Table 10 row SeqLen=1024: FP16 on 16 GPUs latency=1707ms and memory=1095GB are reproduced.",
+                  "weight": 2,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                },
+                {
+                  "id": "mt-nlg-530b-table10-seqlen1024-int8-latency-memory",
+                  "requirements": "Table 10 row SeqLen=1024: INT8 on 8 GPUs latency=1689ms and memory=570GB are reproduced.",
+                  "weight": 2,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                }
+              ],
+              "task_category": null,
+              "finegrained_task_category": null
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "mt-nlg-530b-accuracy-table9-execution",
+          "requirements": "The zero-shot accuracy evaluation for MT-NLG 530B has been executed for both the FP16 baseline and the SmoothQuant W8A8 INT8 model across four benchmarks: LAMBADA, HellaSwag, PIQA, and WinoGrande, producing the results reported in Table 9.",
+          "weight": 3,
+          "sub_tasks": [
+            {
+              "id": "mt-nlg-530b-table9-benchmark-execution",
+              "requirements": "The zero-shot evaluation benchmarks (LAMBADA, HellaSwag, PIQA, WinoGrande) have been executed for both the FP16 baseline MT-NLG 530B model on 16 GPUs and the SmoothQuant W8A8 INT8 MT-NLG 530B model on 8 GPUs using lm-eval-harness or equivalent evaluation framework, as described in Section 5.4. The evaluation is run in zero-shot setting consistent with the other OPT/BLOOM evaluations in Section 5.1, and the raw per-task accuracy scores are recorded to populate all cells of Table 9.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "mt-nlg-530b-accuracy-table9-results",
+          "requirements": "The MT-NLG 530B accuracy results match Table 9: FP16 baseline achieves LAMBADA=76.6%, HellaSwag=62.1%, PIQA=81.0%, WinoGrande=72.9%, Average=73.1%; SmoothQuant W8A8 INT8 achieves LAMBADA=77.2%, HellaSwag=60.4%, PIQA=80.7%, WinoGrande=74.1%, Average=73.1%. The results confirm negligible accuracy loss from W8A8 quantization on MT-NLG 530B.",
+          "weight": 4,
+          "sub_tasks": [
+            {
+              "id": "mt-nlg-530b-table9-fp16-scores",
+              "requirements": "Table 9 FP16 baseline row matches: LAMBADA=76.6%, HellaSwag=62.1%, PIQA=81.0%, WinoGrande=72.9%, Average=73.1%.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "mt-nlg-530b-table9-int8-scores",
+              "requirements": "Table 9 SmoothQuant W8A8 INT8 row matches: LAMBADA=77.2%, HellaSwag=60.4%, PIQA=80.7%, WinoGrande=74.1%, Average=73.1%.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "decoding-stage-table8-opt30b-results",
+          "requirements": "The decoding-stage latency and memory results for OPT-30B (1 GPU) match all four rows of Table 8: (BS=1, SeqLen=512): FP16 latency=422ms, SmoothQuant=314ms, speedup=1.35x, FP16 memory=57GB, SmoothQuant=30GB, saving=1.91x; (BS=1, SeqLen=1024): FP16=559ms, SmoothQuant=440ms, 1.27x, 58GB, 31GB, 1.87x; (BS=16, SeqLen=512): FP16=2488ms, SmoothQuant=1753ms, 1.42x, 69GB, 44GB, 1.59x; (BS=16, SeqLen=1024): FP16=OOM, SmoothQuant=3947ms, memory=61GB (FP16 OOM).",
+          "weight": 4,
+          "sub_tasks": [
+            {
+              "id": "table8-opt30b-bs1-seq512",
+              "requirements": "The decoding-stage latency and memory results for OPT-30B (1 GPU) at BS=1, SeqLen=512 match Table 8: FP16 latency=422ms, SmoothQuant-O3 latency=314ms, speedup=1.35x, FP16 memory=57GB, SmoothQuant-O3 memory=30GB, memory saving=1.91x.",
+              "weight": 2,
+              "sub_tasks": [
+                {
+                  "id": "table8-opt30b-bs1-seq512-latency",
+                  "requirements": "The decoding-stage latency for OPT-30B (1 GPU) at BS=1, SeqLen=512 matches Table 8: FP16 latency=422ms and SmoothQuant-O3 latency=314ms, yielding a speedup of 1.35x.",
+                  "weight": 2,
+                  "sub_tasks": [
+                    {
+                      "id": "table8-opt30b-bs1-seq512-latency-fp16",
+                      "requirements": "The decoding-stage FP16 latency for OPT-30B (1 GPU) at BS=1, SeqLen=512 matches Table 8: FP16 latency=422ms.",
+                      "weight": 1,
+                      "sub_tasks": [],
+                      "task_category": "Result Analysis",
+                      "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                    },
+                    {
+                      "id": "table8-opt30b-bs1-seq512-latency-int8",
+                      "requirements": "The decoding-stage SmoothQuant-O3 latency for OPT-30B (1 GPU) at BS=1, SeqLen=512 matches Table 8: SmoothQuant-O3 latency=314ms, speedup=1.35x.",
+                      "weight": 2,
+                      "sub_tasks": [],
+                      "task_category": "Result Analysis",
+                      "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                    }
+                  ],
+                  "task_category": null,
+                  "finegrained_task_category": null
+                },
+                {
+                  "id": "table8-opt30b-bs1-seq512-memory",
+                  "requirements": "The decoding-stage memory usage for OPT-30B (1 GPU) at BS=1, SeqLen=512 matches Table 8: FP16 memory=57GB and SmoothQuant-O3 memory=30GB, yielding a memory saving of 1.91x.",
+                  "weight": 2,
+                  "sub_tasks": [
+                    {
+                      "id": "table8-opt30b-bs1-seq512-memory-fp16",
+                      "requirements": "The decoding-stage FP16 memory for OPT-30B (1 GPU) at BS=1, SeqLen=512 matches Table 8: FP16 memory=57GB.",
+                      "weight": 1,
+                      "sub_tasks": [],
+                      "task_category": "Result Analysis",
+                      "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                    },
+                    {
+                      "id": "table8-opt30b-bs1-seq512-memory-int8",
+                      "requirements": "The decoding-stage SmoothQuant-O3 memory for OPT-30B (1 GPU) at BS=1, SeqLen=512 matches Table 8: SmoothQuant-O3 memory=30GB, memory saving=1.91x.",
+                      "weight": 2,
+                      "sub_tasks": [],
+                      "task_category": "Result Analysis",
+                      "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                    }
+                  ],
+                  "task_category": null,
+                  "finegrained_task_category": null
+                }
+              ],
+              "task_category": null,
+              "finegrained_task_category": null
+            },
+            {
+              "id": "table8-opt30b-bs1-seq1024",
+              "requirements": "The decoding-stage latency and memory results for OPT-30B (1 GPU) at BS=1, SeqLen=1024 match Table 8: FP16 latency=559ms, SmoothQuant-O3 latency=440ms, speedup=1.27x, FP16 memory=58GB, SmoothQuant-O3 memory=31GB, memory saving=1.87x.",
+              "weight": 2,
+              "sub_tasks": [
+                {
+                  "id": "table8-opt30b-bs1-seq1024-latency",
+                  "requirements": "The decoding-stage latency for OPT-30B (1 GPU) at BS=1, SeqLen=1024 matches Table 8: FP16 latency=559ms and SmoothQuant-O3 latency=440ms, yielding a speedup of 1.27x.",
+                  "weight": 2,
+                  "sub_tasks": [
+                    {
+                      "id": "table8-opt30b-bs1-seq1024-latency-fp16",
+                      "requirements": "The decoding-stage FP16 latency for OPT-30B (1 GPU) at BS=1, SeqLen=1024 matches Table 8: FP16 latency=559ms.",
+                      "weight": 1,
+                      "sub_tasks": [],
+                      "task_category": "Result Analysis",
+                      "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                    },
+                    {
+                      "id": "table8-opt30b-bs1-seq1024-latency-int8",
+                      "requirements": "The decoding-stage SmoothQuant-O3 latency for OPT-30B (1 GPU) at BS=1, SeqLen=1024 matches Table 8: SmoothQuant-O3 latency=440ms, speedup=1.27x.",
+                      "weight": 2,
+                      "sub_tasks": [],
+                      "task_category": "Result Analysis",
+                      "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                    }
+                  ],
+                  "task_category": null,
+                  "finegrained_task_category": null
+                },
+                {
+                  "id": "table8-opt30b-bs1-seq1024-memory",
+                  "requirements": "The decoding-stage memory usage for OPT-30B (1 GPU) at BS=1, SeqLen=1024 matches Table 8: FP16 memory=58GB and SmoothQuant-O3 memory=31GB, yielding a memory saving of 1.87x.",
+                  "weight": 2,
+                  "sub_tasks": [
+                    {
+                      "id": "table8-opt30b-bs1-seq1024-memory-fp16",
+                      "requirements": "The decoding-stage FP16 memory for OPT-30B (1 GPU) at BS=1, SeqLen=1024 matches Table 8: FP16 memory=58GB.",
+                      "weight": 1,
+                      "sub_tasks": [],
+                      "task_category": "Result Analysis",
+                      "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                    },
+                    {
+                      "id": "table8-opt30b-bs1-seq1024-memory-int8",
+                      "requirements": "The decoding-stage SmoothQuant-O3 memory for OPT-30B (1 GPU) at BS=1, SeqLen=1024 matches Table 8: SmoothQuant-O3 memory=31GB, memory saving=1.87x.",
+                      "weight": 2,
+                      "sub_tasks": [],
+                      "task_category": "Result Analysis",
+                      "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                    }
+                  ],
+                  "task_category": null,
+                  "finegrained_task_category": null
+                }
+              ],
+              "task_category": null,
+              "finegrained_task_category": null
+            },
+            {
+              "id": "table8-opt30b-bs16-seq512",
+              "requirements": "The decoding-stage latency and memory results for OPT-30B (1 GPU) at BS=16, SeqLen=512 match Table 8: FP16 latency=2488ms, SmoothQuant-O3 latency=1753ms, speedup=1.42x, FP16 memory=69GB, SmoothQuant-O3 memory=44GB, memory saving=1.59x.",
+              "weight": 3,
+              "sub_tasks": [
+                {
+                  "id": "table8-opt30b-bs16-seq512-latency",
+                  "requirements": "The decoding-stage latency for OPT-30B (1 GPU) at BS=16, SeqLen=512 matches Table 8: FP16 latency=2488ms and SmoothQuant-O3 latency=1753ms, yielding a speedup of 1.42x. This is the maximum speedup reported in Table 8 for OPT-30B, consistent with Section 5.3's claim that SmoothQuant constantly reduces per-token decoding latency compared to FP16 (up to 1.42x speedup).",
+                  "weight": 2,
+                  "sub_tasks": [
+                    {
+                      "id": "table8-opt30b-bs16-seq512-latency-fp16",
+                      "requirements": "The decoding-stage FP16 latency for OPT-30B (1 GPU) at BS=16, SeqLen=512 matches Table 8: FP16 latency=2488ms.",
+                      "weight": 1,
+                      "sub_tasks": [],
+                      "task_category": "Result Analysis",
+                      "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                    },
+                    {
+                      "id": "table8-opt30b-bs16-seq512-latency-int8",
+                      "requirements": "The decoding-stage SmoothQuant-O3 latency for OPT-30B (1 GPU) at BS=16, SeqLen=512 matches Table 8: SmoothQuant-O3 latency=1753ms, speedup=1.42x.",
+                      "weight": 2,
+                      "sub_tasks": [],
+                      "task_category": "Result Analysis",
+                      "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                    }
+                  ],
+                  "task_category": null,
+                  "finegrained_task_category": null
+                },
+                {
+                  "id": "table8-opt30b-bs16-seq512-memory",
+                  "requirements": "The decoding-stage memory usage for OPT-30B (1 GPU) at BS=16, SeqLen=512 matches Table 8: FP16 memory=69GB and SmoothQuant-O3 memory=44GB, yielding a memory saving of 1.59x. This configuration uses a larger batch (BS=16) which increases activation memory relative to the BS=1 rows, reducing the relative memory saving from ~1.9x (BS=1) to 1.59x (BS=16), consistent with Table 8.",
+                  "weight": 2,
+                  "sub_tasks": [
+                    {
+                      "id": "table8-opt30b-bs16-seq512-memory-fp16",
+                      "requirements": "The decoding-stage FP16 memory for OPT-30B (1 GPU) at BS=16, SeqLen=512 matches Table 8: FP16 memory=69GB.",
+                      "weight": 1,
+                      "sub_tasks": [],
+                      "task_category": "Result Analysis",
+                      "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                    },
+                    {
+                      "id": "table8-opt30b-bs16-seq512-memory-int8",
+                      "requirements": "The decoding-stage SmoothQuant-O3 memory for OPT-30B (1 GPU) at BS=16, SeqLen=512 matches Table 8: SmoothQuant-O3 memory=44GB, memory saving=1.59x.",
+                      "weight": 2,
+                      "sub_tasks": [],
+                      "task_category": "Result Analysis",
+                      "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                    }
+                  ],
+                  "task_category": null,
+                  "finegrained_task_category": null
+                }
+              ],
+              "task_category": null,
+              "finegrained_task_category": null
+            },
+            {
+              "id": "table8-opt30b-bs16-seq1024-oom",
+              "requirements": "The decoding-stage latency and memory results for OPT-30B (1 GPU) at BS=16, SeqLen=1024 match Table 8: FP16 runs out of memory (OOM) and no latency is recorded for FP16, while SmoothQuant-O3 successfully runs with latency=3947ms and memory=61GB, demonstrating that SmoothQuant-O3 enables configurations that are infeasible for FP16 on a single GPU.",
+              "weight": 3,
+              "sub_tasks": [
+                {
+                  "id": "table8-opt30b-bs16-seq1024-fp16-oom",
+                  "requirements": "The FP16 baseline for OPT-30B (1 GPU) at BS=16, SeqLen=1024 runs out of memory (OOM): no latency is recorded for FP16 at this configuration, and the benchmark infrastructure correctly detects and records the OOM condition rather than crashing silently. This is consistent with Table 8 where the FP16 latency cell for this row is marked 'OOM' and no memory value is reported for FP16.",
+                  "weight": 2,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                },
+                {
+                  "id": "table8-opt30b-bs16-seq1024-smoothquant-latency",
+                  "requirements": "SmoothQuant-O3 successfully completes the decoding-stage benchmark for OPT-30B (1 GPU) at BS=16, SeqLen=1024 and records latency=3947ms, exactly as reported in Table 8. The INT8 model runs without out-of-memory errors at this configuration where the FP16 baseline fails, demonstrating that W8A8 quantization enables batch-size/sequence-length configurations that are infeasible for FP16 on a single GPU.",
+                  "weight": 2,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                },
+                {
+                  "id": "table8-opt30b-bs16-seq1024-smoothquant-memory",
+                  "requirements": "SmoothQuant-O3 for OPT-30B (1 GPU) at BS=16, SeqLen=1024 records peak GPU memory=61GB, exactly as reported in Table 8. No memory value is recorded for the FP16 baseline at this configuration because it runs out of memory (OOM). The 61GB SmoothQuant-O3 memory usage confirms that INT8 quantization reduces the memory footprint sufficiently to fit the OPT-30B model plus a batch of 16 sequences of length 1024 on a single A100 80GB GPU.",
+                  "weight": 2,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                }
+              ],
+              "task_category": null,
+              "finegrained_task_category": null
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "decoding-stage-table8-opt175b-results",
+          "requirements": "The decoding-stage latency and memory results for OPT-175B (8 GPUs) match all four rows of Table 8: (BS=1, SeqLen=512): FP16 latency=426ms, SmoothQuant=359ms, speedup=1.19x, FP16 memory=44GB, SmoothQuant=23GB, saving=1.87x; (BS=1, SeqLen=1024): FP16=571ms, SmoothQuant=475ms, 1.20x, 44GB, 24GB, 1.85x; (BS=16, SeqLen=512): FP16=2212ms, SmoothQuant=1628ms, 1.36x, 50GB, 30GB, 1.67x; (BS=16, SeqLen=1024): FP16=4133ms, SmoothQuant=3231ms, 1.28x, 56GB, 37GB, 1.52x.",
+          "weight": 4,
+          "sub_tasks": [
+            {
+              "id": "table8-opt175b-bs1-seq512",
+              "requirements": "The decoding-stage latency and memory results for OPT-175B (8 GPUs) at BS=1, SeqLen=512 match Table 8: FP16 latency=426ms, SmoothQuant-O3 latency=359ms, speedup=1.19x, FP16 memory=44GB, SmoothQuant-O3 memory=23GB, memory saving=1.87x.",
+              "weight": 2,
+              "sub_tasks": [
+                {
+                  "id": "table8-opt175b-bs1-seq512-latency",
+                  "requirements": "The decoding-stage latency for OPT-175B (8 GPUs) at BS=1, SeqLen=512 matches Table 8: FP16 latency=426ms, SmoothQuant-O3 latency=359ms, speedup=1.19x.",
+                  "weight": 2,
+                  "sub_tasks": [],
+                  "task_category": "Code Development",
+                  "finegrained_task_category": null
+                },
+                {
+                  "id": "table8-opt175b-bs1-seq512-memory",
+                  "requirements": "The decoding-stage memory for OPT-175B (8 GPUs) at BS=1, SeqLen=512 matches Table 8: FP16 memory=44GB, SmoothQuant-O3 memory=23GB, memory saving=1.87x.",
+                  "weight": 2,
+                  "sub_tasks": [],
+                  "task_category": "Code Development",
+                  "finegrained_task_category": null
+                }
+              ],
+              "task_category": null,
+              "finegrained_task_category": null
+            },
+            {
+              "id": "table8-opt175b-bs1-seq1024",
+              "requirements": "The decoding-stage latency and memory results for OPT-175B (8 GPUs) at BS=1, SeqLen=1024 match Table 8: FP16 latency=571ms, SmoothQuant-O3 latency=475ms, speedup=1.20x, FP16 memory=44GB, SmoothQuant-O3 memory=24GB, memory saving=1.85x.",
+              "weight": 2,
+              "sub_tasks": [
+                {
+                  "id": "table8-opt175b-bs1-seq1024-latency",
+                  "requirements": "The decoding-stage latency for OPT-175B (8 GPUs) at BS=1, SeqLen=1024 matches Table 8: FP16 latency=571ms, SmoothQuant-O3 latency=475ms, speedup=1.20x.",
+                  "weight": 2,
+                  "sub_tasks": [],
+                  "task_category": "Code Development",
+                  "finegrained_task_category": null
+                },
+                {
+                  "id": "table8-opt175b-bs1-seq1024-memory",
+                  "requirements": "The decoding-stage memory for OPT-175B (8 GPUs) at BS=1, SeqLen=1024 matches Table 8: FP16 memory=44GB, SmoothQuant-O3 memory=24GB, memory saving=1.85x.",
+                  "weight": 2,
+                  "sub_tasks": [],
+                  "task_category": "Code Development",
+                  "finegrained_task_category": null
+                }
+              ],
+              "task_category": null,
+              "finegrained_task_category": null
+            },
+            {
+              "id": "table8-opt175b-bs16-seq512",
+              "requirements": "The decoding-stage latency and memory results for OPT-175B (8 GPUs) at BS=16, SeqLen=512 match Table 8: FP16 latency=2212ms, SmoothQuant-O3 latency=1628ms, speedup=1.36x, FP16 memory=50GB, SmoothQuant-O3 memory=30GB, memory saving=1.67x.",
+              "weight": 3,
+              "sub_tasks": [
+                {
+                  "id": "table8-opt175b-bs16-seq512-latency",
+                  "requirements": "The decoding-stage latency for OPT-175B (8 GPUs) at BS=16, SeqLen=512 matches Table 8: FP16 latency=2212ms, SmoothQuant-O3 latency=1628ms, speedup=1.36x.",
+                  "weight": 2,
+                  "sub_tasks": [],
+                  "task_category": "Code Development",
+                  "finegrained_task_category": null
+                },
+                {
+                  "id": "table8-opt175b-bs16-seq512-memory",
+                  "requirements": "The decoding-stage memory for OPT-175B (8 GPUs) at BS=16, SeqLen=512 matches Table 8: FP16 memory=50GB, SmoothQuant-O3 memory=30GB, memory saving=1.67x.",
+                  "weight": 2,
+                  "sub_tasks": [],
+                  "task_category": "Code Development",
+                  "finegrained_task_category": null
+                }
+              ],
+              "task_category": null,
+              "finegrained_task_category": null
+            },
+            {
+              "id": "table8-opt175b-bs16-seq1024",
+              "requirements": "The decoding-stage latency and memory results for OPT-175B (8 GPUs) at BS=16, SeqLen=1024 match Table 8: FP16 latency=4133ms, SmoothQuant-O3 latency=3231ms, speedup=1.28x, FP16 memory=56GB, SmoothQuant-O3 memory=37GB, memory saving=1.52x.",
+              "weight": 3,
+              "sub_tasks": [
+                {
+                  "id": "table8-opt175b-bs16-seq1024-latency",
+                  "requirements": "The decoding-stage latency for OPT-175B (8 GPUs) at BS=16, SeqLen=1024 matches Table 8: FP16 latency=4133ms, SmoothQuant-O3 latency=3231ms, speedup=1.28x.",
+                  "weight": 2,
+                  "sub_tasks": [],
+                  "task_category": "Code Development",
+                  "finegrained_task_category": null
+                },
+                {
+                  "id": "table8-opt175b-bs16-seq1024-memory",
+                  "requirements": "The decoding-stage memory for OPT-175B (8 GPUs) at BS=16, SeqLen=1024 matches Table 8: FP16 memory=56GB, SmoothQuant-O3 memory=37GB, memory saving=1.52x.",
+                  "weight": 2,
+                  "sub_tasks": [],
+                  "task_category": "Code Development",
+                  "finegrained_task_category": null
+                }
+              ],
+              "task_category": null,
+              "finegrained_task_category": null
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "decoding-stage-table8-benchmark-execution",
+          "requirements": "The decoding-stage benchmarks for Table 8 have been executed: per-token autoregressive decoding latency and peak GPU memory usage are measured for OPT-30B (1 GPU) and OPT-175B (8 GPUs) at batch sizes 1 and 16 and sequence lengths 512 and 1024, comparing FP16 baseline against SmoothQuant-O3 on NVIDIA A100 80GB GPU servers. The OOM case (OPT-30B, BS=16, SeqLen=1024 in FP16) is correctly observed and recorded.",
+          "weight": 3,
+          "sub_tasks": [],
+          "task_category": "Code Execution",
+          "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+        }
+      ],
+      "task_category": null,
+      "finegrained_task_category": null
+    },
+    {
+      "id": "migration-strength-ablation",
+      "requirements": "The migration strength ablation on OPT-175B with LAMBADA has been reproduced, showing the sweet-spot region for alpha as in Figure 10.",
+      "weight": 3,
+      "sub_tasks": [
+        {
+          "id": "alpha-grid-search-implementation",
+          "requirements": "A grid search over alpha values (at minimum the range 0.0 to 1.0 in increments of 0.1, covering at least the values 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9) has been implemented and executed on OPT-175B using the LAMBADA benchmark. For each alpha value, the smoothing factors are computed via Equation 4, fused into the model, and SmoothQuant W8A8 quantization is applied before evaluating LAMBADA accuracy.",
+          "weight": 10,
+          "sub_tasks": [],
+          "task_category": "Code Execution",
+          "finegrained_task_category": "Experimental Setup"
+        },
+        {
+          "id": "alpha-sweet-spot-low-alpha-degradation",
+          "requirements": "The migration strength ablation results confirm that when alpha < 0.4, LAMBADA accuracy on OPT-175B degrades significantly (activations are hard to quantize because insufficient migration has occurred), consistent with Section 5.5's statement 'When alpha is too small (<0.4), the activations are hard to quantize' and the left portion of Figure 10.",
+          "weight": 6,
+          "sub_tasks": [],
+          "task_category": "Result Analysis",
+          "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+        },
+        {
+          "id": "alpha-sweet-spot-high-alpha-degradation",
+          "requirements": "The migration strength ablation results confirm that when alpha > 0.6, LAMBADA accuracy on OPT-175B degrades significantly (weights are hard to quantize because too much difficulty has been migrated to them), consistent with Section 5.5's statement 'when alpha is too large (>0.6), the weights will be hard to quantize' and the right portion of Figure 10.",
+          "weight": 6,
+          "sub_tasks": [],
+          "task_category": "Result Analysis",
+          "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+        },
+        {
+          "id": "alpha-sweet-spot-region-accuracy",
+          "requirements": "The migration strength ablation results confirm that alpha values in the range [0.4, 0.6] yield the best LAMBADA accuracy on OPT-175B under W8A8 SmoothQuant quantization, with small quantization errors for both weights and activations and model performance maintained close to the FP16 baseline (~74.7% LAMBADA), consistent with Section 5.5's statement 'Only when we choose alpha from the sweet spot region (0.4-0.6) can we get small quantization errors for both weights and activations'.",
+          "weight": 3,
+          "sub_tasks": [
+            {
+              "id": "alpha-sweet-spot-region-small-errors",
+              "requirements": "The migration strength ablation results confirm that alpha values in the range [0.4, 0.6] yield small quantization errors for both weights and activations on OPT-175B under W8A8 SmoothQuant quantization, consistent with Section 5.5's statement 'Only when we choose alpha from the sweet spot region (0.4-0.6) can we get small quantization errors for both weights and activations'.",
+              "weight": 6,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": null
+            },
+            {
+              "id": "alpha-sweet-spot-region-lambada-accuracy",
+              "requirements": "The migration strength ablation results confirm that alpha values in the range [0.4, 0.6] maintain OPT-175B LAMBADA accuracy close to the FP16 baseline of ~74.7%, consistent with Figure 10 and Section 5.5.",
+              "weight": 10,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": null
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "alpha-ablation-figure10-plot",
+          "requirements": "Figure 10 has been generated as a plot showing LAMBADA accuracy on OPT-175B as a function of the migration strength alpha, covering at minimum alpha values from 0.1 to 0.9. The plot visually identifies the sweet-spot region (alpha in [0.4, 0.6]) where accuracy is highest, with accuracy degrading on both sides of this region, consistent with Figure 10 and Section 5.5.",
+          "weight": 6,
+          "sub_tasks": [],
+          "task_category": "Result Analysis",
+          "finegrained_task_category": "Logging, Analysis & Presentation"
+        }
+      ],
+      "task_category": null,
+      "finegrained_task_category": null
+    }
+  ],
+  "task_category": null,
+  "finegrained_task_category": null
+}

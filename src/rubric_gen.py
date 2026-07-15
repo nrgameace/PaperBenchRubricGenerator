@@ -252,6 +252,7 @@ def run_weight_phase(client, embedding_client, system_blocks, content_list, stat
             weights.update(branch_weights)
 
         weights = _resolve_invalid_weights(client, system_blocks, content_list_text, candidate, model, weights, tracker=tracker, human_review=human_review)
+        apply_weights(candidate, weights)
 
         print("  Rescaling weights via embedding-based branch mass and section coverage...")
         rescaled_leaf_weights, duplicate_clusters = rescale_global_weights(
