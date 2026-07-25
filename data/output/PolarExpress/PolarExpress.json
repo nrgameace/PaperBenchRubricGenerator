@@ -1,0 +1,3014 @@
+{
+  "id": "root",
+  "requirements": "The core contributions of 'The Polar Express: Optimal Matrix Sign Methods and Their Application to the Muon Algorithm' have been reproduced. This comprises: (1) the Polar Express algorithm itself, i.e. the greedy per-iteration minimax construction of Theorem 3.1, the degree-3 closed form and degree-5 Remez solvers that realize it, and the finite-precision stabilizations that make it usable in bfloat16; (2) its convergence advantage over degree-5 Newton-Schulz and the heuristic methods of Jordan et al. (2024b) and Cesista et al. (2025) on synthetic and GPT-2 gradient matrices; (3) its integration into the Muon optimizer, yielding consistently lower validation loss when training GPT-2-Small and GPT-2-Large on FineWeb data across all learning rates; and (4) the supporting ablations and appendix experiments, including the insensitivity of Muon to small singular directions, the image classification results, and the auxiliary algorithmic ideas of Appendices I and J.",
+  "weight": 1,
+  "sub_tasks": [
+    {
+      "id": "polar-express-offline-stage",
+      "requirements": "The offline stage of Polar Express has been implemented: the greedy interval recurrence of Theorem 3.1, the per-iteration minimax solvers for degree 3 (closed form, equation (17)) and degree 5 (Remez exchange, Algorithm 2 / Implementation 2), the driver that chains them into a coefficient schedule, and the finite-precision stabilizations of Section 3.4 and Appendix G.",
+      "weight": 10,
+      "sub_tasks": [
+        {
+          "id": "greedy-interval-recurrence",
+          "requirements": "The greedy interval recurrence of Theorem 3.1 has been implemented: starting from [l_1, u_1] = [l, u], each iteration t selects the minimax-optimal odd polynomial p_t on the current interval, then advances the interval via l_{t+1} = p_t(l_t) and u_{t+1} = 2 - l_{t+1}. The composition p* = p_T o ... o p_1 is the globally optimal approximation to the constant function 1 on [l, u] among all compositions of T odd polynomials of degree d.",
+          "weight": 6,
+          "sub_tasks": [
+            {
+              "id": "greedy-per-iteration-minimax-subproblem",
+              "requirements": "At each iteration t, the code selects p_t by solving the minimax subproblem arg min_{p in P_d^odd} max_{x in [l_t, u_t]} |1 - p(x)| on the CURRENT interval [l_t, u_t], i.e. the best uniform approximation to the constant function f(x) = 1 from odd polynomials of degree at most d, as specified in Theorem 3.1 equation (8).",
+              "weight": 5,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "greedy-adapts-polynomial-each-iteration",
+              "requirements": "The polynomial applied at iteration t differs from the polynomial applied at iteration t' != t (for early iterations, before the interval has collapsed). That is, the implementation adapts the update rule per iteration rather than reusing a single fixed polynomial for all T iterations as Newton-Schulz does, which is the defining structural difference stated in Section 1.3 and Appendix B.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "greedy-init-lower-bound",
+              "requirements": "The offline recurrence is initialized with l_1 = l, where l is the user-supplied lower bound on the singular values of the input matrix, as specified in Theorem 3.1.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "greedy-init-upper-bound",
+              "requirements": "The offline recurrence is initialized with u_1 = u, where u is the user-supplied upper bound on the singular values of the input matrix (u = 1 for the paper's default configuration), as specified in Theorem 3.1.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "greedy-lower-bound-update-scalar-eval",
+              "requirements": "After p_t is found, the new lower bound is computed as the scalar evaluation l_{t+1} = p_t(l_t), per equation (10). This is a single scalar polynomial evaluation and must NOT be implemented as a search for min_{x in [l_t, u_t]} p_t(x) over a grid or as any matrix computation.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "greedy-upper-bound-update-symmetry",
+              "requirements": "After l_{t+1} is computed, the new upper bound is obtained from the symmetry relation u_{t+1} = 2 - l_{t+1}, per equation (10), rather than by evaluating p_t(u_t) or maximizing p_t over the interval. This relation follows from the equioscillation property that the image of [l_t, u_t] under p_t is centered on 1.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "greedy-per-iteration-error",
+              "requirements": "The per-iteration worst-case error max_{x in [l_t, u_t]} |1 - p_t(x)| is obtained as 1 - l_{t+1}, per equation (10), and is available (returned or logged) at each offline step.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "greedy-final-error-bound-exposed",
+              "requirements": "After the offline loop completes, the final worst-case error 1 - l_{T+1} of the composition p* is computed and exposed (returned or logged), per equation (9).",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "greedy-composition-order",
+              "requirements": "The T stored polynomials are applied in the order p_1, p_2, ..., p_T (the polynomial derived from the widest interval is applied first), so that the realized composition is p* = p_T o p_{T-1} o ... o p_1 as defined in equation (3).",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "greedy-remark-3-2-variable-degrees",
+              "requirements": "The implementation reflects Remark 3.2: the per-iteration degree need not be constant across iterations (a sequence d_1, ..., d_T is admissible), and the paper's choice of a fixed d_t = 5 for all t is a deliberate default justified by Lee et al. (2022, Table 2) rather than a requirement of Theorem 3.1. This is either supported in code (degree is a per-iteration parameter) or documented.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "greedy-optimality-numerically-verified",
+              "requirements": "The claimed optimality of equation (9) is numerically verified: the value 1 - l_{T+1} produced by the scalar offline recurrence agrees (to numerical tolerance) with the directly measured max_{x in [l, u]} |1 - p*(x)| obtained by densely sampling the composed polynomial p* on [l, u].",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "greedy-beats-fixed-polynomial",
+              "requirements": "Starting from the same initial interval [l, u] and using the same degree d and iteration count T, the greedy composition attains a strictly smaller worst-case error than T applications of the fixed degree-d Newton-Schulz polynomial, confirming the Section 3.1 claim that Polar Express is strictly faster than Newton-Schulz.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "greedy-twice-as-fast-when-ell-tight",
+              "requirements": "When the lower bound is tight (sigma_min(M) = l), Polar Express reaches any given error level in approximately half the iterations required by Newton-Schulz of the same degree, matching the Section 3.1 claim that the method is 'about twice as fast as Newton-Schulz' in this regime (cf. Chen & Chow (2014, Section 3.1)).",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "figure-2-polynomial-evolution-plot",
+              "requirements": "Figure 2 has been reproduced: the first three optimal polynomials p_1, p_2, p_3 for degree d = 5 with l_1 = 0.03 and u_1 = 1 are plotted, each over its own interval, together with the horizontal reference line y = 1 and the induced bounds l_{t+1} = p_t(l_t) and u_{t+1} = 2 - l_{t+1} marked on the axes.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Logging, Analysis & Presentation"
+            },
+            {
+              "id": "figure-2-interval-contraction-result",
+              "requirements": "Figure 2 shows that the interval [l_t, u_t] contracts toward 1 as t increases, with each successive polynomial p_t equioscillating about y = 1 over a strictly narrower interval than its predecessor.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "theorem-3-3-convergence-rate",
+          "requirements": "The convergence rate guarantee of Theorem 3.3 has been empirically verified: for a matrix normalized so that sigma(M) is contained in [l, 1] and d = 2q + 1, the composed method satisfies ||polar(M) - X_T||_2 <= |1 - l^2|^{(q+1)^T}, giving quadratic convergence for d = 3 and cubic convergence for d = 5.",
+          "weight": 3,
+          "sub_tasks": [
+            {
+              "id": "thm33-bound-holds-empirically",
+              "requirements": "For a test matrix M normalized so that sigma(M) is contained in [l, 1], the measured spectral norm error ||polar(M) - X_T||_2 is verified to satisfy the Theorem 3.3 bound |1 - l^2|^{(q+1)^T} for a range of T, where d = 2q + 1 is the per-iteration polynomial degree.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "thm33-cubic-order-degree-5",
+              "requirements": "For d = 5 (q = 2), the measured error decreases with order of convergence 3 (cubic): the exponent on the error bound triples with each additional iteration, matching Theorem 3.3.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "thm33-quadratic-order-degree-3",
+              "requirements": "For d = 3 (q = 1), the measured error decreases with order of convergence 2 (quadratic), matching Theorem 3.3.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "thm33-error-bound-11-holds",
+              "requirements": "The spectral norm error bound of equation (11), ||polar(M) - X_T||_2 <= 1 - l_{T+1}, is verified numerically against the true spectral norm error for a test matrix M whose singular values lie in [l, u], using the l_{T+1} produced by the offline recurrence.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "degree-3-closed-form-solver",
+          "requirements": "The closed-form solution to the per-iteration minimax problem (13) for degree d = 3, given by equation (17), has been implemented: p(x) = beta * p_NS(alpha * x) where p_NS(x) = (3/2)x - (1/2)x^3, alpha = sqrt(3 / (u^2 + l*u + l^2)) and beta = 4 / (2 + l*u*(l + u)*alpha^3).",
+          "weight": 3,
+          "sub_tasks": [
+            {
+              "id": "cubic-alpha-formula",
+              "requirements": "The scaling factor is computed as alpha = sqrt(3 / (u^2 + l*u + l^2)) from the current interval endpoints, exactly as in equation (17).",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "cubic-beta-formula",
+              "requirements": "The amplitude factor is computed as beta = 4 / (2 + l*u*(l + u)*alpha^3), exactly as in equation (17).",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "cubic-scaled-newton-schulz-form",
+              "requirements": "The returned cubic is assembled as p(x) = beta * p_NS(alpha * x) with p_NS(x) = (3/2)x - (1/2)x^3, i.e. as a rescaled Newton-Schulz cubic rather than as an independently parameterized cubic.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "cubic-no-iterative-solver",
+              "requirements": "The degree-3 coefficients are obtained analytically in closed form, with no Remez exchange loop, root-finding loop, or numerical optimizer invoked, consistent with Section 3.2's statement that an explicit closed-form solution exists for d = 3.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "cubic-equioscillation-verified",
+              "requirements": "The returned cubic is verified to satisfy the three-point equioscillation conditions of equation (16): p(l) = 1 - E, p(sqrt(-a / (3b))) = 1 + E, and p(u) = 1 - E for a common E, where the interior point sqrt(-a/(3b)) equals 1/alpha and E = beta - 1.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "cubic-matches-chen-chow",
+              "requirements": "For u = 1, the polynomial x -> p_NS(alpha * x) produced by equation (17) is verified to coincide with the polynomial derived by Chen & Chow (2014), as stated at the end of Appendix F.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "degree-5-remez-solver",
+          "requirements": "Algorithm 2 / Implementation 2, the degree-5 minimax solver for problem (13), has been implemented as a Remez exchange specialized to odd quintics approximating the constant function 1 on [l, u]. It returns coefficients (a, b, c) of p*(x) = a*x + b*x^3 + c*x^5 that minimize max_{x in [l, u]} |1 - p(x)|.",
+          "weight": 7,
+          "sub_tasks": [
+            {
+              "id": "quintic-four-equioscillation-points",
+              "requirements": "The solver encodes that the optimal odd quintic must equioscillate at exactly 4 points in [l, u], following Lemma C.1 with q = 2 (q + 2 = 4 points), and correspondingly solves for 4 unknowns (a, b, c, E). The number of equioscillation points is fixed by this structural argument, not treated as a tunable parameter.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "quintic-endpoints-fixed-as-nodes",
+              "requirements": "The two interval endpoints are held fixed as equioscillation nodes across every exchange iteration (x_0^(k) = l and x_3^(k) = u for all k). Appendix F justifies this: an odd quintic has at most two local extrema on the positive real line, so the remaining two equioscillation points must be the endpoints. The exchange loop must never move these two nodes.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "quintic-interior-node-initialization",
+              "requirements": "The two interior trial points are initialized to x_1^(1) = (3/4)l + (1/4)u and x_2^(1) = (1/4)l + (3/4)u, as prescribed in Appendix F and used in Implementation 2, before the first exchange iteration.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "quintic-vandermonde-linear-system",
+              "requirements": "At each exchange iteration k the solver builds and solves the 4x4 linear system of equation (19) whose rows are [x_i, x_i^3, x_i^5, s_i] evaluated at the four current nodes {l, x_1^(k), x_2^(k), u}, with right-hand side [1, 1, 1, 1], recovering (a_k, b_k, c_k, E_k) in one linear solve.",
+              "weight": 5,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "quintic-alternating-sign-pattern",
+              "requirements": "The sign column of the linear system alternates as (+1, -1, +1, -1) across the four nodes, encoding the equioscillation conditions of equation (18): p_k(l) = 1 - E_k, p_k(x_1^(k)) = 1 + E_k, p_k(x_2^(k)) = 1 - E_k, p_k(u) = 1 + E_k.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "quintic-extrema-update-via-quadratic",
+              "requirements": "The interior nodes are refreshed by locating the stationary points of the error e_k(x) = 1 - p_k(x), i.e. by solving 5*c_k*y^2 + 3*b_k*y + a_k = 0 in y = x^2 via the quadratic formula and taking positive square roots, giving x_{1,2}^(k+1) = sqrt((-3*b_k -/+ sqrt(9*b_k^2 - 20*a_k*c_k)) / (10*c_k)), as described in Appendix F and implemented in Implementation 2.",
+              "weight": 5,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "quintic-exchange-termination-criterion",
+              "requirements": "The exchange loop terminates when the error level stabilizes, i.e. when | |E_k| - |E_{k-1}| | falls below a tolerance on the order of double-precision machine epsilon (1e-15 in Implementation 2), rather than after a hard-coded fixed number of passes.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "quintic-degenerate-case-threshold",
+              "requirements": "When the interval is nearly degenerate the solver short-circuits: if l/u >= 1 - eps_double^(1/3) (implemented as the test 1 - 5e-6 <= l/u in Implementation 2), the Vandermonde system of equation (19) is ill-conditioned and is bypassed entirely.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "quintic-degenerate-case-return-value",
+              "requirements": "In the degenerate branch the solver returns the scaled Newton-Schulz / Pade coefficients ((15/8)/u, (-10/8)/u^3, (3/8)/u^5), i.e. the polynomial (x/u)/8 * (15 - 10(x/u)^2 + 3(x/u)^4), which Appendix F shows is within double-precision machine epsilon of the true optimum in this regime.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "quintic-returns-three-coefficients",
+              "requirements": "The solver returns the three coefficients (a, b, c) of p*(x) = a*x + b*x^3 + c*x^5 as its output, in a form directly consumable by the offline driver that assembles coeffs_list.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "quintic-computed-in-float64",
+              "requirements": "All offline coefficient computation (linear solves, root extraction, error levels) is carried out in double precision (float64 / numpy default), consistent with Section 3.5's statement that the polynomials are precomputed in full precision even though the online stage runs in bfloat16.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "quintic-converges-within-five-exchanges",
+              "requirements": "The exchange loop is observed to converge within five iterations on the intervals arising in the paper's configuration, matching the statement in Appendix F that the authors never observed Algorithm 2 taking more than five iterations to converge.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "quintic-equioscillation-verified-numerically",
+              "requirements": "For a representative interval [l, u], the returned quintic is verified numerically to equioscillate: |1 - p*(x)| attains the same extreme value E with alternating sign at the four nodes, and max_{x in [l,u]} |1 - p*(x)| = |E|.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "offline-driver-loop",
+          "requirements": "The offline driver (the optimal_composition routine of Implementation 2 / the offline block of Algorithm 1) has been implemented: it walks t = 1, ..., T, calls the per-iteration solver on the current interval, applies the finite-precision corrections, advances the interval, and accumulates the coefficient list that the online stage consumes.",
+          "weight": 6,
+          "sub_tasks": [
+            {
+              "id": "driver-loops-t-times",
+              "requirements": "The driver runs exactly T iterations, invoking the per-iteration optimal polynomial solver once per iteration with the current interval, and accumulating one coefficient tuple per iteration.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "driver-dispatches-degree-3",
+              "requirements": "When d = 3 the driver dispatches to the closed-form degree-3 routine of equation (17) with the current interval [l_t, u_t] as input.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "driver-dispatches-degree-5",
+              "requirements": "When d = 5 the driver dispatches to the degree-5 Remez solver (Algorithm 2 / Implementation 2) with the current interval [l_t, u_t] as input.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "driver-applies-cushion-to-solver-input",
+              "requirements": "The lower endpoint passed to the solver is cushioned as max(l_t, cushion * u_t) rather than l_t itself, so that the solver never sees an interval with an extremely small ratio l_t/u_t. This is line 4 of Algorithm 1 and the max(l, cushion*u) call in Implementation 2.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "driver-cushion-constant-value",
+              "requirements": "The cushion constant used matches the paper's implementation: Algorithm 1 states the threshold as u_t/10, while Implementation 2 uses the specific value 0.02407327424182761, with Appendix G noting explicitly that 'the choice of 10 is somewhat arbitrary' and that a different factor is used in Implementation 2.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "driver-recenters-after-cushioning",
+              "requirements": "Because cushioning solves the minimax problem on [cushion*u, u] rather than on [l, u], the resulting polynomial is recentered about 1 with respect to the true endpoints by rescaling all three coefficients by 2 / (p(l) + p(u)), so that 1 - c*p(l) = c*p(u) - 1. This is the rescalar step in Implementation 2.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "driver-advances-interval-between-iterations",
+              "requirements": "After each iteration the driver advances the interval using the coefficients it just produced: l <- a*l + b*l^3 + c*l^5 and u <- 2 - l, so that the next call to the solver receives the contracted interval. This chaining is what makes the schedule adaptive.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "driver-emits-coefficient-list",
+              "requirements": "The driver returns an ordered list of T coefficient tuples (one per iteration), structured for direct reuse by the online stage (the coeffs_list of Implementation 1).",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "driver-offline-runs-once",
+              "requirements": "The offline stage is run once and its output persisted (hard-coded, cached, or serialized); subsequent calls to the online polar factor routine reuse the stored coefficients and do not re-solve any minimax problem, consistent with Section 3.5.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "driver-reproduces-published-coefficients",
+              "requirements": "Running the offline stage with l = 1e-3, u = 1 reproduces the coefficient triples published in Implementation 1 to at least 4 significant figures, beginning with (8.28721201814563, -23.595886519098837, 17.300387312530933) for the first iteration and (4.107059111542203, -2.9478499167379106, 0.5448431082926601) for the second.",
+              "weight": 5,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "driver-coefficients-converge-to-newton-schulz",
+              "requirements": "The generated coefficient sequence converges to the degree-5 Newton-Schulz coefficients (1.875, -1.25, 0.375) = (15/8, -10/8, 3/8) at later iterations, as reflected by the final entry of coeffs_list in Implementation 1 and by the comment that subsequent coefficients are numerically equal to this triple.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "driver-first-polynomial-most-aggressive",
+              "requirements": "The first polynomial in the generated schedule has a far larger linear coefficient than the Newton-Schulz value 15/8 (approximately 8.29 for l = 1e-3), reflecting the design goal stated in Section 1.3 of prioritizing rapid growth of the smallest singular values in the early iterations.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "offline-finite-precision-stabilization",
+          "requirements": "The finite-precision stabilizations of Section 3.4 and Appendix G are applied during the offline stage: a 1.01 safety factor guards against round-off pushing singular values above u_t, and cushioning of the lower endpoint enforces a lower bound on p_t(x)/x to prevent non-monotonic mapping of singular values.",
+          "weight": 5,
+          "sub_tasks": [
+            {
+              "id": "safety-factor-applied-to-coefficients",
+              "requirements": "Each polynomial p_t is replaced by x -> p_t(x / 1.01), implemented by dividing the coefficients as (a / 1.01, b / 1.01^3, c / 1.01^5), consistent with Section 3.4, line 5 of Algorithm 1, and the coefficient rescaling in Implementation 1.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "safety-factor-omitted-on-final-polynomial",
+              "requirements": "The safety factor is omitted for the final polynomial in the schedule, so the last coefficient tuple is left unscaled. Appendix G explains this correction is needed because the safety factor otherwise causes singular values to converge to approximately 0.999998 rather than to 1.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "safety-factor-motivation-overshoot",
+              "requirements": "The implementation guards specifically against the failure mode described in Appendix G, in which a singular value slightly exceeding u_t satisfies p_t(u_t + eps) > u_{t+1} + eps and therefore diverges to infinity over many iterations rather than converging to 1.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "cushion-enforces-ratio-lower-bound",
+              "requirements": "With cushioning applied at the u_t/10 threshold, the resulting update polynomials are verified to satisfy p_t(x)/x >= 0.236 on the domain of interest, the bound stated in Appendix G that prevents the loss-of-precision failure identified by Nakatsukasa & Higham (2012).",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "cushion-prevents-sign-flip",
+              "requirements": "The stabilized polynomials never map a singular value to a negative value on the working domain, avoiding the extreme failure case described in Appendix G where p_t(sigma_i) < 0 flips the sign of the i-th singular vector and causes convergence to the polar factor of the wrong matrix.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "figure-7-stabilization-plot",
+              "requirements": "Figure 7 has been reproduced: the unstabilized optimal degree-5 polynomial for the interval [0.005, 1] and its stabilized counterpart are plotted on the same axes over x in [0, 1], together with the reference line 0.236x and horizontal markers at l_{t+1} and u_{t+1}.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Logging, Analysis & Presentation"
+            },
+            {
+              "id": "figure-7-unstabilized-collapses-mid-spectrum",
+              "requirements": "Figure 7 shows that the unstabilized optimal polynomial for [0.005, 1] maps singular values near 0.8 down to almost zero, the non-monotonicity that motivates cushioning.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "figure-7-unstabilized-amplifies-overshoot",
+              "requirements": "Figure 7 shows that the unstabilized polynomial maps 1 + eps to approximately u_{t+1} + 25*eps, amplifying round-off overshoot by roughly 25x, whereas the stabilized version maps all x <= 1.01 to at most u_{t+1}.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        }
+      ],
+      "task_category": null,
+      "finegrained_task_category": null
+    },
+    {
+      "id": "polar-express-online-stage",
+      "requirements": "The online stage of Polar Express has been implemented, together with the singular value bound prescription of Section 3.3 that instantiates it: normalization, bfloat16 execution, Horner evaluation of the precomputed odd polynomials using only matrix-matrix products, and the practical engineering details of Implementation 1.",
+      "weight": 9,
+      "sub_tasks": [
+        {
+          "id": "singular-value-bound-selection",
+          "requirements": "The upper and lower bounds on the singular values required to instantiate the method are chosen as prescribed in Section 3.3: the matrix is rescaled by its Frobenius norm so that u = 1, and the lower bound is guessed as l = 1e-3, motivated by the bfloat16 machine epsilon.",
+          "weight": 4,
+          "sub_tasks": [
+            {
+              "id": "upper-bound-from-frobenius-norm",
+              "requirements": "The upper bound on the singular values is obtained by rescaling M by ||M||_F and setting u = 1. Section 3.3 justifies this as a valid (if loose) upper bound that is tight up to a small constant in practice because gradient matrices of dense layers have small effective rank (Yang et al., 2024).",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "lower-bound-set-to-1e-3",
+              "requirements": "The lower bound is set to l = 1e-3 for the bfloat16 configuration used in all GPT-2 experiments, as specified in Section 3.3 and in the recommendation of Section 3.5.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "lower-bound-bfloat16-epsilon-rationale",
+              "requirements": "The choice of l is tied to the working precision as described in Section 3.3: bfloat16 has eps_mach = 2^-8 which is approximately 3.91e-3, and singular values of matrices stored in floating point are usually larger than machine precision (Boutsikas et al., 2024), so l = 1e-3 is chosen just below eps_mach. This rationale is reflected in code or documentation rather than l being an unexplained magic constant.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "bounds-fixed-across-inputs-enable-precompute",
+              "requirements": "Because the same [l, u] is used for every input matrix, the polynomial schedule is precomputed once and applied to arbitrarily many inputs, as stated at the end of Section 3.3. The online routine does not recompute bounds or polynomials per call.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "method-robust-to-mis-specified-lower-bound",
+              "requirements": "The method is verified to converge for any l in (0, u], and an error of one order of magnitude in l delays convergence by only a few iterations, matching the robustness claim in Section 3.3.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "online-iteration-implementation",
+          "requirements": "The online stage of Polar Express (Algorithm 1 lines 10-14 / Implementation 1) has been implemented: the input is normalized, cast to bfloat16, and the precomputed polynomials are applied in sequence using only matrix-matrix products evaluated by Horner's rule.",
+          "weight": 8,
+          "sub_tasks": [
+            {
+              "id": "online-normalization-algorithm-1",
+              "requirements": "The iteration is initialized as X_0 = M / (||M||_F + 1e-2), i.e. the Frobenius norm is offset by 1e-2 rather than used directly. Appendix G states this third finite-precision fix is copied from the original Muon implementation, and it appears as line 10 of Algorithm 1.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "online-normalization-implementation-1",
+              "requirements": "Implementation 1's concrete normalization X <- X / (||X||_F * 1.01 + 1e-7) is reproduced, which folds the 1.01 safety factor into the normalization and uses a 1e-7 floor to avoid division by zero on an all-zero gradient.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "online-odd-monomial-identity",
+              "requirements": "Odd powers of a rectangular matrix are formed via the identity M^{2q+1} = M(M^T M)^q from Section 2, so that p(M) = a_0*M + a_1*M(M^T M) + ... + a_q*M(M^T M)^q. The implementation never forms an explicit SVD to evaluate the polynomial.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "online-odd-polynomials-only",
+              "requirements": "Only odd polynomials are used. Footnote 2 of Section 2 explains that even powers of the singular values of a non-symmetric or rectangular matrix cannot be formed without an explicit SVD, so the admissible search space is restricted to P_d^odd throughout.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "online-horner-evaluation",
+              "requirements": "Each iteration is evaluated by Horner's rule rather than by forming X^3 and X^5 separately and summing. Either of the two equivalent factorizations is acceptable: the form written in Section 3.5, X_t = X_{t-1} * (a*I + Y*(b*I + c*Y)) with Y = X_{t-1}^T X_{t-1}, or the mirrored form used in Implementation 1, X_t = a*X_{t-1} + (b*A + c*A@A) @ X_{t-1} with A = X_{t-1} X_{t-1}^T, which is the cheaper of the two once the transpose optimization has made the iterate wide. Either way exactly three matrix-matrix products are performed per degree-5 iteration.",
+              "weight": 5,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "online-matrix-multiplications-only",
+              "requirements": "The online stage uses only matrix-matrix products and linear combinations of matrices. No matrix inverse, QR decomposition, SVD, eigendecomposition, or other non-GPU-friendly primitive is invoked, consistent with the design constraints stated at the start of Section 2.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "online-cost-is-order-Td-products",
+              "requirements": "The total number of matrix-matrix products across the online stage scales as O(T*d) for T iterations of degree-d polynomials (concretely, three products per degree-5 iteration under Horner's rule), consistent with the cost accounting in Section 2 following equation (4).",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "online-applies-schedule-in-order",
+              "requirements": "The precomputed coefficient tuples are consumed in schedule order, so that iteration t uses the coefficients derived for interval [l_t, u_t]. Reversing or shuffling the schedule must change the result.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "online-bfloat16-execution",
+              "requirements": "The online stage runs in bfloat16: the input matrix is cast to bfloat16 before iterating and all intermediate iterates remain in bfloat16, consistent with Section 3.5's statement that the online stage can be performed in lower precision for greater speed on a GPU.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "online-transpose-for-fewer-flops",
+              "requirements": "Implementation 1's transpose optimization is reproduced: if the input has more rows than columns the matrix is transposed before iterating (reducing the size of the Gram matrix X^T X and hence the FLOP count), and the output is transposed back before being returned.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "online-coefficient-padding-beyond-schedule",
+              "requirements": "When the requested number of steps exceeds the length of the stored coefficient list, the final coefficient tuple is repeated for the remaining steps, as Implementation 1 does via itertools.repeat. This is correct because the schedule has already converged to the fixed Newton-Schulz coefficients by that point.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "online-supports-batched-input",
+              "requirements": "The online routine accepts inputs with ndim >= 2 and applies the iteration over the trailing two dimensions, so that stacks of matrices can be processed together, as Implementation 1 does via the .mT transpose and dim=(-2, -1) norm.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "online-torch-compile",
+              "requirements": "The online routine is wrapped in torch.compile as in Implementation 1, so the polynomial iteration is fused into a compiled kernel.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "online-drop-in-interface",
+              "requirements": "The online routine exposes a signature taking a matrix and a step count and returning an approximation to polar(M) of the same shape, with no dependencies besides PyTorch, so that it is a drop-in replacement for existing matrix sign implementations such as Jordan's, You's, and Modula's, as claimed in Section 1.3 and Appendix A.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "online-recommended-degree-default",
+              "requirements": "The recommended degree d = 5 is the default configuration for deep learning use, as recommended in Section 3.5.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "online-recommended-iteration-count-default",
+              "requirements": "The recommended iteration count T = 5 or T = 6 is the default configuration for deep learning use, as recommended in Section 3.5.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "online-output-approximates-polar-factor",
+              "requirements": "For a test matrix M, the output of the online stage after T iterations is verified to approximate polar(M) = U*V^T computed from a reference SVD, with spectral norm error consistent with the offline bound 1 - l_{T+1}.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        }
+      ],
+      "task_category": null,
+      "finegrained_task_category": null
+    },
+    {
+      "id": "baseline-matrix-sign-methods",
+      "requirements": "The baseline matrix sign methods that Polar Express is compared against have been implemented: degree-5 Newton-Schulz, the degree-3 Newton-Schulz iteration of equation (2), Jordan et al. (2024b)'s heuristic quintic, and You's six-step method (Cesista et al., 2025). All are polynomial iterations using only matrix-matrix products, exposed through a common interface.",
+      "weight": 6,
+      "sub_tasks": [
+        {
+          "id": "baseline-newton-schulz-degree-5",
+          "requirements": "Degree-5 Newton-Schulz is implemented as a FIXED polynomial iteration applying p(x) = (15x - 10x^3 + 3x^5)/8 at every iteration, i.e. X_{t+1} = (15*X_t - 10*X_t*(X_t^T X_t) + 3*X_t*(X_t^T X_t)^2)/8, using only matrix-matrix products.",
+          "weight": 4,
+          "sub_tasks": [],
+          "task_category": "Code Development",
+          "finegrained_task_category": "Method Implementation"
+        },
+        {
+          "id": "baseline-newton-schulz-degree-3",
+          "requirements": "The classical degree-3 Newton-Schulz iteration of equation (2) is implemented: X_0 = M / ||M||_F and X_{t+1} = (3/2)X_t - (1/2)X_t X_t^T X_t.",
+          "weight": 2,
+          "sub_tasks": [],
+          "task_category": "Code Development",
+          "finegrained_task_category": "Method Implementation"
+        },
+        {
+          "id": "baseline-jordan-coefficients",
+          "requirements": "Jordan et al. (2024b)'s method uses exactly the coefficients p(x) = 3.4445x - 4.7750x^3 + 2.0315x^5 as stated in Section 1.2.",
+          "weight": 4,
+          "sub_tasks": [],
+          "task_category": "Code Development",
+          "finegrained_task_category": "Method Implementation"
+        },
+        {
+          "id": "baseline-jordan-fixed-iteration",
+          "requirements": "Jordan's polynomial is applied unchanged at every iteration (a fixed-point iteration), not adapted per step.",
+          "weight": 2,
+          "sub_tasks": [],
+          "task_category": "Code Development",
+          "finegrained_task_category": "Method Implementation"
+        },
+        {
+          "id": "baseline-you-six-distinct-polynomials",
+          "requirements": "You's method (Cesista et al., 2025) is implemented as a succession of six DIFFERENT degree-5 polynomial updates, each with its own coefficients found by heuristic search, applied in the prescribed order.",
+          "weight": 3,
+          "sub_tasks": [],
+          "task_category": "Code Development",
+          "finegrained_task_category": "Method Implementation"
+        },
+        {
+          "id": "baseline-you-defined-for-six-iterations",
+          "requirements": "You's method is only defined for six iterations and the implementation does not extrapolate a seventh or later update from it, consistent with Section 1.2 and with Figure 3, where the You curve terminates at iteration 6.",
+          "weight": 2,
+          "sub_tasks": [],
+          "task_category": "Code Development",
+          "finegrained_task_category": "Method Implementation"
+        },
+        {
+          "id": "baseline-common-interface",
+          "requirements": "All baseline methods and Polar Express share a single call signature (matrix in, approximate polar factor out) so that switching methods requires changing only one argument or function reference, both in the convergence experiments and inside the Muon optimizer.",
+          "weight": 3,
+          "sub_tasks": [],
+          "task_category": "Code Development",
+          "finegrained_task_category": "Method Implementation"
+        },
+        {
+          "id": "baseline-shared-initialization",
+          "requirements": "All methods being compared start from the same normalized initial iterate derived from the same input matrix, so that per-iteration error comparisons are not confounded by different initializations.",
+          "weight": 3,
+          "sub_tasks": [],
+          "task_category": "Code Development",
+          "finegrained_task_category": "Experimental Setup"
+        },
+        {
+          "id": "baseline-jordan-plateaus-not-converges",
+          "requirements": "Jordan's fixed polynomial is verified not to converge to polar(M): iterating it far beyond the number of steps used in training leaves a residual error that stops decreasing, consistent with Section 1.2's statement that it plateaus at an error of approximately 0.3.",
+          "weight": 2,
+          "sub_tasks": [],
+          "task_category": "Result Analysis",
+          "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+        },
+        {
+          "id": "baseline-newton-schulz-converges",
+          "requirements": "Degree-5 Newton-Schulz is verified to converge to polar(M) when iterated sufficiently many times (unlike Jordan's and You's methods), consistent with Section 1.2.",
+          "weight": 2,
+          "sub_tasks": [],
+          "task_category": "Result Analysis",
+          "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+        }
+      ],
+      "task_category": null,
+      "finegrained_task_category": null
+    },
+    {
+      "id": "convergence-experiments",
+      "requirements": "The convergence experiments comparing Polar Express against Newton-Schulz, Jordan, and You have been reproduced: the main spectral norm comparison of Figure 3 on synthetic and GPT-2 gradient matrices, and the supplementary Frobenius/cosine (Figure 8) and truncated-spectrum (Figure 10) analyses of Appendix H.1.",
+      "weight": 7,
+      "sub_tasks": [
+        {
+          "id": "convergence-test-matrices",
+          "requirements": "The two families of test matrices used in Section 4.1 have been constructed: a synthetic matrix with logarithmically spaced singular values spanning six orders of magnitude, and real gradient matrices extracted from a randomly-initialized GPT-2 model on batches of language modeling data.",
+          "weight": 4,
+          "sub_tasks": [
+            {
+              "id": "synthetic-matrix-log-spaced-singular-values",
+              "requirements": "A synthetic test matrix is constructed whose singular values are evenly spaced on a logarithmic scale between 1e-6 and 1, so that sigma_max = 1 and sigma_min = 1e-6 as stated in the Figure 3 caption.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "synthetic-matrix-random-singular-vectors",
+              "requirements": "The singular vectors of the synthetic matrix are chosen randomly (a random orthonormal basis), so the matrix is a random matrix with a prescribed spectrum rather than a diagonal matrix.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "gpt2-gradient-layer-4-mlp-c-proj",
+              "requirements": "The non-synthetic test matrix for the right panel of Figure 3 is the gradient of the mlp.c_proj weight matrix in the fourth transformer block of a randomly-initialized GPT-2 model, evaluated on a batch of language modeling data, as pinned by the Figure 3 caption and panel title.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Dataset and Model Acquisition"
+            },
+            {
+              "id": "gpt2-gradient-twenty-batches",
+              "requirements": "The GPT-2 gradient experiment is repeated over 20 distinct batches of language modeling data so that a distribution over gradient matrices is obtained, as stated in the Figure 3 caption.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "gpt2-model-randomly-initialized",
+              "requirements": "The GPT-2 model used to produce the test gradients is randomly initialized (not a pretrained checkpoint), as specified in the Figure 3 caption.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Dataset and Model Acquisition"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "polar-express-lower-bound-variants",
+          "requirements": "Three degree-5 Polar Express variants with different lower bound guesses are instantiated for Figure 3, spanning two orders of magnitude on either side of the true sigma_min = 1e-6 of the synthetic matrix: l = 1e-6 (exact), l = 1e-4 (two orders too large), and l = 1e-8 (two orders too small).",
+          "weight": 4,
+          "sub_tasks": [
+            {
+              "id": "variant-ell-1e-6-exact",
+              "requirements": "A Polar Express variant is built with l = 1e-6, which exactly matches sigma_min of the synthetic test matrix, by running the offline stage with that lower bound to obtain its own polynomial schedule.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "variant-ell-1e-4-too-large",
+              "requirements": "A Polar Express variant is built with l = 1e-4, two orders of magnitude LARGER than the true sigma_min = 1e-6, with its own offline schedule.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "variant-ell-1e-8-too-small",
+              "requirements": "A Polar Express variant is built with l = 1e-8, two orders of magnitude SMALLER than the true sigma_min = 1e-6, with its own offline schedule.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "variant-ell-1e-3-for-gpt2-gradients",
+              "requirements": "For the GPT-2 gradient convergence plots of Appendix H.1 (Figures 8 and 10), a Polar Express variant with the deployment default l = 1e-3 is used, matching the legends of those figures.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "convergence-metrics",
+          "requirements": "The error metrics used across the convergence experiments have been implemented: spectral norm error against an exact SVD-derived polar factor (Figure 3), and relative Frobenius error plus cosine similarity in the Frobenius inner product (Figure 8).",
+          "weight": 4,
+          "sub_tasks": [
+            {
+              "id": "metric-spectral-norm-error",
+              "requirements": "Convergence in Figure 3 is measured as the spectral norm error ||polar(M) - X_t||_2, where polar(M) = U*V^T is the exact polar factor obtained from a full SVD of the test matrix and X_t is the iterate after t polynomial applications.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "metric-relative-frobenius-error",
+              "requirements": "A relative Frobenius norm error metric is implemented for Figure 8, measuring ||polar(M) - X_t||_F normalized by ||polar(M)||_F.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "metric-cosine-similarity",
+              "requirements": "A cosine similarity metric is implemented for Figure 8 with respect to the Frobenius inner product <A, B> = Tr(A^T B), i.e. <A, B>_F / (||A||_F * ||B||_F), as defined in Appendix H.1.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "metric-recorded-per-iteration",
+              "requirements": "The chosen error metric is recorded after every iteration for every method, producing per-iteration convergence traces rather than only a final error value.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "figure-3-spectral-convergence",
+          "requirements": "Figure 3 has been reproduced: a two-panel comparison of degree-5 polynomial methods measured in spectral norm error versus iteration count, on the synthetic log-spaced matrix (left, out to 25 iterations, log y-axis) and on GPT-2 gradients (right, out to 10 iterations, linear y-axis with a shaded 90 percent interval over 20 batches).",
+          "weight": 8,
+          "sub_tasks": [
+            {
+              "id": "fig3-execution-all-six-methods",
+              "requirements": "The convergence comparison is executed for all six curves in the Figure 3 legend (Newton-Schulz d=5, Jordan, You, and Polar Express at l = 1e-8, 1e-6, 1e-4) on both test matrices, with error logged at every iteration.",
+              "weight": 5,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "fig3-left-panel-25-iterations",
+              "requirements": "The left panel runs each method out to at least 25 iterations on the synthetic matrix (except You's method, which terminates at 6), which is required to observe the late-iteration behavior of Newton-Schulz. Truncating this panel at 5 or 10 iterations does not reproduce the figure.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "fig3-right-panel-10-iterations",
+              "requirements": "The right panel runs each method out to 10 iterations on the GPT-2 gradient matrices, matching the x-axis range of the figure.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "fig3-plot-two-panels",
+              "requirements": "Figure 3 is plotted as two side-by-side panels sharing a common legend: spectral error versus iteration for the synthetic matrix on the left and for the GPT-2 gradient on the right, with iteration count (not wall-clock time) on the x-axis.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Logging, Analysis & Presentation"
+            },
+            {
+              "id": "fig3-left-log-scale-y-axis",
+              "requirements": "The left panel uses a logarithmic y-axis spanning at least 1e-3 to 1e0 for spectral error, as in the published figure.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Logging, Analysis & Presentation"
+            },
+            {
+              "id": "fig3-right-shaded-90-percent-interval",
+              "requirements": "The right panel shows a shaded band representing the 90 percent interval of the error across the 20 data batches, as described in the Figure 3 caption.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Logging, Analysis & Presentation"
+            },
+            {
+              "id": "fig3-result-newton-schulz-stalls-17-iterations",
+              "requirements": "The left panel shows that degree-5 Newton-Schulz makes almost no progress for the first 17 iterations on the synthetic matrix before its error begins to fall, matching Section 4.1.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "fig3-result-jordan-plateaus-at-0.3",
+              "requirements": "The left panel shows that Jordan's method reaches an error of approximately 0.3 after about 11 iterations and then ceases to converge further, matching Section 4.1.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "fig3-result-you-similar-rate-to-jordan",
+              "requirements": "The left panel shows that You's method, defined only for six iterations, converges at a rate similar to Jordan's method over the iterations for which it is defined, matching Section 4.1.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "fig3-result-tuned-polarexp-dominates",
+              "requirements": "The left panel shows that Polar Express with l = sigma_min = 1e-6 attains a lower spectral error than every other method at EVERY iteration on the synthetic matrix, matching Section 4.1's claim that it dominates the other methods at every iteration.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "fig3-result-tuned-polarexp-accurate-by-11-iterations",
+              "requirements": "The left panel shows that Polar Express with l = sigma_min achieves excellent accuracy after just 11 iterations on the synthetic matrix, matching Section 4.1.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "fig3-result-twice-as-fast-as-newton-schulz",
+              "requirements": "The left panel shows that Polar Express with l = sigma_min reaches any given error level in roughly half the iterations required by degree-5 Newton-Schulz, matching Section 4.1's claim that it converges about twice as fast to any given error.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "fig3-result-mistuned-competitive-until-13-14",
+              "requirements": "The left panel shows that when l is wrong by two orders of magnitude in either direction the method remains competitive but does not overtake Jordan's method until roughly iteration 13 or 14, matching Section 4.1.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "fig3-result-right-panel-polarexp-best",
+              "requirements": "The right panel shows that the best-tuned Polar Express variant again attains lower error than Newton-Schulz, Jordan, and You on the GPT-2 gradient matrices, matching Section 4.1.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "fig3-result-right-panel-too-small-ell-delays",
+              "requirements": "The right panel shows that setting l many orders of magnitude too small delays convergence on the GPT-2 gradient matrices, matching Section 4.1's caveat that an excessively small l is harmful even though the method remains convergent.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "figure-8-frobenius-and-cosine-convergence",
+          "requirements": "Figure 8 (Appendix H.1) has been reproduced: convergence of the degree-5 methods measured in relative Frobenius error and in cosine similarity, on gradients of two different GPT-2 layers, over 10 iterations.",
+          "weight": 3,
+          "sub_tasks": [
+            {
+              "id": "fig8-layer-1-attn-c-attn-matrix",
+              "requirements": "The gradient of the attn.c_attn weight matrix in layer 1 of a randomly-initialized GPT-2 model is used as one of the two test matrices for Figure 8, as pinned by the panel title.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Dataset and Model Acquisition"
+            },
+            {
+              "id": "fig8-layer-3-mlp-c-fc-matrix",
+              "requirements": "The gradient of the mlp.c_fc weight matrix in layer 3 of a randomly-initialized GPT-2 model is used as the other test matrix for Figure 8, as pinned by the panel title.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Dataset and Model Acquisition"
+            },
+            {
+              "id": "fig8-execution",
+              "requirements": "The four degree-5 methods in the Figure 8 legend (Newton-Schulz d=5, Jordan, You, Polar Express with l = 1e-3) are executed on both layer gradients for 10 iterations, with relative Frobenius error and cosine similarity logged per iteration.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "fig8-plot-2x2-grid",
+              "requirements": "Figure 8 is plotted as a 2x2 grid: relative Frobenius error on the top row and cosine similarity on the bottom row, with one column per test layer, sharing a common legend.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Logging, Analysis & Presentation"
+            },
+            {
+              "id": "fig8-result-frobenius-mirrors-spectral",
+              "requirements": "Figure 8 shows that convergence measured in the Frobenius norm behaves similarly to convergence measured in the spectral norm in Figure 3, matching Appendix H.1's observation that although Polar Express is designed to minimize spectral norm error, Frobenius convergence is similar.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "fig8-result-polarexp-outperforms-in-both-metrics",
+              "requirements": "Figure 8 shows that Polar Express attains lower relative Frobenius error and higher cosine similarity than Newton-Schulz, Jordan, and You at comparable iteration counts on both test layers, matching Appendix H.1.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "figure-10-truncated-spectrum-convergence",
+          "requirements": "Figure 10 (Appendix H.1) has been reproduced: convergence measured only over the top of the spectrum, ignoring singular values smaller than sigma_max / 10^3, by comparing the projected iterate to the truncated polar factor.",
+          "weight": 3,
+          "sub_tasks": [
+            {
+              "id": "fig10-truncated-polar-factor-definition",
+              "requirements": "The truncated polar factor polar_gamma(M) := U_1 V_1^T of equation (22) is implemented, where the SVD is partitioned as in equation (20) so that Sigma_1 holds singular values above the threshold gamma * sigma_max and Sigma_2 holds those below it.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "fig10-projected-comparison",
+              "requirements": "The comparison performed is between the projected algorithm output U_1 U_1^T * alg(M) * V_1 V_1^T and the truncated polar factor polar_{1e-3}(M), as described in Appendix H.1, so that error contributions from the bottom singular subspace are excluded.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "fig10-execution",
+              "requirements": "The truncated-spectrum convergence comparison is executed for all four degree-5 methods on the same two GPT-2 layer gradients used in Figure 8, over 10 iterations, in both relative Frobenius error and cosine similarity.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "fig10-plot-2x2-grid",
+              "requirements": "Figure 10 is plotted as a 2x2 grid matching the layout of Figure 8 (Frobenius error on top, cosine similarity below, one column per layer).",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Logging, Analysis & Presentation"
+            },
+            {
+              "id": "fig10-result-six-iterations-frobenius",
+              "requirements": "Figure 10 shows that Polar Express converges in just six iterations as measured by relative Frobenius error once small singular values are excluded, matching Appendix H.1.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "fig10-result-five-iterations-cosine",
+              "requirements": "Figure 10 shows that Polar Express converges in just five iterations as measured by cosine similarity once small singular values are excluded, matching Appendix H.1.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "fig10-result-still-outperforms-baselines",
+              "requirements": "Figure 10 shows that all methods converge faster under the truncated metric, but Polar Express still outperforms Newton-Schulz, Jordan, and You, matching Appendix H.1.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "fig10-result-explains-five-iteration-saturation",
+              "requirements": "The truncated-spectrum convergence results are connected to the Figure 5 ablation: they explain why Muon performance saturates at five or six iterations of Polar Express even though the full-spectrum error has not converged, as argued in Appendix H.1.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        }
+      ],
+      "task_category": null,
+      "finegrained_task_category": null
+    },
+    {
+      "id": "muon-optimizer-implementation",
+      "requirements": "The Muon optimizer of Section 1.1 has been implemented: a momentum buffer updated as M_t = beta*M_{t-1} + (1-beta)*G_t with M_0 = 0 and beta = 0.9, a weight update W_{t+1} = W_t - lambda*polar(M_t) that steps along the orthogonalized momentum, a pluggable polar factor routine, and the nano-gpt parameter assignment policy that routes excluded parameters to AdamW.",
+      "weight": 9,
+      "sub_tasks": [
+        {
+          "id": "muon-momentum-recurrence",
+          "requirements": "The momentum buffer follows M_t = beta*M_{t-1} + (1 - beta)*G_t, i.e. an exponential moving average with the (1 - beta) scaling on the incoming stochastic gradient, exactly as written in Section 1.1.",
+          "weight": 5,
+          "sub_tasks": [],
+          "task_category": "Code Development",
+          "finegrained_task_category": "Method Implementation"
+        },
+        {
+          "id": "muon-momentum-initialized-to-zero",
+          "requirements": "The momentum buffer is initialized as M_0 = 0, as specified in Section 1.1.",
+          "weight": 2,
+          "sub_tasks": [],
+          "task_category": "Code Development",
+          "finegrained_task_category": "Method Implementation"
+        },
+        {
+          "id": "muon-beta-default-0.9",
+          "requirements": "The momentum coefficient defaults to beta = 0.9, the value stated in Section 1.1.",
+          "weight": 3,
+          "sub_tasks": [],
+          "task_category": "Code Development",
+          "finegrained_task_category": "Method Implementation"
+        },
+        {
+          "id": "muon-weight-update-uses-polar-factor",
+          "requirements": "The weight update is W_{t+1} = W_t - lambda*polar(M_t), i.e. the step direction is the orthogonalized momentum rather than the raw momentum -M_t used by SGD with momentum. This is the defining feature of Muon per Section 1.1.",
+          "weight": 5,
+          "sub_tasks": [],
+          "task_category": "Code Development",
+          "finegrained_task_category": "Method Implementation"
+        },
+        {
+          "id": "muon-polar-routine-is-pluggable",
+          "requirements": "The routine that computes polar(M_t) inside the optimizer is a swappable component, so that Polar Express, Jordan's method, You's method, degree-5 Newton-Schulz, and an exact SVD can each be selected without any other change to the optimizer or training loop.",
+          "weight": 4,
+          "sub_tasks": [],
+          "task_category": "Code Development",
+          "finegrained_task_category": "Method Implementation"
+        },
+        {
+          "id": "muon-assigned-to-multidimensional-params",
+          "requirements": "Muon is assigned to all parameters with at least two dimensions, excluding one-dimensional parameters such as RMS norm scales, following the nano-gpt convention (Jordan et al., 2024a) as stated in Section 4.2.",
+          "weight": 4,
+          "sub_tasks": [],
+          "task_category": "Code Development",
+          "finegrained_task_category": "Method Implementation"
+        },
+        {
+          "id": "muon-excludes-embeddings-and-positional",
+          "requirements": "Embeddings, unembeddings, and positional encodings are excluded from Muon even though they are at least two-dimensional, as stated in Section 4.2.",
+          "weight": 4,
+          "sub_tasks": [],
+          "task_category": "Code Development",
+          "finegrained_task_category": "Method Implementation"
+        },
+        {
+          "id": "muon-excluded-params-use-adamw",
+          "requirements": "All parameters excluded from Muon (one-dimensional parameters, embeddings, unembeddings, positional encodings) are optimized with AdamW, as stated in Section 4.2.",
+          "weight": 4,
+          "sub_tasks": [],
+          "task_category": "Code Development",
+          "finegrained_task_category": "Method Implementation"
+        },
+        {
+          "id": "muon-steepest-descent-spectral-norm-rationale",
+          "requirements": "The implementation reflects the motivation given in Section 1.1 that -polar(M) is the steepest-descent direction with respect to the spectral norm (in contrast to the Frobenius norm underlying standard SGD), for example in documentation or comments explaining why the polar factor is used.",
+          "weight": 1,
+          "sub_tasks": [],
+          "task_category": "Code Development",
+          "finegrained_task_category": "Method Implementation"
+        }
+      ],
+      "task_category": null,
+      "finegrained_task_category": null
+    },
+    {
+      "id": "gpt2-training-infrastructure",
+      "requirements": "The GPT-2 training infrastructure required by Section 4.2 has been built: both model configurations, the FineWeb data pipeline, the training hyperparameters and hardware setup, and the instrumentation that produces the logged quantities plotted in Figures 1, 4, 11, 12, and 13.",
+      "weight": 7,
+      "sub_tasks": [
+        {
+          "id": "gpt2-architecture-configuration",
+          "requirements": "Both GPT-2 architectures used in Section 4.2 have been configured: GPT-2-Small (n_embd = 768, n_layer = 12, n_head = 12, 124M parameters) and GPT-2-Large (n_embd = 1280, n_layer = 36, n_head = 20, 774M parameters), sharing vocabulary size 50,257 and context length 1024.",
+          "weight": 4,
+          "sub_tasks": [
+            {
+              "id": "gpt2-small-n-embd-768",
+              "requirements": "GPT-2-Small is configured with embedding dimension n_embd = 768, per Section 4.2.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "gpt2-small-n-layer-12",
+              "requirements": "GPT-2-Small is configured with n_layer = 12 transformer blocks, per Section 4.2.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "gpt2-small-n-head-12",
+              "requirements": "GPT-2-Small is configured with n_head = 12 attention heads, per Section 4.2.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "gpt2-small-parameter-count-124m",
+              "requirements": "The configured GPT-2-Small has approximately 124M parameters, matching the count stated in the Figure 4 caption.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "gpt2-large-n-embd-1280",
+              "requirements": "GPT-2-Large is configured with embedding dimension n_embd = 1280, per Section 4.2.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "gpt2-large-n-layer-36",
+              "requirements": "GPT-2-Large is configured with n_layer = 36 transformer blocks, per Section 4.2.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "gpt2-large-n-head-20",
+              "requirements": "GPT-2-Large is configured with n_head = 20 attention heads, per Section 4.2.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "gpt2-large-parameter-count-774m",
+              "requirements": "The configured GPT-2-Large has approximately 774M parameters, matching the count stated in the Figure 1 caption.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "gpt2-shared-vocab-size-50257",
+              "requirements": "Both GPT-2 configurations use vocabulary size 50,257, per Section 4.2.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "gpt2-shared-context-length-1024",
+              "requirements": "Both GPT-2 configurations use context length 1024, per Section 4.2.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "gpt2-models-run-forward-pass",
+              "requirements": "Both configured models instantiate and execute a forward pass without error, emitting logits of shape [batch, 1024, 50257], so they can serve as the backbone for the Section 4.2 training runs.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Experimental Setup"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "fineweb-data-pipeline",
+          "requirements": "The FineWeb dataset (Penedo et al., 2024) has been acquired and a tokenized data loader constructed that streams the 1 billion token budget used in Section 4.2 (and the 10 billion token budget used in the Section 4.3 extension) at batch size 32.",
+          "weight": 5,
+          "sub_tasks": [
+            {
+              "id": "fineweb-dataset-acquired",
+              "requirements": "The FineWeb dataset (Penedo et al., 2024) is acquired and made available to the training pipeline.",
+              "weight": 5,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Dataset and Model Acquisition"
+            },
+            {
+              "id": "fineweb-1b-token-budget",
+              "requirements": "A data loader supplies exactly the 1 billion token training budget used for the main Section 4.2 experiments.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Dataset and Model Acquisition"
+            },
+            {
+              "id": "fineweb-single-epoch",
+              "requirements": "The 1 billion token budget is consumed in a single epoch, as stated in Section 4.2 ('We train on 1B tokens of the FineWeb dataset for one epoch').",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "fineweb-tokenization-matches-vocab",
+              "requirements": "Text is tokenized with the GPT-2 tokenizer so that token ids are consistent with the configured vocabulary size of 50,257.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Dataset and Model Acquisition"
+            },
+            {
+              "id": "fineweb-10b-token-budget",
+              "requirements": "A data loader supplies the extended 10 billion token budget used for the Section 4.3 / Appendix H.2 extended training runs.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Dataset and Model Acquisition"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "training-hyperparameters-and-infrastructure",
+          "requirements": "The training hyperparameters and infrastructure of Section 4.2 have been configured: batch size 32, bfloat16 mixed precision, the Jordan et al. (2024a) learning rate schedule with a constant phase covering the first 40 percent of steps followed by linear decay, and 4 H100 GPUs.",
+          "weight": 5,
+          "sub_tasks": [
+            {
+              "id": "batch-size-32",
+              "requirements": "All GPT-2 training runs in Section 4.2 use batch size 32.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "bfloat16-mixed-precision-training",
+              "requirements": "All GPT-2 training runs use bfloat16 mixed precision, as stated in Section 4.2.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "lr-schedule-constant-first-40-percent",
+              "requirements": "The learning rate schedule holds the learning rate constant for the first 40 percent of training steps, following Jordan et al. (2024a) as stated in Section 4.2.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "lr-schedule-linear-decay-remainder",
+              "requirements": "After the constant phase the learning rate decays linearly over the remaining 60 percent of training steps, following Jordan et al. (2024a) as stated in Section 4.2.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "lr-schedule-shared-across-methods",
+              "requirements": "The identical learning rate schedule is applied to every method variant and both model sizes, so that differences in validation loss are attributable to the matrix sign method and not to the schedule.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "four-h100-gpus",
+              "requirements": "The training infrastructure is configured for 4 H100 GPUs with data-parallel or distributed training, as stated in Section 4.2.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Environment & Infrastructure Setup"
+            },
+            {
+              "id": "no-weight-decay-in-main-runs",
+              "requirements": "The main Section 4.2 / Figure 4 runs use no weight decay, as stated explicitly in the Figure 4 caption, distinguishing them from the weight-decay ablation of Appendix H.2.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Experimental Setup"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "training-instrumentation",
+          "requirements": "The training loop is instrumented to record the quantities plotted throughout Section 4 and Appendix H.2: validation loss, training loss, training step index / epoch, and wall-clock time.",
+          "weight": 3,
+          "sub_tasks": [
+            {
+              "id": "log-validation-loss",
+              "requirements": "Validation loss is evaluated periodically during training and at the end of training, and recorded per run and per learning rate.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Logging, Analysis & Presentation"
+            },
+            {
+              "id": "log-training-loss",
+              "requirements": "Training loss is recorded alongside validation loss, since Appendix H.2 Figure 11 plots final training loss versus learning rate and training loss versus time.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Logging, Analysis & Presentation"
+            },
+            {
+              "id": "log-wall-clock-time",
+              "requirements": "Cumulative wall-clock training time is recorded so that loss can be plotted against elapsed time, as in the bottom-right panels of Figures 11, 12, and 13.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Logging, Analysis & Presentation"
+            },
+            {
+              "id": "log-epoch-or-step-index",
+              "requirements": "The training step or epoch fraction is recorded per logged point so that loss-versus-epoch curves (right panels of Figures 1 and 4) can be produced.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Logging, Analysis & Presentation"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        }
+      ],
+      "task_category": null,
+      "finegrained_task_category": null
+    },
+    {
+      "id": "main-gpt2-training-results",
+      "requirements": "The main GPT-2 training experiments of Section 4.2 have been reproduced, establishing the paper's headline empirical claim: substituting Polar Express for Jordan's or You's method inside Muon yields consistently lower validation loss on GPT-2-Small and GPT-2-Large trained on 1 billion FineWeb tokens, at no additional cost per step.",
+      "weight": 10,
+      "sub_tasks": [
+        {
+          "id": "matrix-sign-methods-in-muon",
+          "requirements": "The three matrix sign methods compared in Section 4.2 are wired into Muon as interchangeable polar factor routines, each running in bfloat16 with five iterations, and an AdamW baseline optimizer is available for the comparison shown in Figure 4.",
+          "weight": 6,
+          "sub_tasks": [
+            {
+              "id": "polarexp-integrated-into-muon",
+              "requirements": "Polar Express (Implementation 1) is selectable as Muon's polar factor routine, producing the muon-PolarExp variant.",
+              "weight": 6,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "jordan-integrated-into-muon",
+              "requirements": "Jordan et al. (2024b)'s method is selectable as Muon's polar factor routine, producing the muon-Jordan variant.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "you-integrated-into-muon",
+              "requirements": "You's method (Cesista et al., 2025) is selectable as Muon's polar factor routine, producing the muon-You variant.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "matrix-sign-methods-run-in-bfloat16",
+              "requirements": "All matrix sign computations inside the optimizer are performed in bfloat16, as stated in Section 4.2 ('All methods for the matrix sign computations are performed in bfloat16 precision').",
+              "weight": 5,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "matrix-sign-methods-use-five-iterations",
+              "requirements": "Each matrix sign method is run for five iterations per optimizer step in the Section 4.2 experiments, as stated in Section 4.2 ('and use five iterations') and reiterated in the Figure 1 and Figure 4 captions ('Muon with 5 iterations of <method>').",
+              "weight": 5,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "adamw-baseline-optimizer",
+              "requirements": "A standalone AdamW baseline optimizer is available for training GPT-2 without Muon, since AdamW appears as a comparison curve in Figure 4 and in Figure 13b.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "main-training-runs",
+          "requirements": "The Section 4.2 training runs have been executed: all three Muon variants (and AdamW for GPT-2-Small) trained on 1 billion FineWeb tokens at both model scales, swept over learning rates, with final validation loss recorded per configuration.",
+          "weight": 8,
+          "sub_tasks": [
+            {
+              "id": "learning-rate-sweep-performed",
+              "requirements": "A sweep over multiple learning rates is performed for each method, covering at least the decade around 1e-2 for GPT-2-Large and the range from roughly 3e-4 to 2e-2 for GPT-2-Small, so that a best learning rate can be identified per method and the loss-versus-learning-rate curves of Figures 1 and 4 can be plotted.",
+              "weight": 6,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "gpt2-large-runs-executed",
+              "requirements": "GPT-2-Large is trained to completion with muon-PolarExp, muon-Jordan, and muon-You on 1 billion FineWeb tokens at each swept learning rate, producing the data underlying Figure 1.",
+              "weight": 8,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "gpt2-small-runs-executed",
+              "requirements": "GPT-2-Small is trained to completion with muon-PolarExp, muon-Jordan, muon-You, and AdamW on 1 billion FineWeb tokens at each swept learning rate, producing the data underlying Figure 4.",
+              "weight": 7,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "controlled-comparison-single-variable",
+              "requirements": "Across the three Muon variants only the matrix sign routine differs; model configuration, data order, batch size, precision, iteration count, and learning rate schedule are held identical, so the comparison isolates the effect of the polar factor method.",
+              "weight": 5,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Experimental Setup"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "figure-1-gpt2-large-results",
+          "requirements": "Figure 1 has been reproduced: final validation loss versus learning rate (left) and validation loss versus epoch at the best learning rate (right) for muon-PolarExp, muon-Jordan, and muon-You on GPT-2-Large trained on 1 billion FineWeb tokens.",
+          "weight": 8,
+          "sub_tasks": [
+            {
+              "id": "fig1-plot-two-panels",
+              "requirements": "Figure 1 is plotted as two panels: final validation loss versus learning rate on the left (log-scale x-axis) and validation loss versus epoch at the best learning rate on the right, labeled with the muon-<method> naming convention used in the caption.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Logging, Analysis & Presentation"
+            },
+            {
+              "id": "fig1-result-polarexp-best-across-all-lrs",
+              "requirements": "Figure 1 left panel shows that muon-PolarExp attains a lower final validation loss than both muon-Jordan and muon-You at every learning rate tested on GPT-2-Large, matching Section 4.2's description of the advantage as remarkably consistent across all learning rates.",
+              "weight": 7,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "fig1-result-polarexp-best-loss-3.340",
+              "requirements": "The best final validation loss for muon-PolarExp on GPT-2-Large is approximately 3.340, attained at learning rate 0.02, as stated in the Figure 1 caption.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "fig1-result-jordan-best-loss-3.398",
+              "requirements": "The best final validation loss for muon-Jordan on GPT-2-Large is approximately 3.398, attained at learning rate 0.02, as stated in the Figure 1 caption.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "fig1-result-you-best-loss-3.399",
+              "requirements": "The best final validation loss for muon-You on GPT-2-Large is approximately 3.399, attained at learning rate 0.02, as stated in the Figure 1 caption.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "fig1-result-advantage-holds-across-epochs",
+              "requirements": "Figure 1 right panel shows that at the best learning rate the muon-PolarExp validation loss curve lies below the muon-Jordan and muon-You curves throughout training, not only at the final step, matching Section 4.2's claim that the advantage is consistent across epochs.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "fig1-result-baselines-nearly-tied",
+              "requirements": "Figure 1 shows that muon-Jordan and muon-You attain nearly identical final validation loss on GPT-2-Large (3.398 versus 3.399), so the Polar Express improvement is much larger than the gap between the two baselines.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "figure-4-gpt2-small-results",
+          "requirements": "Figure 4 has been reproduced: final validation loss versus learning rate (left) and validation loss versus training iteration (right) for muon-PolarExp, muon-Jordan, muon-You, and AdamW on GPT-2-Small trained on 1 billion FineWeb tokens with no weight decay.",
+          "weight": 7,
+          "sub_tasks": [
+            {
+              "id": "fig4-plot-two-panels",
+              "requirements": "Figure 4 is plotted as two panels: final validation loss versus learning rate on the left (log-scale x-axis, including the AdamW curve) and validation loss versus training iteration on the right.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Logging, Analysis & Presentation"
+            },
+            {
+              "id": "fig4-result-polarexp-best-across-all-lrs",
+              "requirements": "Figure 4 left panel shows that muon-PolarExp attains a lower final validation loss than muon-Jordan and muon-You at every learning rate tested on GPT-2-Small, matching Section 4.2.",
+              "weight": 6,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "fig4-result-polarexp-best-loss-3.588",
+              "requirements": "The best final validation loss for muon-PolarExp on GPT-2-Small is approximately 3.588, attained at learning rate 0.005, as stated in the Figure 4 caption.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "fig4-result-you-best-loss-3.629",
+              "requirements": "The best final validation loss for muon-You on GPT-2-Small is approximately 3.629, attained at learning rate 0.01, as stated in the Figure 4 caption.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "fig4-result-jordan-best-loss-3.639",
+              "requirements": "The best final validation loss for muon-Jordan on GPT-2-Small is approximately 3.639, attained at learning rate 0.01, as stated in the Figure 4 caption.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "fig4-result-adamw-best-loss-4.197",
+              "requirements": "The AdamW baseline attains a best final validation loss of approximately 4.197 on GPT-2-Small, substantially worse than all three Muon variants. The Figure 4 caption reports this at learning rate 0.0005 while the Figure 11b caption reports the same loss at learning rate 0.001; either best learning rate is acceptable, but the 4.197 loss value must be reproduced.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "fig4-result-muon-variants-beat-adamw",
+              "requirements": "Figure 4 shows that all three Muon variants substantially outperform AdamW on GPT-2-Small, consistent with Section 1.1's statement that Muon often outperforms adaptive gradient methods such as Adam and AdamW.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "fig4-result-best-lr-differs-for-polarexp",
+              "requirements": "Figure 4 shows that muon-PolarExp attains its best loss at learning rate 0.005 whereas muon-Jordan and muon-You both peak at 0.01, so the optimal learning rate is not identical across methods at this scale.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "equal-cost-and-wall-clock",
+          "requirements": "The cost-equivalence argument of Section 4.2 has been substantiated: because all three matrix sign methods apply a degree-5 polynomial at each of five iterations they cost the same per optimizer step, so an improvement measured in training steps also holds in wall-clock time.",
+          "weight": 4,
+          "sub_tasks": [
+            {
+              "id": "cost-equal-flops-per-step",
+              "requirements": "The three matrix sign methods are verified to perform the same number of matrix-matrix products per optimizer step (all apply a degree-5 polynomial at each of five iterations), so their per-step FLOP cost is equal, as argued in Section 4.2.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "cost-wall-clock-parity-measured",
+              "requirements": "Measured wall-clock time per training step is verified to be indistinguishable across muon-PolarExp, muon-Jordan, and muon-You, confirming that Polar Express introduces no runtime overhead.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "cost-loss-improvement-holds-in-wall-clock",
+              "requirements": "Plotting loss against wall-clock time rather than training steps preserves the muon-PolarExp advantage, matching Section 4.2's conclusion that improved validation loss in terms of training steps also implies improved loss in terms of wall clock time.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "training-loss-mirrors-validation-loss",
+              "requirements": "Training loss is verified to show essentially the same ordering and margins as validation loss, matching Section 4.2's statement that muon-PolarExp also achieves better training loss and that the improvements in training loss are nearly identical to those in validation loss.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "figure-11-four-panel-training-curves",
+          "requirements": "Figure 11 (Appendix H.2) has been reproduced for both model sizes: a four-panel layout showing final validation loss versus learning rate, final training loss versus learning rate, validation loss versus epoch at the best learning rate, and training loss versus wall-clock time at the best learning rate, for the 1 billion token runs without weight decay.",
+          "weight": 2,
+          "sub_tasks": [
+            {
+              "id": "fig11-large-four-panels",
+              "requirements": "Figure 11a is reproduced for GPT-2-Large with all four panels (final validation loss vs learning rate, final training loss vs learning rate, validation loss vs epoch, training loss vs wall-clock time) for the three Muon variants.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Logging, Analysis & Presentation"
+            },
+            {
+              "id": "fig11-small-four-panels",
+              "requirements": "Figure 11b is reproduced for GPT-2-Small with the same four panels, additionally including the AdamW curve as in the published figure.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Logging, Analysis & Presentation"
+            },
+            {
+              "id": "fig11-result-consistent-with-figures-1-and-4",
+              "requirements": "The top-left and top-right panels of Figure 11 reproduce Figures 1 and 4 respectively, confirming internal consistency between the main-text and appendix presentations of the same runs.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        }
+      ],
+      "task_category": null,
+      "finegrained_task_category": null
+    },
+    {
+      "id": "muon-ablation-experiments",
+      "requirements": "The ablation experiments of Section 4.3 and Appendix H.1/H.2 have been reproduced: the number of Polar Express iterations versus an exact SVD (Figure 5), the sensitivity of Muon to small singular directions (Figure 9), the weight decay ablation (Figure 12), and the extension to 10 billion training tokens (Figures 6 and 13).",
+      "weight": 6,
+      "sub_tasks": [
+        {
+          "id": "figure-5-iteration-count-and-svd-ablation",
+          "requirements": "The Section 4.3 accuracy ablation has been reproduced (Figure 5): GPT-2-Small is trained with Muon using 2, 3, 4, 5, 6, 7, 10, 20, and 30 iterations of Polar Express and, separately, with the exact polar factor from torch.linalg.svd, at learning rate 0.05 with weight decay 0.1, recording both final validation loss and median training step time.",
+          "weight": 6,
+          "sub_tasks": [
+            {
+              "id": "fig5-iteration-count-grid",
+              "requirements": "Training runs are configured for each of the nine iteration counts appearing on the Figure 5 x-axis: 2, 3, 4, 5, 6, 7, 10, 20, and 30 iterations of Polar Express.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "fig5-exact-svd-variant",
+              "requirements": "A variant of Muon is implemented that computes the exact polar factor via torch.linalg.svd (forming U*V^T from the SVD) instead of any polynomial iteration, serving as the accuracy upper bound in Figure 5.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "fig5-hyperparameters-lr-0.05-wd-0.1",
+              "requirements": "All Figure 5 runs use learning rate 0.05 and weight decay 0.1 on GPT-2-Small with 1 billion FineWeb tokens, as specified in the Figure 5 caption. Note these differ from the main Section 4.2 runs, which sweep learning rate and use no weight decay.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "fig5-median-step-time-metric",
+              "requirements": "Median training step time in seconds is measured per configuration (median over training steps rather than mean, matching the y-axis label of the Figure 5 right panel), using a timing method that accounts for asynchronous GPU execution such as CUDA event synchronization.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "fig5-execution-all-configurations",
+              "requirements": "All ten configurations (nine iteration counts plus the exact SVD variant) are trained to completion on GPT-2-Small, with final validation loss and median step time recorded for each.",
+              "weight": 5,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "fig5-plot-two-panels",
+              "requirements": "Figure 5 is plotted as two bar-chart panels sharing a categorical x-axis of iteration counts plus an SVD category: final validation loss on the left and median training step time on the right, with the SVD bar visually distinguished from the Polar Express bars.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Logging, Analysis & Presentation"
+            },
+            {
+              "id": "fig5-result-2-iterations-worse",
+              "requirements": "Figure 5 left panel shows that 2 iterations of Polar Express yields a clearly worse final validation loss (approximately 3.73) than 5 or 6 iterations, matching Section 4.3.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "fig5-result-3-iterations-worse",
+              "requirements": "Figure 5 left panel shows that 3 iterations of Polar Express yields a worse final validation loss (approximately 3.605) than 5 or 6 iterations, though the deficit is far smaller than at 2 iterations, matching Section 4.3.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "fig5-result-plateau-beyond-6-iterations",
+              "requirements": "Figure 5 left panel shows that increasing the iteration count beyond 5 or 6 (to 7, 10, 20, or 30) does not further reduce final validation loss, which is flat at approximately 3.59 across that range, matching Section 4.3's statement that using more than 6 iterations does not improve final validation loss.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "fig5-result-exact-svd-no-better",
+              "requirements": "Figure 5 left panel shows that computing polar(M) exactly via torch.linalg.svd does not yield a better final validation loss than 5 or 6 iterations of Polar Express, matching Section 4.3's statement that increasing the accuracy of the polar approximation further, even computing it exactly with the SVD, does not improve optimization quality.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "fig5-result-runtime-insensitive-to-iterations",
+              "requirements": "Figure 5 right panel shows that median training step time is essentially flat (approximately 1.9 seconds) as the Polar Express iteration count varies from 2 to 30, matching Section 4.3's explanation that the runtime of computing polar(M) is dominated by the forward and backward passes.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "fig5-result-svd-doubles-step-time",
+              "requirements": "Figure 5 right panel shows that the exact SVD variant approximately doubles median training step time (to approximately 4 seconds versus approximately 1.9 seconds), matching Section 4.3's statement that the SVD is so costly that using it doubles the runtime of each training step.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "fig5-result-validates-5-to-6-iteration-default",
+              "requirements": "Taken together the two panels support Section 4.3's conclusion that the standard practice of using 5 or 6 iterations of an iterative approximation, rather than an exact polar factor, is the right operating point: it matches the SVD's optimization quality at half the step cost.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "figure-9-small-singular-direction-ablation",
+          "requirements": "The Appendix H.1 experiment probing Muon's sensitivity to small singular directions has been reproduced (Figure 9): three variants of the Muon update that map sub-threshold singular values to 1, to 0, or to -1 are trained on GPT-2-Small across three cutoff values, isolating how much the bottom of the spectrum matters.",
+          "weight": 5,
+          "sub_tasks": [
+            {
+              "id": "fig9-svd-partition-implementation",
+              "requirements": "The SVD partition of equation (20) is implemented: M = U_1 Sigma_1 V_1^T + U_2 Sigma_2 V_2^T, where Sigma_1 holds the singular values larger than gamma * sigma_max and Sigma_2 holds those smaller.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "fig9-exact-muon-variant",
+              "requirements": "The exact Muon update of equation (21) is implemented, mapping every singular value to 1 to give polar(M) = U_1 V_1^T + U_2 V_2^T.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "fig9-truncated-muon-variant",
+              "requirements": "The truncated Muon update of equation (22) is implemented, mapping large singular values to 1 and small ones to 0 to give polar_gamma(M) = U_1 V_1^T.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "fig9-reverse-muon-variant",
+              "requirements": "The reverse Muon update of equation (23) is implemented, mapping large singular values to 1 and small ones to -1 to give U_1 V_1^T - U_2 V_2^T, so that the step is partly uphill in the bottom singular subspace.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "fig9-cutoff-sweep",
+              "requirements": "The cutoff gamma defining large versus small singular values is swept over the three values 1e-4, 1e-3, and 1e-2, as shown on the Figure 9 x-axis.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "fig9-hyperparameters",
+              "requirements": "All Figure 9 runs train GPT-2-Small on 1 billion FineWeb tokens at learning rate 0.05 with weight decay 0.1, as stated in the Figure 9 caption.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "fig9-precision-setting",
+              "requirements": "Computations for the Figure 9 runs are performed in the 32-bit precision stated in the caption, rather than in the bfloat16 used for the main Section 4.2 experiments.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "fig9-execution",
+              "requirements": "All Figure 9 configurations (three update variants across three cutoffs, plus the exact-polar reference) are trained to completion with final validation loss recorded.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "fig9-plot-with-polynomial-panel",
+              "requirements": "Figure 9 is plotted with the final validation loss of the three update variants against cutoff gamma in the upper panel and, in a lower panel sharing the same x-axis, the value of the polynomial obtained by composing five iterations of Polar Express evaluated at gamma.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Logging, Analysis & Presentation"
+            },
+            {
+              "id": "fig9-result-cutoff-1e-4-irrelevant",
+              "requirements": "At cutoff gamma = 1e-4 both the truncated and the reverse update variants land on the exact-polar reference of approximately 3.588 (the two reported values are approximately 3.587 and approximately 3.589), showing that the treatment of singular values below 1e-4 * sigma_max does not matter at all for Muon, as stated in Appendix H.1.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "fig9-result-cutoff-1e-3-minor",
+              "requirements": "At cutoff gamma = 1e-3 the effect is still very minor: the two variants reach approximately 3.594 and approximately 3.612, with the reverse update the worse of the two, both remaining close to the exact-polar reference of 3.588, as stated in Appendix H.1.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "fig9-result-cutoff-1e-2-reverse-catastrophic",
+              "requirements": "At cutoff gamma = 1e-2 reverse Muon degrades sharply to approximately 4.884, showing that the directions between 1e-3 and 1e-2 do carry meaningful loss-landscape information.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "fig9-result-cutoff-1e-2-truncated-degrades-mildly",
+              "requirements": "At cutoff gamma = 1e-2 truncated Muon degrades only to approximately 3.669, far less than reverse Muon, showing that discarding those directions is much less harmful than stepping against them.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "fig9-result-composed-polynomial-maps-large-values-to-one",
+              "requirements": "The lower panel of Figure 9 shows that the polynomial obtained by composing five iterations of Polar Express with l = 1e-3 maps inputs greater than 1e-3 close to 1, so five iterations is just enough for singular values at or above 1e-3 to nearly converge.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "fig9-result-composed-polynomial-maps-small-values-to-zero",
+              "requirements": "The lower panel of Figure 9 shows that the same composed polynomial maps inputs smaller than 1e-4 close to 0, i.e. five iterations of Polar Express behaves like the truncated update in the bottom subspace.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "fig9-result-explains-five-iteration-sufficiency",
+              "requirements": "The combination of the two panels supports Appendix H.1's conclusion that although Polar Express has not fully converged after five iterations, it converges in the ways that matter for Muon, which explains the Figure 5 saturation at 5 to 6 iterations.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "figure-12-weight-decay-ablation",
+          "requirements": "The weight decay ablation of Section 4.3 and Appendix H.2 has been reproduced (Figure 12): the 1 billion token GPT-2-Small and GPT-2-Large runs are repeated with weight decay 0.1 and all else held equal.",
+          "weight": 3,
+          "sub_tasks": [
+            {
+              "id": "fig12-small-runs-executed",
+              "requirements": "GPT-2-Small is retrained with all three Muon variants using weight decay 0.1 across the learning rate sweep, with everything else identical to the Section 4.2 setup.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "fig12-large-runs-executed",
+              "requirements": "GPT-2-Large is retrained with all three Muon variants using weight decay 0.1 across the learning rate sweep, with everything else identical to the Section 4.2 setup.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "fig12-plot-four-panels-per-model",
+              "requirements": "Figure 12 is plotted as a four-panel layout per model size (final validation loss vs learning rate, final training loss vs learning rate, validation loss vs epoch, training loss vs wall-clock time), matching the Figure 11 layout.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Logging, Analysis & Presentation"
+            },
+            {
+              "id": "fig12-result-large-polarexp-3.344",
+              "requirements": "With weight decay 0.1 on GPT-2-Large, muon-PolarExp attains a best final validation loss of approximately 3.344 at learning rate 0.02, as stated in the Figure 12a caption.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "fig12-result-large-you-3.390",
+              "requirements": "With weight decay 0.1 on GPT-2-Large, muon-You attains a best final validation loss of approximately 3.390 at learning rate 0.02, as stated in the Figure 12a caption.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "fig12-result-large-jordan-3.401",
+              "requirements": "With weight decay 0.1 on GPT-2-Large, muon-Jordan attains a best final validation loss of approximately 3.401 at learning rate 0.02, as stated in the Figure 12a caption.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "fig12-result-small-polarexp-3.587",
+              "requirements": "With weight decay 0.1 on GPT-2-Small, muon-PolarExp attains a best final validation loss of approximately 3.587 at learning rate 0.005, as stated in the Figure 12b caption.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "fig12-result-small-jordan-3.638",
+              "requirements": "With weight decay 0.1 on GPT-2-Small, muon-Jordan attains a best final validation loss of approximately 3.638 at learning rate 0.01, as stated in the Figure 12b caption.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "fig12-result-small-you-3.641",
+              "requirements": "With weight decay 0.1 on GPT-2-Small, muon-You attains a best final validation loss of approximately 3.641 at learning rate 0.005, as stated in the Figure 12b caption.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "fig12-result-polarexp-still-best",
+              "requirements": "Figure 12 shows that muon-PolarExp attains the lowest final validation loss at both model scales when weight decay 0.1 is used, matching Section 4.3's statement that the results are quite similar to Figures 1 and 4 and that muon-PolarExp again outperforms the other methods.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "fig12-result-weight-decay-changes-little",
+              "requirements": "Figure 12 shows that adding weight decay 0.1 has little effect on the overall picture relative to the no-weight-decay runs of Figures 1 and 4, matching Appendix H.2's statement that this change had little effect on the results.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "figure-6-and-13-ten-billion-token-ablation",
+          "requirements": "The extended-training ablation of Section 4.3 has been reproduced (Figures 6 and 13): a subset of the training runs is extended from 1 billion to 10 billion FineWeb tokens, a budget that roughly matches the Chinchilla scaling rule for GPT-2-Large and exceeds it for GPT-2-Small.",
+          "weight": 3,
+          "sub_tasks": [
+            {
+              "id": "fig6-large-10b-runs-executed",
+              "requirements": "GPT-2-Large is trained with all three Muon variants on 10 billion FineWeb tokens with weight decay 0.1 across a learning rate sweep, producing the data underlying Figure 6 and Figure 13a.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "fig13b-small-10b-runs-executed",
+              "requirements": "GPT-2-Small is trained with all three Muon variants plus AdamW on 10 billion FineWeb tokens without weight decay across a learning rate sweep, producing the data underlying Figure 13b.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "fig6-plot",
+              "requirements": "Figure 6 is plotted as two panels for GPT-2-Large at 10 billion tokens: final validation loss versus learning rate and validation loss versus epoch at the best learning rate, for the three Muon variants.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Logging, Analysis & Presentation"
+            },
+            {
+              "id": "fig13-plot-four-panels",
+              "requirements": "Figure 13 is plotted as a four-panel layout per model size matching Figures 11 and 12 (final validation loss vs learning rate, final training loss vs learning rate, validation loss vs epoch, training loss vs wall-clock time).",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Logging, Analysis & Presentation"
+            },
+            {
+              "id": "fig6-result-polarexp-2.913",
+              "requirements": "At 10 billion tokens on GPT-2-Large with weight decay, muon-PolarExp attains a best final validation loss of approximately 2.913 at learning rate 0.002, as stated in the Figure 6 caption.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "fig6-result-you-2.919",
+              "requirements": "At 10 billion tokens on GPT-2-Large with weight decay, muon-You attains a best final validation loss of approximately 2.919 at learning rate 0.002, as stated in the Figure 6 caption.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "fig6-result-jordan-2.921",
+              "requirements": "At 10 billion tokens on GPT-2-Large with weight decay, muon-Jordan attains a best final validation loss of approximately 2.921 at learning rate 0.002, as stated in the Figure 6 caption.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "fig13b-result-polarexp-3.231",
+              "requirements": "At 10 billion tokens on GPT-2-Small without weight decay, muon-PolarExp attains a best final validation loss of approximately 3.231 at learning rate 0.005, as stated in the Figure 13b caption.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "fig13b-result-jordan-3.233",
+              "requirements": "At 10 billion tokens on GPT-2-Small, muon-Jordan attains a best final validation loss of approximately 3.233 at learning rate 0.005, as stated in the Figure 13b caption.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "fig13b-result-you-3.234",
+              "requirements": "At 10 billion tokens on GPT-2-Small, muon-You attains a best final validation loss of approximately 3.234 at learning rate 0.005, as stated in the Figure 13b caption.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "fig13b-result-adamw-3.370",
+              "requirements": "At 10 billion tokens on GPT-2-Small, the AdamW baseline attains a best final validation loss of approximately 3.370 at learning rate 0.0005, as stated in the Figure 13b caption.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "fig6-result-margin-small-but-consistent",
+              "requirements": "Figure 6 shows that Polar Express still outperforms both baselines at 10 billion tokens by a small but consistent margin, matching Section 4.3.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "fig13-result-gap-shrinks-with-longer-training",
+              "requirements": "Figure 13 shows that the advantage of Polar Express persists across all conditions at 10 billion tokens but the gap shrinks relative to the 1 billion token runs as the training loss converges, matching Appendix H.2.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "fig6-chinchilla-budget-rationale",
+              "requirements": "The choice of a 10 billion token budget is documented as roughly matching the Chinchilla scaling rule for GPT-2-Large (774M parameters) and exceeding it for GPT-2-Small, per Table 3 in Hoffmann et al. (2022), as stated in Section 4.3.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Experimental Setup"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        }
+      ],
+      "task_category": null,
+      "finegrained_task_category": null
+    },
+    {
+      "id": "image-classification-experiments",
+      "requirements": "The image classification experiments of Appendix H.3 have been reproduced: ResNet-20 on CIFAR-10, ResNet-110 on CIFAR-100, and a Vision Transformer on CIFAR-10, comparing four Muon variants against AdamW and SGD with momentum, including the paper's honest conclusion that these experiments show no consistent advantage for Polar Express.",
+      "weight": 3,
+      "sub_tasks": [
+        {
+          "id": "image-classification-shared-setup",
+          "requirements": "The shared experimental setup for the Appendix H.3 image classification experiments has been built: CIFAR-10 and CIFAR-100 datasets, a constant learning rate schedule swept over a wide range, three random seeds per configuration, and the additional muon-Newton, AdamW, and SGD-with-momentum baselines that appear in these figures but not in the language modeling experiments.",
+          "weight": 4,
+          "sub_tasks": [
+            {
+              "id": "vision-cifar10-dataset",
+              "requirements": "The CIFAR-10 dataset (Krizhevsky, 2009) is acquired and loaded for the Figure 14 and Figure 16 experiments.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Dataset and Model Acquisition"
+            },
+            {
+              "id": "vision-cifar100-dataset",
+              "requirements": "The CIFAR-100 dataset (Krizhevsky, 2009) is acquired and loaded for the Figure 15 experiment.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Dataset and Model Acquisition"
+            },
+            {
+              "id": "vision-constant-lr-schedule",
+              "requirements": "A constant learning rate schedule is used for the image classification experiments, as stated in Appendix H.3, rather than the constant-then-linear-decay schedule used for GPT-2.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "vision-lr-sweep-range",
+              "requirements": "The learning rate is swept over the range from 1e-6 to 1 for the image classification experiments, as stated in Appendix H.3.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "vision-three-random-seeds",
+              "requirements": "Each hyperparameter setting is run with three different random seeds to assess stability and variability, as stated in Appendix H.3, and the spread across seeds is retained for the shaded regions of Figures 14, 15, and 16.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "vision-muon-newton-baseline",
+              "requirements": "A muon-Newton variant using degree-5 Newton-Schulz as the polar factor routine is added for the image classification experiments; it appears in Figures 14, 15, and 16 but not in the GPT-2 experiments.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "vision-sgd-momentum-baseline",
+              "requirements": "An SGD-with-momentum baseline optimizer is implemented for comparison in Figures 14, 15, and 16, as stated in Appendix H.3.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "vision-adamw-baseline",
+              "requirements": "An AdamW baseline optimizer is used for comparison in Figures 14, 15, and 16, as stated in Appendix H.3.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "resnet-classification-experiments",
+          "requirements": "The ResNet image classification experiments of Appendix H.3 have been reproduced: ResNet-20 on CIFAR-10 (Figure 14) and ResNet-110 on CIFAR-100 (Figure 15), both with batch normalization, batch size 128, and 50 epochs of training.",
+          "weight": 3,
+          "sub_tasks": [
+            {
+              "id": "resnet20-architecture",
+              "requirements": "A ResNet-20 with batch normalization (He et al., 2016) is configured for the CIFAR-10 experiment of Figure 14.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "resnet110-architecture",
+              "requirements": "A ResNet-110 with batch normalization (He et al., 2016) is configured for the CIFAR-100 experiment of Figure 15.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "resnet-batch-size-128",
+              "requirements": "The ResNet experiments use batch size 128, as stated in Appendix H.3.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "resnet-50-epochs",
+              "requirements": "The ResNet experiments train for 50 epochs, as stated in Appendix H.3.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "resnet-execution",
+              "requirements": "All six optimizer variants (muon-PolarExp, muon-Jordan, muon-You, muon-Newton, AdamW, SGD-with-momentum) are trained across the learning rate sweep and three seeds on both ResNet configurations, with validation accuracy and training loss recorded.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "fig14-plot",
+              "requirements": "Figure 14 is plotted for CIFAR-10 with ResNet-20 as two panels sharing a six-entry legend: validation score against learning rate on a linear y-axis, and training loss against learning rate on a logarithmic y-axis, with shaded bands showing the range across the three random seeds.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Logging, Analysis & Presentation"
+            },
+            {
+              "id": "fig15-plot",
+              "requirements": "Figure 15 is plotted for CIFAR-100 with ResNet-110 in the same two-panel layout as Figure 14, with the validation-score y-axis spanning roughly 0.40 to 0.70 to accommodate the lower accuracies attainable on the 100-class task.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Logging, Analysis & Presentation"
+            },
+            {
+              "id": "fig14-result-polarexp-best-accuracy-0.893",
+              "requirements": "On CIFAR-10 with ResNet-20 the best validation accuracy for muon-PolarExp is approximately 0.893 at learning rate 0.001, the highest of the six methods, as stated in the Figure 14 caption.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "fig14-result-muon-variants-cluster",
+              "requirements": "On CIFAR-10 with ResNet-20 all four Muon variants cluster tightly between approximately 0.887 and 0.893 best validation accuracy (muon-You 0.887, muon-Newton 0.890, muon-Jordan 0.891, muon-PolarExp 0.893), as stated in the Figure 14 caption.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "fig14-result-muon-beats-adamw-and-sgd",
+              "requirements": "On CIFAR-10 with ResNet-20 every Muon variant exceeds both AdamW (approximately 0.878 at learning rate 0.01) and SGD-with-momentum (approximately 0.855 at learning rate 0.1) in best validation accuracy, as stated in the Figure 14 caption.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "fig15-result-accuracies",
+              "requirements": "On CIFAR-100 with ResNet-110 the best validation accuracies are approximately 0.665 for muon-You, 0.663 for muon-PolarExp and muon-Newton, 0.660 for muon-Jordan, 0.643 for AdamW and 0.602 for SGD-with-momentum, as stated in the Figure 15 caption; muon-PolarExp is therefore not the top method on this benchmark.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "vision-result-muon-more-lr-robust",
+              "requirements": "The ResNet experiments show that the Muon variants are more stable with respect to the choice of learning rate than AdamW and SGD-with-momentum, matching Appendix H.3.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "vision-result-newton-schulz-competitive-on-resnets",
+              "requirements": "Degree-5 Newton-Schulz performs comparably to Polar Express, Jordan, and You on the ResNet benchmarks despite being significantly less accurate as a polar factor approximation, matching Appendix H.3's explicit observation of this.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "vision-transformer-experiment",
+          "requirements": "The Vision Transformer experiment of Appendix H.3 (Figure 16) has been reproduced: a ViT with patch size 4, embedding dimension 512, depth 6, 8 heads, MLP dimension 512 and dropout 0.1, trained on CIFAR-10 for 200 epochs at batch size 512 with a constant learning rate schedule.",
+          "weight": 2,
+          "sub_tasks": [
+            {
+              "id": "vit-architecture-config",
+              "requirements": "The ViT is configured with patch size 4, embedding dimension 512, depth 6, 8 attention heads, MLP dimension 512, and dropout 0.1, as specified in Appendix H.3.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "vit-200-epochs-batch-512",
+              "requirements": "The ViT training configuration specifies 200 epochs at batch size 512, as stated in Appendix H.3.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "vit-execution",
+              "requirements": "All six optimizer variants are trained on CIFAR-10 with the ViT across the learning rate sweep and three seeds, with validation accuracy and training loss recorded.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "fig16-plot",
+              "requirements": "Figure 16 is plotted for CIFAR-10 with the ViT in the same two-panel layout, with the learning-rate axis extended down to 1e-7 on the training-loss panel to cover the much smaller optimal learning rates (around 1e-5) that the Muon variants require on this architecture.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Logging, Analysis & Presentation"
+            },
+            {
+              "id": "fig16-result-polarexp-best-loss",
+              "requirements": "On CIFAR-10 with the ViT, muon-PolarExp achieves the best training and validation LOSS, closely followed by Jordan's and You's methods, as stated in Appendix H.3.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "fig16-result-accuracy-ordering-differs",
+              "requirements": "On CIFAR-10 with the ViT the improved loss does not translate into the best accuracy: muon-Newton attains the highest best validation accuracy at approximately 0.874, ahead of muon-You at 0.865, muon-Jordan and AdamW at 0.861, muon-PolarExp at 0.860, and SGD-with-momentum trailing at 0.809, as stated in the Figure 16 caption.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "vision-result-no-consistent-advantage",
+          "requirements": "The image classification experiments are reported as a negative result for Polar Express: Appendix H.3 concludes that these experiments do not show a consistent advantage for Polar Express, and that further work may be needed to realize its potential benefits in this setting. The reproduction must report this outcome rather than claiming a vision-domain win.",
+          "weight": 4,
+          "sub_tasks": [],
+          "task_category": "Result Analysis",
+          "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+        }
+      ],
+      "task_category": null,
+      "finegrained_task_category": null
+    },
+    {
+      "id": "spectrum-aware-initialization",
+      "requirements": "The spectrum-aware initialization scheme of Appendix I has been implemented and evaluated (Figure 17): for matrices with large spectral gaps, subspace iteration is used to bracket the leading singular values and a specially constructed cubic preprocesses the matrix so that the large outlying singular values are handled before the standard iteration begins.",
+      "weight": 3,
+      "sub_tasks": [
+        {
+          "id": "spectrum-aware-subspace-iteration",
+          "requirements": "Subspace iteration is implemented as described in footnote 10 of Appendix I: starting from a random Q_0 with orthonormal columns, repeatedly compute Q_{t+1}, R_{t+1} = qr(M^T M Q_t), then take the singular values of M Q_T as the estimates.",
+          "weight": 3,
+          "sub_tasks": [],
+          "task_category": "Code Development",
+          "finegrained_task_category": "Method Implementation"
+        },
+        {
+          "id": "spectrum-aware-lower-bounds-are-underestimates",
+          "requirements": "The subspace iteration estimates are used as LOWER bounds sigma_tilde_i <= sigma_i, justified in Appendix I by the Cauchy interlacing theorem.",
+          "weight": 2,
+          "sub_tasks": [],
+          "task_category": "Code Development",
+          "finegrained_task_category": "Method Implementation"
+        },
+        {
+          "id": "spectrum-aware-frobenius-upper-bounds",
+          "requirements": "Upper bounds on each leading singular value are computed from the Frobenius norm identity of equation (24): sigma_i <= sqrt(||M||_F^2 - sum_{j != i, j <= k} sigma_tilde_j^2), which also bounds the tail sigma_{k+1}, ..., sigma_n when i = k+1.",
+          "weight": 3,
+          "sub_tasks": [],
+          "task_category": "Code Development",
+          "finegrained_task_category": "Method Implementation"
+        },
+        {
+          "id": "spectrum-aware-cubic-coefficients",
+          "requirements": "For the k = 1 case the preprocessing cubic p(x) = a*x + b*x^3 is constructed with the coefficients of equation (25), a = (z^2*(z + sqrt(1 - z^2)) - sqrt(1 - z^2)) / (z*sqrt(1 - z^2)*(2*z^2 - 1)) and b = (sqrt(1 - z^2) - z) / (z*sqrt(1 - z^2)*(2*z^2 - 1)), where z = sigma_tilde_1 and M is normalized so that ||M||_F = 1.",
+          "weight": 4,
+          "sub_tasks": [],
+          "task_category": "Code Development",
+          "finegrained_task_category": "Method Implementation"
+        },
+        {
+          "id": "spectrum-aware-interpolation-conditions",
+          "requirements": "The constructed cubic is verified to satisfy the two interpolation conditions used to derive equation (25): p(sqrt(1 - z^2)) = 1 and p(z) = 1.",
+          "weight": 3,
+          "sub_tasks": [],
+          "task_category": "Result Analysis",
+          "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+        },
+        {
+          "id": "spectrum-aware-non-overlap-condition",
+          "requirements": "The scheme is applied only when the bracketing intervals do not overlap, i.e. when sqrt(1 - z^2) <= z, equivalently z >= 1/sqrt(2), as required in Appendix I.",
+          "weight": 2,
+          "sub_tasks": [],
+          "task_category": "Code Development",
+          "finegrained_task_category": "Method Implementation"
+        },
+        {
+          "id": "spectrum-aware-power-law-test-matrix",
+          "requirements": "The Figure 17 test matrix is a 32x32 synthetic matrix with power-law decaying spectrum sigma_j(M) = j^{-5}, so that it has a single large outlying singular value, as stated in the Figure 17 caption.",
+          "weight": 2,
+          "sub_tasks": [],
+          "task_category": "Code Development",
+          "finegrained_task_category": "Experimental Setup"
+        },
+        {
+          "id": "spectrum-aware-counted-as-extra-iteration",
+          "requirements": "Because applying the initialization costs about as much as one degree-5 iteration, it is counted as an additional iteration when plotting convergence, as stated explicitly in Appendix I and in the Figure 17 caption, so the comparison is not artificially favorable.",
+          "weight": 3,
+          "sub_tasks": [],
+          "task_category": "Code Development",
+          "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+        },
+        {
+          "id": "spectrum-aware-execution",
+          "requirements": "Convergence is measured for four configurations on the power-law test matrix: Newton-Schulz and Polar Express, each with standard and with spectrum-aware initialization, with spectral error logged per iteration out to 25 iterations.",
+          "weight": 3,
+          "sub_tasks": [],
+          "task_category": "Code Execution",
+          "finegrained_task_category": "Experimental Setup"
+        },
+        {
+          "id": "fig17-plot",
+          "requirements": "Figure 17 is plotted as spectral error versus iteration for the four configurations, with method distinguished by color and initializer distinguished by line style.",
+          "weight": 1,
+          "sub_tasks": [],
+          "task_category": "Code Development",
+          "finegrained_task_category": "Logging, Analysis & Presentation"
+        },
+        {
+          "id": "fig17-result-speeds-up-both-methods",
+          "requirements": "Figure 17 shows that spectrum-aware initialization significantly speeds convergence for BOTH Newton-Schulz and Polar Express on the power-law test matrix, as stated in Appendix I.",
+          "weight": 3,
+          "sub_tasks": [],
+          "task_category": "Result Analysis",
+          "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+        },
+        {
+          "id": "spectrum-aware-scope-documented",
+          "requirements": "The reproduction documents that this scheme is NOT used in the paper's Muon experiments and is presented in Appendix I as a further algorithmic idea meriting future study, per footnote 5 of Section 4.1.",
+          "weight": 1,
+          "sub_tasks": [],
+          "task_category": "Code Development",
+          "finegrained_task_category": "Experimental Setup"
+        }
+      ],
+      "task_category": null,
+      "finegrained_task_category": null
+    },
+    {
+      "id": "fast-rectangular-polynomial-iteration",
+      "requirements": "The fast polynomial iteration for rectangular matrices of Appendix J has been reproduced: Algorithm 3 and its numerical stabilizations, the GPU runtime benchmark of Figure 18, and the application to Muon by splitting attention weight matrices per head described in Appendix J.1.",
+      "weight": 3,
+      "sub_tasks": [
+        {
+          "id": "algorithm-3-fast-rectangular-iteration",
+          "requirements": "Algorithm 3 of Appendix J has been implemented: for a tall matrix, the entire T-iteration polynomial composition is computed using only two rectangular matrix multiplications by propagating a small square factor Q_t instead of the full iterate.",
+          "weight": 4,
+          "sub_tasks": [
+            {
+              "id": "alg3-gram-matrix-precomputed",
+              "requirements": "The Gram matrix Y = X^T X is formed once before the loop at a cost of m*n^2, as in Algorithm 3.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "alg3-q-initialized-to-identity",
+              "requirements": "The propagated factor is initialized as Q_0 = I of size n x n, as in Algorithm 3.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "alg3-r-update",
+              "requirements": "At each iteration the small matrix is updated as R_t = Q_{t-1}^T Y Q_{t-1} at a cost of 2*n^3, as in Algorithm 3.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "alg3-q-update-via-horner",
+              "requirements": "At each iteration the propagated factor is updated as Q_t = Q_{t-1} * h_t(R_t), where h_t is the degree-q polynomial satisfying p_t(x) = x*h_t(x^2), evaluated by Horner's rule at a cost of deg(h_t)*n^3, as in Algorithm 3.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "alg3-final-rectangular-product",
+              "requirements": "The result is returned as X * Q_T, the second and final rectangular multiplication, at a cost of m*n^2, as in Algorithm 3.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "alg3-no-rectangular-multiplies-in-loop",
+              "requirements": "The inner loop contains no rectangular matrix multiplications; only the pre-loop Gram matrix and the post-loop product involve the large dimension m, which is the entire point of the algorithm as stated in Appendix J.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "alg3-correctness-identity",
+              "requirements": "The implementation is verified to reproduce the baseline result, i.e. X*Q_T equals (p_T o ... o p_1)(X) to numerical tolerance, following the induction of equations (26) and (27) that R_t = r_t(X) and Q_t = q_t(X).",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "alg3-aspect-ratio-guard",
+              "requirements": "The algorithm is applied only to inputs with m > 1.5*n, as required by the input condition of Algorithm 3.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "alg3-cost-based-selection-criterion",
+              "requirements": "The choice between Algorithm 3 and the baseline is made at runtime by the cost criterion of Appendix J: Algorithm 3 is cheaper when the aspect ratio satisfies alpha > 1.5*T/(T-1), derived from the total cost ((d+3)/2 * T + 2*alpha) * n^3.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "alg3-restart-strategy",
+              "requirements": "The restarting strategy of Appendix J is implemented: Algorithm 3 is applied over blocks of three iterations at a time (X_0 -> X_3 -> X_6 -> ...) rather than for all T iterations at once, because Q_T becomes ill-conditioned for large T when X has very small singular values.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "alg3-ridge-stabilization-first-application",
+              "requirements": "On the first application of Algorithm 3 the Gram matrix is regularized as Y = X^T X + 1e-3 * I to prevent round-off from introducing spurious negative eigenvalues that would cause divergence; subsequent restarts use Y = X^T X unmodified, as specified in Appendix J.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "alg3-normalization-with-1e-3-offset",
+              "requirements": "When the ridge regularization is applied the input is correspondingly normalized by ||X||_F + 1e-3 rather than by ||X||_F, as stated in Appendix J.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "alg3-ridge-preserves-polar-factor",
+              "requirements": "The reproduction reflects Appendix J's argument that adding 1e-3 * I to the Gram matrix slightly increases each singular value but does NOT change the polar factor of X, so the algorithm still converges to the correct answer despite differing in the early iterations.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "alg3-inverse-square-root-observation",
+              "requirements": "The observation of footnote 11 is verified or documented: Q_T tends to Y^{-1/2}, so the Polar Express polynomials also yield a method for computing the inverse square root of a positive semidefinite matrix.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "figure-18-rectangular-runtime-benchmark",
+          "requirements": "The GPU runtime benchmark of Figure 18 has been reproduced: six iterations of a degree-5 polynomial method are timed across matrix dimensions n in {1024, 2048, 4096}, a sweep of aspect ratios, and restart intervals of 1, 3, and 6.",
+          "weight": 2,
+          "sub_tasks": [
+            {
+              "id": "fig18-benchmark-configuration",
+              "requirements": "The benchmark runs T = 6 iterations of a degree-5 polynomial method over n in {1024, 2048, 4096} and a sweep of aspect ratios alpha = m/n from 1 to at least 32, as shown in Figure 18.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "fig18-restart-interval-sweep",
+              "requirements": "Three restart intervals are timed: interval 6 (full Algorithm 3), interval 1 (equivalent to the baseline that does not use Algorithm 3), and interval 3 (the intermediate method that calls Algorithm 3 twice for three iterations each), as described in the Figure 18 caption.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "fig18-plot",
+              "requirements": "Figure 18 is plotted as runtime versus aspect ratio on log-log axes, with matrix dimension distinguished by color and restart interval by line style.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Logging, Analysis & Presentation"
+            },
+            {
+              "id": "fig18-result-2x-speedup-at-alpha-4",
+              "requirements": "At aspect ratio alpha = 4, matching the linear transformations in each MLP block of a transformer, Algorithm 3 gives almost a 2x speedup over the baseline, as stated in Appendix J.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "fig18-result-5x-speedup-at-alpha-32",
+              "requirements": "At aspect ratio alpha = 32, Algorithm 3 gives approximately a 5x speedup over the baseline, as stated in Appendix J.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "fig18-result-restart-3-reduces-savings",
+              "requirements": "Restarting every three iterations shows the same qualitative trend as full Algorithm 3 but with somewhat smaller runtime savings, as stated in Appendix J.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "fig18-result-runtime-decoupled-from-aspect-ratio",
+              "requirements": "Figure 18 shows that using Algorithm 3 for many iterations substantially reduces the dependence of runtime on the aspect ratio, which is the mechanism behind the speedups, as stated in Appendix J.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "algorithm-3-applied-to-muon",
+          "requirements": "The application of Algorithm 3 to Muon described in Appendix J.1 has been reproduced: attention weight matrices are reshaped into per-head slices with large aspect ratio so that Algorithm 3 can be applied to all heads in parallel, and four conditions are compared on GPT-2-Small.",
+          "weight": 2,
+          "sub_tasks": [
+            {
+              "id": "j1-head-splitting-reshape",
+              "requirements": "The gradient matrices of the concatenated [W_Q | W_K | W_V] and of W_O are reshaped into 3-tensors whose slices are the per-head linear transformations of size d x (d/H), giving aspect ratio alpha = H, as described in Appendix J.1.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "j1-four-conditions",
+              "requirements": "A 2x2 factorial grid over the two independent interventions of Appendix J.1 is configured, crossing head splitting (on/off) with Algorithm 3 at restart interval 3 (on/off), which yields the four conditions the appendix compares: baseline, splitting only, Algorithm 3 only, and both together.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "j1-hyperparameters",
+              "requirements": "All four conditions use Polar Express with weight decay 0.1 on GPT-2-Small trained on 1 billion FineWeb tokens, sweeping learning rates 0.003, 0.005, and 0.01, with all other hyperparameters as in Section 4.2, as stated in Appendix J.1.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "j1-execution",
+              "requirements": "All twelve runs (four conditions across three learning rates) are trained to completion with final loss and runtime recorded.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "j1-result-baseline-3.59",
+              "requirements": "The baseline condition attains a final loss of approximately 3.59, as reported in Appendix J.1.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "j1-result-head-splitting-3.55",
+              "requirements": "Head splitting alone slightly REDUCES the final loss from approximately 3.59 to approximately 3.55, as reported in Appendix J.1.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "j1-result-alg3-no-split-3.60",
+              "requirements": "Using Algorithm 3 without head splitting slightly increases the final loss from approximately 3.59 to approximately 3.60, as reported in Appendix J.1.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "j1-result-alg3-with-split-3.56",
+              "requirements": "Using Algorithm 3 together with head splitting gives approximately 3.56 versus approximately 3.55 for head splitting alone, as reported in Appendix J.1.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "j1-result-runtimes-identical",
+              "requirements": "The runtimes of all twelve runs are nearly identical, showing that the FLOP savings of Algorithm 3 do not translate into wall-clock benefit at the GPT-2-Small scale where the embedding size is only 768, as concluded in Appendix J.1.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "j1-result-negligible-effect-documented",
+              "requirements": "The reproduction reports Appendix J.1's conclusion that these changes had a negligible effect at this scale and that the techniques may be more impactful for larger models or for iteration counts beyond the five used in the main experiments.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        }
+      ],
+      "task_category": null,
+      "finegrained_task_category": null
+    }
+  ],
+  "task_category": null,
+  "finegrained_task_category": null
+}

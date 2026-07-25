@@ -62,6 +62,32 @@ def test_blocks_to_text_unknown_type_skipped():
     assert result == ""
 
 
+def test_blocks_to_text_chart_outputs_chart_label():
+    result = pb_mineru.blocks_to_text([{"type": "chart", "chart_caption": "Loss curves"}])
+    assert "[Chart: Loss curves]" in result
+
+
+def test_blocks_to_text_chart_no_caption():
+    result = pb_mineru.blocks_to_text([{"type": "chart"}])
+    assert "[Chart]" in result
+
+
+def test_blocks_to_text_chart_caption_as_list():
+    result = pb_mineru.blocks_to_text([{"type": "chart", "chart_caption": ["Figure 2:", "Loss curves"]}])
+    assert "[Chart: Figure 2: Loss curves]" in result
+
+
+def test_blocks_to_text_code_includes_body():
+    result = pb_mineru.blocks_to_text([{"type": "code", "code_body": "```python\nprint(1)\n```"}])
+    assert "print(1)" in result
+
+
+def test_blocks_to_text_code_includes_caption_when_present():
+    block = {"type": "code", "code_body": "print(1)", "code_caption": "Listing 1"}
+    result = pb_mineru.blocks_to_text([block])
+    assert "[Code: Listing 1]" in result and "print(1)" in result
+
+
 def test_slice_section_returns_matching_section():
     blocks = pb_mineru.slice_section(_CONTENT, "Method")
     texts = [b["text"] for b in blocks if b.get("text")]

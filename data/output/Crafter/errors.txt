@@ -1,0 +1,135 @@
+codegen-context-asymmetry-matches-orchestrator-vs-module-distinction: Branch 'context-calibration-formulation' hit the 40-node cap; forced to leaf.
+two-pass-ordering-enables-orchestrator-full-source-access: Branch 'context-calibration-formulation' hit the 40-node cap; forced to leaf.
+stage-gap-analysis-implementation: Branch 'pipeline-stages-implementation' hit the 40-node cap; forced to leaf.
+stage-gap-external-resolution-cascade: Branch 'pipeline-stages-implementation' hit the 40-node cap; forced to leaf.
+stage-hierarchical-planning-implementation: Branch 'pipeline-stages-implementation' hit the 40-node cap; forced to leaf.
+stage-planning-extraction-phase: Branch 'pipeline-stages-implementation' hit the 40-node cap; forced to leaf.
+stage-architecture-design-with-validator: Branch 'pipeline-stages-implementation' hit the 40-node cap; forced to leaf.
+stage-three-independent-planning-subtasks: Branch 'pipeline-stages-implementation' hit the 40-node cap; forced to leaf.
+stage-sub-planning-per-module: Branch 'pipeline-stages-implementation' hit the 40-node cap; forced to leaf.
+stage-code-generation-two-pass-implementation: Branch 'pipeline-stages-implementation' hit the 40-node cap; forced to leaf.
+stage-unit-test-generation-implementation: Branch 'pipeline-stages-implementation' hit the 40-node cap; forced to leaf.
+stage-debug-triage-and-fast-paths: Branch 'pipeline-stages-implementation' hit the 40-node cap; forced to leaf.
+stage-debug-llm-tool-invocation-submit-fix: Branch 'pipeline-stages-implementation' hit the 40-node cap; forced to leaf.
+partition-consumes-mineru-content-list: Branch 'pipeline-stages-implementation' hit the 40-node cap; forced to leaf.
+vlm-structured-extraction-prompt-exact-text: Branch 'pipeline-stages-implementation' hit the 40-node cap; forced to leaf.
+vlm-extraction-output-schema-extracted-object: Branch 'pipeline-stages-implementation' hit the 40-node cap; forced to leaf.
+llm-client-output-continuation-on-max-tokens: Branch 'backends-orchestration' hit the 40-node cap; forced to leaf.
+llm-client-input-truncation-on-context-overflow: Branch 'backends-orchestration' hit the 40-node cap; forced to leaf.
+batch-runner-multi-paper-multi-backend-driver: Branch 'backends-orchestration' hit the 40-node cap; forced to leaf.
+incremental-restartability-within-single-run: Branch 'backends-orchestration' hit the 40-node cap; forced to leaf.
+planning-gather-latency-amortization-ordering: Branch 'backends-orchestration' hit the 40-node cap; forced to leaf.
+codedev-weighted-aggregation-scoring: Branch 'paperbench-codedev-evaluation' hit the 40-node cap; forced to leaf.
+run-crafter-system-on-23-papers: Branch 'paperbench-codedev-evaluation' hit the 40-node cap; forced to leaf.
+each-system-run-under-both-backend-settings: Branch 'paperbench-codedev-evaluation' hit the 40-node cap; forced to leaf.
+backend-config-consistent-per-system: Branch 'paperbench-codedev-evaluation' hit the 40-node cap; forced to leaf.
+judge-model-matches-backend-setting: Branch 'paperbench-codedev-evaluation' hit the 40-node cap; forced to leaf.
+locked-execution-protocols-per-paper: Branch 'execution-oriented-evaluation' hit the 40-node cap; forced to leaf.
+fixture-construction-per-paper: Branch 'execution-oriented-evaluation' hit the 40-node cap; forced to leaf.
+probe-plan-run-extract-harness-mechanics: Branch 'execution-oriented-evaluation' hit the 40-node cap; forced to leaf.
+metric-extraction-and-predicate-evaluation: Branch 'execution-oriented-evaluation' hit the 40-node cap; forced to leaf.
+repair-audit-protocol-implementation: Branch 'execution-oriented-evaluation' hit the 40-node cap; forced to leaf.
+table4-pre-repair-milestones: Branch 'execution-oriented-evaluation' hit the 40-node cap; forced to leaf.
+table15-full-repair-record-lbcs: Branch 'execution-oriented-evaluation' hit the 40-node cap; forced to leaf.
+table15-full-repair-record-sema: Branch 'execution-oriented-evaluation' hit the 40-node cap; forced to leaf.
+table15-full-repair-record-lca: Branch 'execution-oriented-evaluation' hit the 40-node cap; forced to leaf.
+selection-criterion-contractable-claim: Branch 'execution-oriented-evaluation' hit the 40-node cap; forced to leaf.
+selection-criterion-lightweight-infrastructure: Branch 'execution-oriented-evaluation' hit the 40-node cap; forced to leaf.
+selection-criterion-no-safety-refusal-confounds: Branch 'execution-oriented-evaluation' hit the 40-node cap; forced to leaf.
+milestone-m5-pilot-complete-liveness-fail: Branch 'execution-oriented-evaluation' hit the 40-node cap; forced to leaf.
+milestone-m6-liveness-pass-contribution-fail: Branch 'execution-oriented-evaluation' hit the 40-node cap; forced to leaf.
+milestone-m7-contribution-pass: Branch 'execution-oriented-evaluation' hit the 40-node cap; forced to leaf.
+ablation-gap-agent-enabled-pinn: Branch 'ablation-study' hit the 40-node cap; forced to leaf.
+ablation-gap-agent-enabled-all-in-one: Branch 'ablation-study' hit the 40-node cap; forced to leaf.
+ablation-gap-agent-enabled-mechanistic-understanding: Branch 'ablation-study' hit the 40-node cap; forced to leaf.
+ablation-gap-agent-enabled-bbox: Branch 'ablation-study' hit the 40-node cap; forced to leaf.
+ablation-bam-claude-backend-judge-pairing: Branch 'ablation-study' hit the 40-node cap; forced to leaf.
+ablation-pinn-claude-backend-judge-pairing: Branch 'ablation-study' hit the 40-node cap; forced to leaf.
+ablation-all-in-one-claude-backend-judge-pairing: Branch 'ablation-study' hit the 40-node cap; forced to leaf.
+ablation-mechanistic-understanding-claude-backend-judge-pairing: Branch 'ablation-study' hit the 40-node cap; forced to leaf.
+ablation-bbox-claude-backend-judge-pairing: Branch 'ablation-study' hit the 40-node cap; forced to leaf.
+both-prompt-types-include-architecture-artifact: split-check removed as duplicate of 'codegen-prompt-includes-architecture'.
+both-prompt-types-include-goal-and-config: split-check removed as duplicate of 'codegen-prompt-includes-goal-and-config'.
+both-prompt-types-include-paper-analysis: split-check removed as duplicate of 'codegen-prompt-includes-paper-analysis'.
+both-prompt-types-include-review: split-check removed as duplicate of 'codegen-prompt-includes-review'.
+codegen-does-not-reparse-raw-paper-text: split-check removed as duplicate of 'codegen-consumes-spec-not-raw-paper'.
+hallucination-taxonomy-definition: split-check split into 2 children (branch 'context-calibration-formulation').
+codegen-prompt-includes-architecture: split-check split into 2 children (branch 'context-calibration-formulation').
+codegen-prompt-includes-module-specs: split-check split into 2 children (branch 'context-calibration-formulation').
+codegen-prompt-includes-goal-and-config: split-check split into 2 children (branch 'context-calibration-formulation').
+codegen-prompt-includes-paper-analysis: split-check split into 2 children (branch 'context-calibration-formulation').
+codegen-prompt-includes-review: split-check split into 2 children (branch 'context-calibration-formulation').
+partition-handles-all-mineru-item-types: split-check child of 'partition-consumes-mineru-content-list' still enumerates >= 3 items after splitting (model under-split).
+partition-consumes-mineru-content-list: split-check split into 2 children (branch 'pipeline-stages-implementation').
+vlm-algorithm-category-schema-discrepancy: split-check child of 'vlm-classification-retains-algorithm' still enumerates >= 3 items after splitting (model under-split).
+vlm-classification-retains-algorithm: split-check split into 2 children (branch 'pipeline-stages-implementation').
+stage-gap-external-resolution-cascade: split-check split into 5 children (branch 'pipeline-stages-implementation').
+stage-planning-five-subphases-sequence: split-check child of 'stage-hierarchical-planning-implementation' still enumerates >= 3 items after splitting (model under-split).
+stage-hierarchical-planning-implementation: split-check split into 2 children (branch 'pipeline-stages-implementation').
+stage-code-generation-two-pass-implementation: split-check split into 3 children (branch 'pipeline-stages-implementation').
+stage-debug-triage-and-fast-paths: split-check split into 3 children (branch 'pipeline-stages-implementation').
+stage-debug-three-tools-exposed: split-check child of 'stage-debug-llm-tool-invocation-submit-fix' still enumerates >= 3 items after splitting (model under-split).
+stage-debug-llm-tool-invocation-submit-fix: split-check split into 3 children (branch 'pipeline-stages-implementation').
+exactly-five-backends-no-more-no-fewer: split-check removed as duplicate of 'process-global-set-backend-selector'.
+native-tool-calling-anthropic-only-fallback: split-check removed as duplicate of 'backend-openai'.
+llm-client-exactly-three-call-surfaces-no-more: split-check removed as duplicate of 'llm-client-vision-surface'.
+vlm-stage-bound-to-gemini-2-5-flash: split-check removed as duplicate of 'backend-gemini'.
+backend-selection-independent-of-vlm-backend: split-check removed as duplicate of 'backend-gemini'.
+default-main-model-backend-minimax-m2-7-highspeed: split-check removed as duplicate of 'backend-minimax-anthropic-compatible-endpoint'.
+run-pipeline-coroutine-awaits-stages-in-order: split-check child of 'run-pipeline-sequential-stage-orchestration' still enumerates >= 3 items after splitting (model under-split).
+run-pipeline-sequential-stage-orchestration: split-check split into 1 children (branch 'backends-orchestration').
+llm-client-surface-selection-per-agent-call-site: split-check split into 4 children (branch 'backends-orchestration').
+llm-client-continuation-appends-partial-and-retries: split-check child of 'llm-client-output-continuation-on-max-tokens' still enumerates >= 3 items after splitting (model under-split).
+llm-client-output-continuation-on-max-tokens: split-check split into 2 children (branch 'backends-orchestration').
+llm-client-truncation-shrinks-longest-message-and-retries: split-check child of 'llm-client-input-truncation-on-context-overflow' still enumerates >= 3 items after splitting (model under-split).
+llm-client-input-truncation-on-context-overflow: split-check split into 2 children (branch 'backends-orchestration').
+batch-runner-multi-paper-multi-backend-driver: split-check split into 2 children (branch 'backends-orchestration').
+slurm-scripts-for-cluster-and-partial-pipeline-configs: split-check split into 3 children (branch 'backends-orchestration').
+incremental-restartability-within-single-run: split-check split into 2 children (branch 'backends-orchestration').
+acquire-paper2code-codegen-system: split-check removed as duplicate of 'acquire-paper2code-baseline-system'.
+run-paper2code-on-23-papers: split-check removed as duplicate of 'acquire-paper2code-baseline-system'.
+acquire-deepcode-codegen-system: split-check removed as duplicate of 'acquire-deepcode-baseline-system'.
+run-deepcode-on-23-papers: split-check removed as duplicate of 'acquire-deepcode-baseline-system'.
+codedev-eval-run-23-papers: split-check removed as duplicate of 'six-configurations-all-23-papers-confirmed'.
+paper2code-claude-backend-config: split-check removed as duplicate of 'backend-config-consistent-per-system'.
+paper2code-minimax-backend-config: split-check removed as duplicate of 'backend-config-consistent-per-system'.
+deepcode-claude-backend-config: split-check removed as duplicate of 'backend-config-consistent-per-system'.
+deepcode-minimax-backend-config: split-check removed as duplicate of 'backend-config-consistent-per-system'.
+acquire-paper2code-baseline-system: split-check split into 2 children (branch 'paperbench-codedev-evaluation').
+acquire-deepcode-baseline-system: split-check split into 2 children (branch 'paperbench-codedev-evaluation').
+same-input-same-judge-same-protocol-across-systems: split-check split into 2 children (branch 'paperbench-codedev-evaluation').
+backend-config-consistent-per-system: split-check split into 2 children (branch 'paperbench-codedev-evaluation').
+judge-model-matches-backend-setting: split-check split into 2 children (branch 'paperbench-codedev-evaluation').
+codedev-metric-passed-leaves: split-check split into 2 children (branch 'paperbench-codedev-evaluation').
+codedev-metric-win-counts: split-check split into 2 children (branch 'paperbench-codedev-evaluation').
+table1-crafter-claude-results: split-check split into 2 children (branch 'paperbench-codedev-evaluation').
+table1-crafter-minimax-results: split-check split into 2 children (branch 'paperbench-codedev-evaluation').
+table1-paper2code-claude-results: split-check split into 2 children (branch 'paperbench-codedev-evaluation').
+table1-paper2code-minimax-results: split-check split into 2 children (branch 'paperbench-codedev-evaluation').
+table1-deepcode-claude-results: split-check split into 2 children (branch 'paperbench-codedev-evaluation').
+table1-deepcode-minimax-results: split-check split into 2 children (branch 'paperbench-codedev-evaluation').
+table4-pre-repair-milestones: split-check split into 9 children (branch 'execution-oriented-evaluation').
+table5-repair-distance-to-m7: split-check split into 3 children (branch 'execution-oriented-evaluation').
+table12-lbcs-final-metrics: split-check split into 3 children (branch 'execution-oriented-evaluation').
+table13-sema-final-metrics: split-check split into 3 children (branch 'execution-oriented-evaluation').
+table14-lca-final-metrics: split-check split into 3 children (branch 'execution-oriented-evaluation').
+table15-lbcs-crafter-record: split-check child of 'table15-full-repair-record-lbcs' still enumerates >= 3 items after splitting (model under-split).
+table15-lbcs-paper2code-record: split-check child of 'table15-full-repair-record-lbcs' still enumerates >= 3 items after splitting (model under-split).
+table15-lbcs-deepcode-record: split-check child of 'table15-full-repair-record-lbcs' still enumerates >= 3 items after splitting (model under-split).
+table15-full-repair-record-lbcs: split-check split into 3 children (branch 'execution-oriented-evaluation').
+table15-sema-crafter-record: split-check child of 'table15-full-repair-record-sema' still enumerates >= 3 items after splitting (model under-split).
+table15-sema-paper2code-record: split-check child of 'table15-full-repair-record-sema' still enumerates >= 3 items after splitting (model under-split).
+table15-sema-deepcode-record: split-check child of 'table15-full-repair-record-sema' still enumerates >= 3 items after splitting (model under-split).
+table15-full-repair-record-sema: split-check split into 3 children (branch 'execution-oriented-evaluation').
+table15-lca-crafter-record: split-check child of 'table15-full-repair-record-lca' still enumerates >= 3 items after splitting (model under-split).
+table15-lca-paper2code-record: split-check child of 'table15-full-repair-record-lca' still enumerates >= 3 items after splitting (model under-split).
+table15-lca-deepcode-record: split-check child of 'table15-full-repair-record-lca' still enumerates >= 3 items after splitting (model under-split).
+table15-full-repair-record-lca: split-check split into 3 children (branch 'execution-oriented-evaluation').
+ablation-gap-agent-distinguishes-from-wo-gaps-debug-bam: split-check removed as duplicate of 'ablation-gap-agent-supplementary-context-populated-bam'.
+ablation-backend-judge-uniformity-across-five-papers: split-check removed as duplicate of 'ablation-bam-claude-backend-judge-pairing'.
+table6-bam-scores: split-check split into 5 children (branch 'ablation-study').
+table6-pinn-scores: split-check split into 5 children (branch 'ablation-study').
+table6-all-in-one-scores: split-check split into 5 children (branch 'ablation-study').
+table6-mechanistic-understanding-scores: split-check split into 5 children (branch 'ablation-study').
+table6-bbox-scores: split-check split into 5 children (branch 'ablation-study').
+table6-average-scores: split-check split into 5 children (branch 'ablation-study').

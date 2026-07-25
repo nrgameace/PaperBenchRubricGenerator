@@ -1,0 +1,72 @@
+strict-match-no-normalization-applied: Branch 'hotpotqa-environment' hit the 40-node cap; forced to leaf.
+figure6-nonlinear-k-dependence-result: Branch 'cost-latency-analysis' hit the 40-node cap; forced to leaf.
+theorem3-per-branch-probability-estimator-chess: Branch 'cost-latency-analysis' hit the 40-node cap; forced to leaf.
+theorem3-fifty-percent-threshold-chess-launch: Branch 'cost-latency-analysis' hit the 40-node cap; forced to leaf.
+theorem3-selective-policy-cost-latency-result: Branch 'cost-latency-analysis' hit the 40-node cap; forced to leaf.
+theorem6-latency-formula-verification: Branch 'cost-latency-analysis' hit the 40-node cap; forced to leaf.
+figure6-diminishing-returns-shape-result: Branch 'cost-latency-analysis' hit the 40-node cap; forced to leaf.
+prop1-closed-form-ratio-implementation: Branch 'cost-latency-analysis' hit the 40-node cap; forced to leaf.
+prop1-pk-formula-verification: Branch 'cost-latency-analysis' hit the 40-node cap; forced to leaf.
+prop1-50pct-upper-bound-verification: Branch 'cost-latency-analysis' hit the 40-node cap; forced to leaf.
+prop1-50pct-asymptotic-formula-evaluation: Branch 'cost-latency-analysis' hit the 40-node cap; forced to leaf.
+prop1-50pct-k-independence-result: Branch 'cost-latency-analysis' hit the 40-node cap; forced to leaf.
+theorem4-finite-t-formula-structure-verification: Branch 'cost-latency-analysis' hit the 40-node cap; forced to leaf.
+theorem4-numerical-simulation-config1: Branch 'cost-latency-analysis' hit the 40-node cap; forced to leaf.
+theorem4-numerical-simulation-config2: Branch 'cost-latency-analysis' hit the 40-node cap; forced to leaf.
+theorem4-same-pk-governs-both-latency-and-cost: Branch 'cost-latency-analysis' hit the 40-node cap; forced to leaf.
+empirical-p-chess: split-check split into 2 children (branch 'framework-core').
+chess-metrics-logging: split-check split into 2 children (branch 'chess-environment').
+chess-variance-interpretation: split-check split into 2 children (branch 'chess-environment').
+ecommerce-speculation-latency-result: split-check split into 2 children (branch 'ecommerce-environment').
+strict-match-conjunction-both-conditions: split-check removed as duplicate of 'hotpotqa-strict-match-both-conditions'.
+strict-match-no-synonym-normalization: split-check removed as duplicate of 'strict-match-no-normalization-applied'.
+strict-match-no-paraphrase-normalization: split-check removed as duplicate of 'strict-match-no-normalization-applied'.
+strict-match-no-word-order-normalization: split-check removed as duplicate of 'strict-match-no-normalization-applied'.
+strict-match-no-capitalization-normalization: split-check removed as duplicate of 'strict-match-no-normalization-applied'.
+strict-match-no-stemming-fuzzy: split-check removed as duplicate of 'strict-match-no-normalization-applied'.
+strict-match-surface-form-string-comparison: split-check removed as duplicate of 'strict-match-no-normalization-applied'.
+strict-match-synonym-mismatch-verified: split-check removed as duplicate of 'strict-match-surface-form-mismatch-verified'.
+strict-match-word-order-mismatch-verified: split-check removed as duplicate of 'strict-match-surface-form-mismatch-verified'.
+strict-match-hit-zero-canonical-example-result: split-check removed as duplicate of 'strict-match-surface-form-mismatch-verified'.
+hotpotqa-step-binary-outcome-computation: split-check removed as duplicate of 'hotpotqa-per-step-binary-outcome-computation'.
+strict-match-conjunction-implementation: split-check removed as duplicate of 'hotpotqa-strict-match-both-conditions'.
+strict-match-api-target-exact-string: split-check removed as duplicate of 'hotpotqa-strict-match-both-conditions'.
+strict-match-parameter-exact-string: split-check removed as duplicate of 'strict-match-no-normalization-applied'.
+strict-match-single-component-match-is-miss: split-check removed as duplicate of 'hotpotqa-strict-match-both-conditions'.
+strict-match-canonical-example-hit-zero: split-check removed as duplicate of 'strict-match-surface-form-mismatch-verified'.
+hotpotqa-persistent-log-storage: split-check removed as duplicate of 'hotpotqa-per-step-persistent-storage'.
+hotpotqa-downstream-accuracy-retrieval: split-check removed as duplicate of 'hotpotqa-topk-accuracy-aggregation'.
+hotpotqa-per-step-any-k-match-check: split-check removed as duplicate of 'hotpotqa-per-step-binary-outcome-computation'.
+hotpotqa-speculative-pipeline-impl: split-check split into 4 children (branch 'hotpotqa-environment').
+hotpotqa-topk-accuracy-aggregation-from-logs: split-check split into 2 children (branch 'hotpotqa-environment').
+hotpotqa-speculator-model-configs: split-check split into 3 children (branch 'hotpotqa-environment').
+table2-actor-only-row-leaf: split-check removed as duplicate of 'table2-actor-only-row'.
+table2-speculator-only-row-leaf: split-check removed as duplicate of 'table2-speculator-only-row'.
+table2-speculator-actor-lww-row-leaf: split-check removed as duplicate of 'table2-speculator-actor-last-write-wins-row'.
+os-tuning-table2-cost-results: split-check removed as duplicate of 'table2-exactly-three-rows-no-omission'.
+table2-exactly-three-rows-no-omission: split-check split into 2 children (branch 'os-tuning-environment').
+prop1-50pct-asymptotic-formula-evaluation: split-check removed as duplicate of 'prop1-50pct-upper-bound-verification'.
+prop1-50pct-large-alpha-numerical-confirmation: split-check removed as duplicate of 'prop1-50pct-upper-bound-verification'.
+prop1-50pct-k-independence-result: split-check removed as duplicate of 'prop1-50pct-upper-bound-verification'.
+prop1-50pct-upper-bound: forced to leaf after its last child 'prop1-50pct-k-independence-result' was removed as a duplicate.
+theorem4-pk-formula-shared-quantity: split-check removed as duplicate of 'prop1-pk-formula-verification'.
+theorem4-same-pk-governs-both-latency-and-cost: split-check removed as duplicate of 'prop1-pk-formula-verification'.
+figure6-pareto-curve-plot-code: split-check removed as duplicate of 'figure6-pareto-curve-plot'.
+figure6-diminishing-returns-shape-result: split-check removed as duplicate of 'figure6-nonlinear-k-dependence-result'.
+figure6-selective-policy-cost-dominance-result: split-check removed as duplicate of 'figure6-confidence-threshold-policy-dominance-result'.
+theorem3-selective-policy-cost-latency-result: split-check removed as duplicate of 'figure6-confidence-threshold-policy-dominance-result'.
+figure6-chess-k-sweep-execution: split-check removed as duplicate of 'theorem4-k-sweep-chess-empirical'.
+figure6-pareto-curve-result: forced to leaf after its last child 'figure6-chess-k-sweep-execution' was removed as a duplicate.
+prop1-50pct-upper-bound-verification: split-check split into 2 children (branch 'cost-latency-analysis').
+prop1-recurrence-hits: split-check split into 2 children (branch 'cost-latency-analysis').
+prop1-closed-form-hits: split-check split into 2 children (branch 'cost-latency-analysis').
+theorem4-cost-formula-callable-function: split-check split into 2 children (branch 'cost-latency-analysis').
+theorem4-cost-asymptotic-limit-function: split-check split into 2 children (branch 'cost-latency-analysis').
+theorem6-latency-formula-verification: split-check split into 2 children (branch 'cost-latency-analysis').
+theorem6-cost-formula-verification: split-check split into 2 children (branch 'cost-latency-analysis').
+theorem6-depth-vs-breadth-speedup-ceiling-comparison: split-check split into 2 children (branch 'cost-latency-analysis').
+figure6-pareto-curve-plot: split-check split into 2 children (branch 'cost-latency-analysis').
+figure6-nonlinear-k-dependence-result: split-check split into 2 children (branch 'cost-latency-analysis').
+theorem3-bellman-backward-recursion: split-check split into 2 children (branch 'cost-latency-analysis').
+theorem3-stationary-delta-star-computation: split-check split into 2 children (branch 'cost-latency-analysis').
+figure6-confidence-threshold-policy-dominance-result: split-check split into 2 children (branch 'cost-latency-analysis').

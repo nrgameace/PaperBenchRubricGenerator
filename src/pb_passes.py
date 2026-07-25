@@ -170,12 +170,18 @@ def invoke_llm(client, system_blocks, messages, model, max_tokens=8000, tracker=
     a non-streaming request whenever ``max_tokens`` is large enough that the response could
     plausibly take longer than 10 minutes (see run_split_check_llm's scaled max_tokens), and
     streaming is the SDK's documented way to make those calls safely regardless of size.
+
+    Thinking is explicitly disabled: every pass in this pipeline expects a direct JSON response
+    (the base pass's Self-Check is a prompted scratchpad within that response, not model-internal
+    thinking), and some current models (e.g. Claude Sonnet 5) run adaptive thinking by default
+    when the ``thinking`` parameter is omitted, which eats into ``max_tokens`` and can truncate
+    the JSON output.
     """
     try:
         with client.messages.stream(
             model=model,
             max_tokens=max_tokens,
-            temperature=0,
+            thinking={"type": "disabled"},
             system=system_blocks,
             messages=messages,
         ) as stream:
@@ -190,7 +196,11 @@ def invoke_llm(client, system_blocks, messages, model, max_tokens=8000, tracker=
             f"Anthropic API response for {model} was truncated at max_tokens={max_tokens} "
             "before completing its JSON output. Re-run with a higher max_tokens for this call."
         )
-    return response.content[0].text
+    text_blocks = [block.text for block in response.content if block.type == "text"]
+    if not text_blocks:
+        block_types = [block.type for block in response.content]
+        raise RuntimeError(f"Anthropic API response for {model} contained no text block (content types: {block_types}).")
+    return "".join(text_blocks)
 
 
 def _strip_code_fences(text: str) -> str:
@@ -343,6 +353,10 @@ def apply_expansion(rubric: dict, node_id: str, parsed, hints: dict, errors: lis
     Children that would sit past ``max_depth`` are forced into leaves instead of being
     queued for further expansion, since expansion cost is unbounded otherwise. Each such
     guardrail hit is appended to ``errors`` (if provided) as ``"<id>: ..."``.
+
+    ``node_id`` itself is forced into a leaf the same way if the model returns zero
+    children, since a node with no children and no ``task_category`` is neither a valid
+    leaf nor a valid internal node.
     """
     target = find_node(rubric, node_id)
     if target is None:
@@ -363,6 +377,10 @@ def apply_expansion(rubric: dict, node_id: str, parsed, hints: dict, errors: lis
             hints[node["id"]] = hint
     if target["sub_tasks"]:
         target["task_category"] = None
+    else:
+        target["task_category"] = _DEPTH_FALLBACK_CATEGORY
+        if errors is not None:
+            errors.append(f"{node_id}: Model returned zero children when expanding; forced to leaf.")
     hints.pop(node_id, None)
     return new_pending
 

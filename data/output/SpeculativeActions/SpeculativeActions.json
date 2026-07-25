@@ -1,0 +1,2249 @@
+{
+  "id": "root",
+  "requirements": "The core contributions of 'Speculative Actions: A Lossless Framework for Faster Agentic Systems' have been reproduced: the speculative actions framework of Section 2 and Algorithm 1, its instantiation in the three lossless environments (chess on TextArena, e-commerce on tau-bench retail, and multi-hop web search on HotpotQA), the lossy OS hyperparameter tuning extension, and the cost-latency analysis with its empirical validation.",
+  "weight": 1,
+  "sub_tasks": [
+    {
+      "id": "framework-core",
+      "requirements": "The core speculative actions framework of Section 2 has been implemented: agent steps are abstracted as API calls, Algorithm 1 (k-way parallel next-call speculation) is realized with the Actor and Speculator roles, a pending-action cache supports cache-hit reuse, and the losslessness guarantees (semantic guards, safety envelopes, repair paths) hold relative to strictly sequential execution.",
+      "weight": 6,
+      "sub_tasks": [
+        {
+          "id": "api-call-abstraction",
+          "requirements": "The agentic system is modeled as an MDP over (s_t, a_t) in which every action is abstracted as an API call, as specified in Section 2.",
+          "weight": 3,
+          "sub_tasks": [
+            {
+              "id": "mdp-state-action-model",
+              "requirements": "The agentic system is represented as a Markov Decision Process over (s_t, a_t), where a concrete state object s_t and an action object a_t exist at every step t of an episode and are carried through the loop as first-class values.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "policy-emits-api-specifier",
+              "requirements": "The policy pi maps the current state s_t to a structured API call specifier (h_t, q_t), where h_t names the target API to invoke and q_t holds its associated parameters. The two components are separately addressable rather than being fused into a single opaque prompt or string.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "transition-function-callable-on-speculation",
+              "requirements": "A transition function f computing s_{t+1} = f(s_t, a_t) is implemented so that it accepts a speculated action a-hat_t on the same footing as a realized action, which is what allows a hypothetical next state to be produced without committing to it.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "action-type-generality",
+              "requirements": "The action abstraction admits multiple realizations of an API call as described in Section 2 (LLM invocations, internal or external tool and MCP server calls, and human-as-an-API responses). At least two distinct realization types are instantiated against the same interface, demonstrating that the abstraction is not specialized to a single call type.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "async-future-and-cache",
+          "requirements": "Asynchronous invocation with futures and the pending-action cache C: (h, q) -> a-bar are implemented, enabling cache-hit detection and reuse as specified in Algorithm 1 lines 3 to 8.",
+          "weight": 3,
+          "sub_tasks": [
+            {
+              "id": "async-future-abstraction",
+              "requirements": "The asynchronous invocation a-bar_t <- h_t(q_t) is implemented so that issuing an API call returns a pending action (future) immediately without blocking the caller, allowing the enclosing loop to continue executing while the call is in flight.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "await-primitive",
+              "requirements": "An await primitive a_t <- await(a-bar_t) is implemented that blocks until the pending action resolves and returns its value, and that returns immediately with the stored result when the pending action has already resolved, without re-issuing the call.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "pending-action-cache",
+              "requirements": "A cache C mapping an API call specifier (h, q) to its corresponding pending action is implemented and persists across steps within an episode, so that a call pre-launched at step t remains retrievable at step t+1.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "cache-hit-skips-invocation",
+              "requirements": "When the policy's current call (h_t, q_t) is found in the cache C, the system takes the cache-hit path of Algorithm 1 lines 3 to 7: it retrieves the pending action from C, awaits it instead of issuing a fresh request, applies the transition, and continues to the next step without launching a new speculation window for that step.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "cache-miss-issues-real-request",
+              "requirements": "When (h_t, q_t) is not present in the cache, the system falls through to Algorithm 1 line 9 and issues the real request to the Actor, obtaining a pending action a-bar_t.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "actor-speculator-roles",
+          "requirements": "The two roles introduced in Section 2, Actor and Speculator, are instantiated as distinct, configurable components of the environment loop.",
+          "weight": 2,
+          "sub_tasks": [
+            {
+              "id": "actor-role",
+              "requirements": "An Actor component is implemented as the authoritative but slow executor whose output materializes the ground truth for correctness and side effects. The Actor is configurable so that different backends (a powerful LLM, an external API, or the environment's own response) can be substituted without changing the loop.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "speculator-role",
+              "requirements": "A Speculator component is implemented as an inexpensive, low-latency predictor of the next environment step. The Speculator is configurable so that a smaller LLM, the same LLM under a reduced prompt or reasoning budget, or a domain heuristic can be substituted without changing the loop.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "roles-run-in-parallel",
+              "requirements": "The Actor request and the Speculator request are dispatched concurrently rather than sequentially, as annotated in Algorithm 1 line 10. The real request is issued before the Speculator's output is awaited, so that the Speculator's latency is overlapped with the Actor's rather than added to it.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "algorithm1-loop",
+          "requirements": "The speculation window of Algorithm 1 (lines 10 to 18) is implemented: the Speculator emits k candidate responses, each candidate is rolled out one step to derive an implied next call, each implied call is pre-launched non-blockingly and cached, and the Actor's true response is then awaited and applied.",
+          "weight": 4,
+          "sub_tasks": [
+            {
+              "id": "speculator-emits-k-candidates",
+              "requirements": "The Speculator produces a set of k candidate current-step responses {a-hat_t^(i)} for i in 1..k in a single speculation window, where k is a configurable speculation width, consistent with Algorithm 1 line 10.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "speculative-rollout-per-guess",
+              "requirements": "For each candidate response a-hat_t^(i), a one-step speculative rollout computes the hypothetical next state s-hat_{t+1}^(i) = f(s_t, a-hat_t^(i)), consistent with Algorithm 1 line 12.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "implied-next-call-from-rollout",
+              "requirements": "For each hypothetical next state s-hat_{t+1}^(i), the policy is applied to derive the implied next API call (h-hat_{t+1}^(i), q-hat_{t+1}^(i)) = pi(s-hat_{t+1}^(i)), consistent with Algorithm 1 line 13.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "prelaunch-nonblocking",
+              "requirements": "Each implied next call is pre-launched as an asynchronous invocation that returns a pending action, and the pre-launch loop does not block on any of these calls, consistent with Algorithm 1 line 14. All k pre-launched calls are therefore in flight concurrently.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "cache-speculative-pending",
+              "requirements": "Each pre-launched speculative pending action is stored in the cache C keyed by its own implied specifier (h-hat_{t+1}^(i), q-hat_{t+1}^(i)), consistent with Algorithm 1 line 15, so that it becomes retrievable if that call is realized at the next step.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "speculative-branch-deduplication",
+              "requirements": "Duplicate speculative branches are detected and collapsed: when two or more of the k candidate responses imply the same (h, q) specifier, the call is pre-launched only once and the redundant speculation processes are terminated rather than run in parallel, consistent with the note in Appendix C.1 that duplicated speculations are killed and that the effective number of distinct actions k-tilde may be smaller than k.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "await-actor-then-transition",
+              "requirements": "After the pre-launch loop completes, the system awaits the Actor's resolved response a_t and applies s_{t+1} = f(s_t, a_t) using the true action rather than any speculated action, consistent with Algorithm 1 lines 17 to 18.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "losslessness-guarantees",
+          "requirements": "Losslessness relative to the environment's baseline semantics is enforced through the three mechanisms named in Section 2: semantic guards, safety envelopes, and repair paths.",
+          "weight": 4,
+          "sub_tasks": [
+            {
+              "id": "semantic-guard-equivalence-check",
+              "requirements": "A semantic guard is implemented in which the Actor's realized transition is compared against the speculative transition before any speculative branch is committed. The comparison establishes equivalence of the resulting state transition rather than mere textual similarity of the responses.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "commit-only-on-match",
+              "requirements": "A speculative branch is committed only when the guard confirms a match. Committing consumes the already-resolved pre-launched result instead of re-issuing the call, so that no additional latency is incurred for that step.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "fallback-on-mismatch",
+              "requirements": "When no speculative branch matches, all speculative branches are discarded and execution proceeds along the ordinary sequential path, producing the same result the non-speculative agent would have produced.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "safety-envelope-restriction",
+              "requirements": "A safety envelope restricts which calls may be speculatively pre-launched, admitting only calls that are idempotent, reversible, or sandboxed. Calls outside the envelope are excluded from pre-launching rather than issued speculatively.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "repair-path-rollback",
+              "requirements": "A repair path is implemented that rolls back or issues compensating actions for any speculative side effect whose branch is rejected, using forking, snapshot restoration, or roll-forward repair as described in Section 2.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "trajectory-equivalence-test",
+              "requirements": "An executed test demonstrates losslessness empirically: for the same task instance and the same random seed or fixed inputs, the trajectory produced with speculation enabled is identical to the trajectory produced with speculation disabled. The comparison covers the full realized action sequence, not only the final outcome.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "assumption1-accuracy",
+          "requirements": "Assumption 1 is operationalized and measured: the Speculator's guess a-hat_t implies a next call (h_{t+1}, q_{t+1}) = pi(f(s_t, a-hat_t)) that matches the true next call with probability p > 0, and this probability is estimated empirically.",
+          "weight": 3,
+          "sub_tasks": [
+            {
+              "id": "hit-definition-via-implied-next-call",
+              "requirements": "A hit is defined and computed exactly as in Assumption 1: the implied next call derived from the speculated response, pi(f(s_t, a-hat_t)), is compared against the true next call determined after the Actor resolves. The hit criterion is evaluated on the implied next API call rather than on a surface comparison of the speculated response text.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "per-step-hit-logging",
+              "requirements": "For every speculation window, a binary hit or miss outcome is written to persistent storage (for example a CSV or JSONL log) together with the identifiers needed to aggregate it later, so that the empirical accuracy can be recomputed without re-running any episode.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Logging, Analysis & Presentation"
+            },
+            {
+              "id": "p-estimated-per-environment",
+              "requirements": "The empirical speculation accuracy p is estimated as the fraction of speculation windows resulting in a hit, and is reported separately for each evaluated environment. The estimate is strictly positive in every environment, confirming that Assumption 1 holds in practice.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "assumption2-concurrency",
+          "requirements": "Assumption 2 is enforced: multiple API calls are launched concurrently, and pre-launched calls that do not correspond to the realized trajectory leave no externally visible side effects.",
+          "weight": 3,
+          "sub_tasks": [
+            {
+              "id": "concurrent-launch-mechanism",
+              "requirements": "A concurrency mechanism (threads, processes, or an async event loop) allows at least k + 1 API calls to be in flight simultaneously, so that the Actor call and all k speculative pre-launches overlap in wall-clock time rather than serializing.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "unrealized-branch-termination",
+              "requirements": "Pending actions belonging to branches that are not committed are explicitly cancelled or terminated once validation resolves, so that abandoned speculative work does not continue to consume resources or to mutate state.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "no-visible-side-effects-verification",
+              "requirements": "An executed check confirms that discarding unrealized speculative branches leaves the environment state unchanged: after a step in which at least one speculation was rejected, the observable environment state matches the state that sequential execution would have produced.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        }
+      ],
+      "task_category": null,
+      "finegrained_task_category": null
+    },
+    {
+      "id": "chess-environment",
+      "requirements": "The turn-based gameplay environment of Section 3.1 has been implemented on top of TextArena and evaluated, reproducing the four-phase speculative pipeline, the GPT-5 Actor and Speculator configuration, and the prediction accuracy and time saved results of Figure 2.",
+      "weight": 4,
+      "sub_tasks": [
+        {
+          "id": "chess-textarena-setup",
+          "requirements": "The chess environment is built on TextArena (Guertler et al., 2025), which is installed and configured to run two-player chess games between LLM-driven agents through its standardized gameplay interface. A game between two agents runs end to end and produces a legal move sequence.",
+          "weight": 2,
+          "sub_tasks": [],
+          "task_category": "Code Development",
+          "finegrained_task_category": "Environment & Infrastructure Setup"
+        },
+        {
+          "id": "chess-speculative-pipeline",
+          "requirements": "The speculative chess pipeline of Section 3.1.1 is implemented as four phases (prediction, parallel computation, validation, and commit or restart) executed by the out-of-turn player Q while the in-turn player P deliberates.",
+          "weight": 5,
+          "sub_tasks": [
+            {
+              "id": "chess-inturn-actor-call",
+              "requirements": "The in-turn player P receives the board state s_t and issues an API call h_t with parameter q_t = (s_t, prompt) that returns the next move a_t = h(q_t). This is the high-latency deep-reasoning call whose latency the framework aims to overlap.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "chess-prediction-phase",
+              "requirements": "In the prediction phase, the Speculator of the out-of-turn player Q also receives the board state s_t and issues its own API call h-hat_t using a prompt optimized for speed rather than depth, returning the top-k predicted moves for the opponent.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "chess-topk-confidence-ordering",
+              "requirements": "The k predicted moves returned by the Speculator are ordered by confidence, so that the ordering a-hat_t^(1) through a-hat_t^(k) reflects decreasing predicted likelihood as described in Section 3.1.1.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "chess-parallel-computation-phase",
+              "requirements": "In the parallel computation phase, for each predicted opponent move a-hat_t^(i) the out-of-turn player Q immediately applies s-hat_{t+1}^(i) = f(s_t, a-hat_t^(i)) and launches its own next-move analysis a-hat_{t+1}^(i) = h_{t+1}(s-hat_{t+1}^(i), prompt). All k analyses are launched concurrently while P is still deliberating.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "chess-validation-phase",
+              "requirements": "In the validation phase, once the in-turn player P returns its actual move a_t, the system immediately checks whether a_t matches any of the predicted moves a-hat_t^(1) through a-hat_t^(k).",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "chess-commit-phase",
+              "requirements": "On a match, the corresponding speculative branch is committed and the game advances directly to s_{t+1} = f(s_t, a_t) using the already-computed analysis, and the remaining speculative threads are terminated rather than left running.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "chess-restart-phase",
+              "requirements": "On no match, all speculative branches are discarded and player Q falls back to its regular move computation a_{t+1} = h_{t+1}(f(s_t, a_t), prompt) starting from the true board state.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "chess-lossless-trajectory-preserved",
+              "requirements": "The pipeline is verified to be lossless in the sense stated in Section 3.1.1: the final move-by-move game trajectory produced with speculation enabled is identical to the trajectory produced by non-speculative play under the same conditions, with time saved only through parallelized reasoning.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "chess-agent-config",
+          "requirements": "The agent configuration of Section 3.1.1 is implemented, in which Actor and Speculator share the same underlying model but differ in reasoning effort and system prompt.",
+          "weight": 3,
+          "sub_tasks": [
+            {
+              "id": "chess-actor-gpt5-high-effort",
+              "requirements": "The Actor is instantiated with GPT-5 configured for high reasoning effort, producing the deep and extensive analysis that gives rise to the high per-move latency.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "chess-speculator-gpt5-low-effort",
+              "requirements": "The Speculator is instantiated with GPT-5 configured for low reasoning effort, so that speculation completes substantially faster than the Actor's call.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "chess-speculator-rapid-prediction-prompt",
+              "requirements": "The Speculator uses a specialized system prompt designed for rapid move prediction rather than exhaustive analysis, and this prompt is distinct from the reasoning-eliciting prompt given to the Actor.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "chess-same-model-both-roles",
+              "requirements": "Both roles are instantiated from the same underlying model family, differing only in reasoning effort and prompt, reflecting the design finding reported in Section 3.1.1 that this configuration maximizes prediction accuracy while keeping speculation fast.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Experimental Setup"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "chess-metrics",
+          "requirements": "The two evaluation metrics defined in Section 3.1.2 are implemented and logged: prediction accuracy and time saved.",
+          "weight": 3,
+          "sub_tasks": [
+            {
+              "id": "chess-prediction-accuracy-metric",
+              "requirements": "Prediction accuracy is computed as the fraction of rounds in which any of the k speculative predictions matches the actual move played, so that a round counts as a hit if at least one branch is correct.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "chess-time-saved-metric",
+              "requirements": "Time saved is computed as (T_seq - T_s) / T_seq, where T_s is the wall-clock execution time of the speculative run and T_seq is the wall-clock execution time of sequential execution over the same number of steps.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "chess-sequential-baseline-timing",
+              "requirements": "The sequential reference time T_seq is obtained from an actual non-speculative execution of the same game configuration rather than from an analytic estimate, so that the reported time saved is a measured speedup against a real baseline.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "chess-per-step-metric-logging",
+              "requirements": "Both metrics are logged per game step and per run, tagged with the speculation width k, so that per-k averages and across-run variability can be recomputed from the logs.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Logging, Analysis & Presentation"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "chess-experiment-execution",
+          "requirements": "The chess speculative pipeline is executed for 30 steps per game across 5 runs for each speculation width k in {1, 2, 3}, matching the experimental protocol stated in the Figure 2 caption ('across 5 runs at 30 steps').",
+          "weight": 3,
+          "sub_tasks": [],
+          "task_category": "Code Execution",
+          "finegrained_task_category": "Experimental Setup"
+        },
+        {
+          "id": "chess-figure2-results",
+          "requirements": "Figure 2 is reproduced, reporting speculative accuracy and time saved for 1, 2, and 3 predictions over 30 steps and 5 runs.",
+          "weight": 5,
+          "sub_tasks": [
+            {
+              "id": "chess-fig2-plot",
+              "requirements": "A grouped bar chart is generated with the number of speculative predictions (1, 2, 3) on the x-axis and percentage on the y-axis, showing two series, speculative accuracy and time saved, with error bars reflecting variability across the 5 runs, matching the layout of Figure 2.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Logging, Analysis & Presentation"
+            },
+            {
+              "id": "chess-acc-k1",
+              "requirements": "The measured speculative accuracy with 1 prediction is approximately 31.3%, matching the value labeled in Figure 2.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "chess-acc-k2",
+              "requirements": "The measured speculative accuracy with 2 predictions is approximately 41.3%, matching the value labeled in Figure 2.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "chess-acc-k3",
+              "requirements": "The measured speculative accuracy with 3 predictions is approximately 54.7%, matching the value labeled in Figure 2 and the headline figure of up to 55% next-action prediction accuracy quoted in the abstract.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "chess-time-k1",
+              "requirements": "The measured time saved with 1 prediction is approximately 11.8%, matching the value labeled in Figure 2.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "chess-time-k2",
+              "requirements": "The measured time saved with 2 predictions is approximately 15.0%, matching the value labeled in Figure 2.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "chess-time-k3",
+              "requirements": "The measured time saved with 3 predictions is approximately 19.5%, matching the value labeled in Figure 2 and the roughly 20% end-to-end speedup quoted in Section 1.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "chess-monotonic-in-k",
+              "requirements": "Both reported quantities increase monotonically with the number of speculative predictions, so that accuracy and time saved are each strictly larger at k = 2 than at k = 1 and strictly larger at k = 3 than at k = 2, supporting the claim in Section 3.1.2 that more predictions improve time savings and accuracy.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "chess-time-saved-below-accuracy",
+              "requirements": "At every speculation width the measured time saved is substantially smaller than the corresponding prediction accuracy, reproducing the gap visible in Figure 2 between the two series and consistent with Proposition 1, under which a correct guess converts into at most a fraction of a step of saved latency.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "chess-variance-analysis",
+          "requirements": "The variability visible in the Figure 2 error bars is reproduced and attributed to the two sources identified in Section 3.2's opening discussion of randomness in gameplay.",
+          "weight": 2,
+          "sub_tasks": [
+            {
+              "id": "chess-variance-nonzero",
+              "requirements": "The reproduced results exhibit non-negligible variance across the 5 runs, shown as error bars on both the accuracy and time saved series, rather than reporting point estimates from a single run.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "chess-variance-position-complexity",
+              "requirements": "The analysis attributes part of the observed variance to position complexity: even when a prediction is correct, little acceleration is realized if the resulting position is trivial, while large gains occur only when predictions lead to positions requiring deep analysis.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "chess-variance-api-latency",
+              "requirements": "The analysis attributes the remaining variance to the inherent stochasticity of API latency, noting that backend load fluctuations cause the same API call to take different amounts of time across runs, so measured latency reductions are not perfectly reproducible.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        }
+      ],
+      "task_category": null,
+      "finegrained_task_category": null
+    },
+    {
+      "id": "ecommerce-environment",
+      "requirements": "The e-commerce environment of Section 3.2 has been implemented on the tau-bench retail domain and evaluated, reproducing the two-stage Speculator (user query then API calls), the single-model and multi-model Speculator configurations, the API prediction accuracy results of Figure 3, and the accuracy against cost trade-offs of Figure 8.",
+      "weight": 4,
+      "sub_tasks": [
+        {
+          "id": "ecommerce-taubench-setup",
+          "requirements": "The tau-bench retail environment (Yao et al., 2024) is installed and configured as described in Section 3.2 and Appendix B.1.",
+          "weight": 2,
+          "sub_tasks": [
+            {
+              "id": "taubench-retail-runnable",
+              "requirements": "The retail domain of tau-bench is installed and runs end to end, supporting dynamic task-oriented dialogue between a simulated user and an API-augmented agent backed by the domain's structured database.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Environment & Infrastructure Setup"
+            },
+            {
+              "id": "taubench-api-inventory",
+              "requirements": "The retail domain exposes its 15 domain APIs, comprising 7 write APIs and 8 read-only APIs, as stated in Appendix B.1, and the read-only subset is identifiable so that the safety envelope can distinguish reversible from irreversible calls.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Environment & Infrastructure Setup"
+            },
+            {
+              "id": "taubench-115-tasks",
+              "requirements": "The 115 retail tasks defined by the benchmark are available and used as the evaluation set, covering operations such as cancelling or modifying pending orders, initiating returns or exchanges, and providing product and order information.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "taubench-user-simulator",
+              "requirements": "The language-model user simulator is configured and drives the dialogue, producing the ground-truth user utterance at each turn that the Speculator must anticipate and against which speculation is later validated.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Environment & Infrastructure Setup"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "ecommerce-state-definition",
+          "requirements": "The state s_t is defined as the conversation history up to turn t and is shared by both roles, as specified in Section 3.2.1.",
+          "weight": 2,
+          "sub_tasks": [
+            {
+              "id": "ecommerce-state-is-conversation-history",
+              "requirements": "The state s_t is implemented as the conversation history up to turn t, accumulating the prior user utterances and agent responses in order from the start of the episode.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "ecommerce-state-includes-tool-results",
+              "requirements": "The results of API calls executed earlier in the episode are appended to the conversation history and are therefore part of s_t, so that later predictions are conditioned on what previous tool calls returned.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "ecommerce-state-shared-by-both-roles",
+              "requirements": "The same assembled state s_t is used as the conditioning context for both the Actor and the Speculator at each turn, rather than the two roles maintaining divergent histories.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "ecommerce-two-stage-speculation",
+          "requirements": "The two-stage Speculator of Section 3.2.1 is implemented: it first predicts the user's next query and then, conditioned on that prediction, predicts the API calls and parameters needed to serve it.",
+          "weight": 5,
+          "sub_tasks": [
+            {
+              "id": "ecommerce-user-query-prediction",
+              "requirements": "The first prediction stage is implemented: conditioned on the current state s_t, the Speculator predicts the user's next query a-hat_t before the user simulator has produced it. This predicted utterance is retained and used to condition the second stage.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "ecommerce-api-target-prediction",
+              "requirements": "The second stage predicts the target API names h-hat_{t+1}^(i) for i in 1..k, conditioned jointly on the state s_t and the predicted user query a-hat_t. The predicted targets are drawn from the retail domain's available API set.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "ecommerce-api-parameter-prediction",
+              "requirements": "The second stage also predicts the parameters q-hat_{t+1}^(i) accompanying each predicted API call, producing complete call specifiers that conform to the schema of the corresponding target API and are directly executable.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "ecommerce-predicted-k",
+              "requirements": "Because the number of API calls required per turn is not fixed in the retail domain, the Speculator predicts k itself: its second-stage output is a variable-length list whose length is determined per turn rather than fixed a priori, and the parser correctly recovers both k and the k call specifiers.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "ecommerce-parallel-prelaunch",
+              "requirements": "All k predicted API calls are pre-launched in parallel immediately after the second prediction stage completes and are stored in the cache, so that their results may already be available when the real user query arrives.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "ecommerce-validation",
+          "requirements": "The runtime validation described in Section 3.2.1 is implemented, in which the Actor validates speculative API calls once the user simulator reveals the ground-truth utterance.",
+          "weight": 3,
+          "sub_tasks": [
+            {
+              "id": "ecommerce-groundtruth-utterance-trigger",
+              "requirements": "Validation is triggered at the moment the user simulator reveals the ground-truth utterance for the turn, at which point the true set of API calls required to resolve the query is determined by the Actor and compared against the pre-launched speculative calls.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "ecommerce-commit-correct",
+              "requirements": "Speculative API calls that match a required ground-truth call are committed immediately, with the pre-launched result reused directly so that the latency of that call is eliminated for the turn.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "ecommerce-discard-incorrect",
+              "requirements": "Speculative API calls that do not match any required ground-truth call are discarded without affecting correctness, and any unmatched ground-truth calls are executed normally, leaving the observable conversation state identical to sequential execution.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "ecommerce-speculator-configs",
+          "requirements": "The Speculator configurations of Section 3.2.1 are implemented, spanning single-model variants at three reasoning-capability tiers and multi-model variants in which comparable models run in parallel.",
+          "weight": 4,
+          "sub_tasks": [
+            {
+              "id": "ecommerce-gpt5-family-tiers",
+              "requirements": "The GPT-5 family single-model Speculators are implemented across three reasoning capability tiers using gpt-5-nano, gpt-5-mini, and gpt-5, corresponding to the low, medium, and high positions on the x-axis of Figure 3.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "ecommerce-gemini-budget-tiers",
+              "requirements": "The Gemini single-model Speculator is implemented with gemini-2.5-flash evaluated under the three reasoning budgets of 1024, 2048, and 4096 tokens, corresponding to the low, medium, and high positions on the x-axis of Figure 3.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "ecommerce-multimodel-pairings",
+              "requirements": "The multi-model Speculator configurations pair comparable models at matched capability tiers, including at minimum gpt-5-nano with the low-budget Gemini and gpt-5-mini with the medium-budget Gemini, as named in Section 3.2.1.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "ecommerce-multimodel-parallel-execution",
+              "requirements": "In a multi-model configuration the participating Speculator models are invoked in parallel rather than sequentially, so that the wall-clock speculation latency of the ensemble is bounded by the slowest member rather than by their sum.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "ecommerce-multimodel-shared-pool",
+              "requirements": "The outputs of the participating Speculator models are aggregated into a single shared pool of candidate speculative actions from which pre-launching is performed, rather than each model maintaining an independent branch set.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "ecommerce-accuracy-metric",
+          "requirements": "The evaluation metric of Section 3.2.1 is implemented as APIs prediction accuracy: the fraction of speculative API calls that match the ground-truth APIs required to resolve the user's query. The metric is logged per turn and aggregated across evaluated episodes.",
+          "weight": 2,
+          "sub_tasks": [],
+          "task_category": "Code Development",
+          "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+        },
+        {
+          "id": "ecommerce-experiment-execution",
+          "requirements": "The e-commerce speculative pipeline is executed on the tau-bench retail domain for every evaluated Speculator configuration, covering the GPT-5 family tiers, the Gemini reasoning budget tiers, and the multi-model pairings, producing the nine accuracy measurements shown in Figure 3.",
+          "weight": 2,
+          "sub_tasks": [],
+          "task_category": "Code Execution",
+          "finegrained_task_category": "Experimental Setup"
+        },
+        {
+          "id": "ecommerce-figure3-results",
+          "requirements": "Figure 3 is reproduced, reporting APIs prediction accuracy for three Speculator families across three reasoning capability tiers.",
+          "weight": 5,
+          "sub_tasks": [
+            {
+              "id": "ecom-fig3-plot",
+              "requirements": "A grouped bar chart is generated with reasoning capability (low, medium, high) on the x-axis and APIs prediction accuracy in percent on the y-axis, showing three series labeled Gemini-2.5-Flash, GPT-5 family, and Multi Agent, matching the layout of Figure 3.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Logging, Analysis & Presentation"
+            },
+            {
+              "id": "ecom-fig3-gemini-low",
+              "requirements": "The Gemini-2.5-Flash Speculator at the low reasoning capability tier achieves an APIs prediction accuracy of approximately 22.8%, matching the value labeled in Figure 3.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "ecom-fig3-gemini-medium",
+              "requirements": "The Gemini-2.5-Flash Speculator at the medium reasoning capability tier achieves an APIs prediction accuracy of approximately 23.4%, matching the value labeled in Figure 3.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "ecom-fig3-gemini-high",
+              "requirements": "The Gemini-2.5-Flash Speculator at the high reasoning capability tier achieves an APIs prediction accuracy of approximately 23.3%, matching the value labeled in Figure 3.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "ecom-fig3-gpt5-low",
+              "requirements": "The GPT-5 family Speculator at the low reasoning capability tier achieves an APIs prediction accuracy of approximately 24.1%, matching the value labeled in Figure 3.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "ecom-fig3-gpt5-medium",
+              "requirements": "The GPT-5 family Speculator at the medium reasoning capability tier achieves an APIs prediction accuracy of approximately 27.2%, matching the value labeled in Figure 3.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "ecom-fig3-gpt5-high",
+              "requirements": "The GPT-5 family Speculator at the high reasoning capability tier achieves an APIs prediction accuracy of approximately 34.3%, matching the value labeled in Figure 3.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "ecom-fig3-multi-low",
+              "requirements": "The Multi Agent Speculator at the low reasoning capability tier achieves an APIs prediction accuracy of approximately 32.5%, matching the value labeled in Figure 3.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "ecom-fig3-multi-medium",
+              "requirements": "The Multi Agent Speculator at the medium reasoning capability tier achieves an APIs prediction accuracy of approximately 34.9%, matching the value labeled in Figure 3.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "ecom-fig3-multi-high",
+              "requirements": "The Multi Agent Speculator at the high reasoning capability tier achieves an APIs prediction accuracy of approximately 38.5%, matching the value labeled in Figure 3.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "ecom-fig3-overall-range",
+              "requirements": "Across all nine evaluated configurations the APIs prediction accuracy falls between roughly 22% and 38%, reproducing the range stated in Section 3.2.2.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "ecom-fig3-multimodel-dominance",
+              "requirements": "The Multi Agent configuration outperforms both single-model series at every reasoning capability tier, reproducing the finding in Section 3.2.2 that the multi-agent configuration consistently outperforms single-model speculation.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "ecom-fig3-accuracy-improves-with-capability",
+              "requirements": "Accuracy improves as Speculator capability increases within the GPT-5 family and within the Multi Agent configuration, reproducing the finding in Section 3.2.2 that accuracy improves with stronger models.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "ecommerce-latency-headroom",
+          "requirements": "The latency argument of Section 3.2.2, which compares speculation time against human typing time, is reproduced.",
+          "weight": 3,
+          "sub_tasks": [
+            {
+              "id": "ecom-speculation-2-to-3-seconds",
+              "requirements": "Low-budget Speculator models are measured to complete a speculation in roughly 2 to 3 seconds, consistent with Section 3.2.2.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "ecom-user-typing-baseline",
+              "requirements": "The comparison baseline for user typing time is computed as roughly 30 seconds, derived from an assumed typing rate of 40 words per minute as stated in Section 3.2.2, and is used as the threshold against which speculation latency is judged.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "ecom-one-third-of-turns",
+              "requirements": "The results support the conclusion that in roughly one third of turns the agent can respond faster than sequential execution because the required API calls were already speculated and executed, consistent with Section 3.2.2.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "ecommerce-figure8-cost-tradeoffs",
+          "requirements": "Figure 8 of Appendix C.2.1 is reproduced, plotting prediction accuracy against the Speculator's time cost and against its monetary cost.",
+          "weight": 3,
+          "sub_tasks": [
+            {
+              "id": "fig8a-accuracy-vs-time-cost",
+              "requirements": "Figure 8(a) is reproduced as a plot of APIs prediction accuracy against time cost per turn in seconds on a logarithmic x-axis, with one series per Speculator family (Gemini-2.5-Flash, GPT-5 family, Multi Agent) and a dashed vertical line marking the average user typing time. The plotted time cost is composed of time to first token plus output response time, as specified in Appendix C.2.1.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Logging, Analysis & Presentation"
+            },
+            {
+              "id": "fig8b-accuracy-vs-price-cost",
+              "requirements": "Figure 8(b) is reproduced as a plot of APIs prediction accuracy against monetary price cost per turn in USD, with the same three Speculator family series, reflecting the monetary cost of speculative execution.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Logging, Analysis & Presentation"
+            },
+            {
+              "id": "fig8-multiagent-34pct-at-typing-threshold",
+              "requirements": "At the user typing time threshold marked in Figure 8(a), the multi-agent configuration attains approximately 34% prediction accuracy, reproducing the value stated in Appendix C.2.1.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        }
+      ],
+      "task_category": null,
+      "finegrained_task_category": null
+    },
+    {
+      "id": "hotpotqa-environment",
+      "requirements": "The multi-hop web search environment of Section 3.3 has been implemented on HotpotQA using a ReAct scaffold and evaluated, reproducing the response-level Speculator, the strict-match evaluation criterion, and the top-1 and top-3 prediction accuracies of Figure 4.",
+      "weight": 3,
+      "sub_tasks": [
+        {
+          "id": "hotpotqa-setup",
+          "requirements": "The HotpotQA environment is constructed on top of ReAct with Wikipedia retrieval as described in Section 3.3 and Appendix B.2.1.",
+          "weight": 2,
+          "sub_tasks": [
+            {
+              "id": "hotpotqa-react-scaffold",
+              "requirements": "The framework is built on ReAct (Yao et al., 2023), which interleaves chain-of-thought reasoning with tool use, and the scaffold runs multi-hop question answering episodes end to end.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Environment & Infrastructure Setup"
+            },
+            {
+              "id": "hotpotqa-action-space",
+              "requirements": "The action space is restricted to the three ReAct API calls named in Appendix B.2.1, Search(), Lookup(), and Finish(), each taking a parameter q_t such as the entity string passed to Search().",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "hotpotqa-wikipedia-backend",
+              "requirements": "Search() and Lookup() are backed by Wikipedia API calls, so that the retrieval latency the framework aims to hide is real network round-trip latency rather than a simulated delay.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Environment & Infrastructure Setup"
+            },
+            {
+              "id": "hotpotqa-dataset-loaded",
+              "requirements": "The HotpotQA multi-hop question answering dataset (Yang et al., 2018) is loaded and a fixed evaluation subset of questions is selected and recorded, so that accuracies across Speculator models are computed over the same questions.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Data Processing & Preparation"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "hotpotqa-pipeline",
+          "requirements": "The HotpotQA speculative pipeline of Appendix B.2.1 is implemented, in which the Speculator predicts the API response rather than the action, and the Actor then reasons forward from each predicted response.",
+          "weight": 4,
+          "sub_tasks": [
+            {
+              "id": "hotpotqa-state-is-trace-history",
+              "requirements": "The state s_t is implemented as the entire history of reasoning traces and retrieved information accumulated so far in the episode, including all prior API responses.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "hotpotqa-actor-selects-call",
+              "requirements": "The Actor takes in the current state s_t, selects an API call h_t from {Search(), Lookup(), Finish()} together with its parameter q_t, and receives the response a_t returned by that call.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "hotpotqa-speculator-predicts-response",
+              "requirements": "The Speculator predicts the content of the API response a-hat_t^(i) for i in 1..k, that is, the likely Wikipedia content that the pending retrieval will return. This is the distinguishing feature of this environment relative to chess and e-commerce, where the Speculator predicts the action rather than the response.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "hotpotqa-predicted-next-states",
+              "requirements": "Each predicted response yields a predicted next state s-hat_{t+1}^(i) = f(s_t, a-hat_t^(i)) by appending the hypothesized retrieval result to the trace history.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "hotpotqa-actor-reasons-on-predicted-states",
+              "requirements": "For each predicted next state, the Actor generates reasoning traces and subsequently determines the next API decision (h-hat_{t+1}^(i), q-hat_{t+1}^(i)), so that reasoning proceeds on provisional information during the idle API waiting time instead of blocking on retrieval latency.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "hotpotqa-strict-match-evaluation",
+          "requirements": "The strict-match evaluation criterion of Appendix B.2.1 is implemented, under which a predicted next API call counts as correct only on exact agreement of both components.",
+          "weight": 4,
+          "sub_tasks": [
+            {
+              "id": "hotpotqa-strict-match-conjunction",
+              "requirements": "A predicted call is counted as correct only when both conditions hold simultaneously: the predicted target equals the true target, h-hat_{t+1} = h_{t+1}, and the predicted parameter equals the true parameter, q-hat_{t+1} = q_{t+1}. A prediction matching only one of the two components is counted as a mismatch.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "hotpotqa-no-normalization",
+              "requirements": "Parameter comparison is performed without any normalization or fuzzy matching, so that synonyms, paraphrases, differing word order, and other surface-form variants count as mismatches. No stemming, case folding, embedding similarity, or edit-distance thresholding is applied, consistent with the stringent criterion described in Appendix B.2.1.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "hotpotqa-per-step-hit-logging",
+              "requirements": "For each step of each evaluated question, a binary outcome is recorded that is 1 when at least one of the k predictions satisfies the strict-match criterion and 0 otherwise, and these outcomes are written to persistent storage keyed by question, step, Speculator model, and k.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Logging, Analysis & Presentation"
+            },
+            {
+              "id": "hotpotqa-topk-aggregation",
+              "requirements": "Top-k accuracy is computed from the stored per-step outcomes as the number of steps with a hit divided by the total number of steps evaluated, aggregated separately for each combination of Speculator model and k. The aggregation runs as a separable step that does not require re-executing episodes.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "hotpotqa-agent-configs",
+          "requirements": "The agent configuration of Figure 4 and Appendix B.2.1 is implemented: a fixed Actor, three Speculator models, and two speculation widths.",
+          "weight": 3,
+          "sub_tasks": [
+            {
+              "id": "hotpotqa-actor-gemini-flash",
+              "requirements": "The Actor is instantiated with gemini-2.5-flash and held fixed across all Speculator configurations, as stated in the caption of Figure 4, so that accuracy differences are attributable to the Speculator alone.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "hotpotqa-speculator-gpt5-nano",
+              "requirements": "GPT-5-nano is configured as a Speculator and used to predict Wikipedia responses in this environment, giving the weakest of the three evaluated predictors.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "hotpotqa-speculator-gpt41-nano",
+              "requirements": "GPT-4.1-nano is configured as a Speculator and used to predict Wikipedia responses in this environment, drawn from a different model generation than the other two predictors.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "hotpotqa-speculator-gemini-flash",
+              "requirements": "Gemini-2.5-flash is configured as a Speculator and used to predict Wikipedia responses in this environment, which makes this the one configuration where the Speculator and the Actor are the same model, differing only in role.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "hotpotqa-k-values-one-and-three",
+              "requirements": "Top-k prediction accuracy is measured at the two speculation widths used in this environment, k = 1 and k = 3, as stated in Appendix B.2.1 and shown by the two series of Figure 4. Intermediate widths are not part of this experiment.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Experimental Setup"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "hotpotqa-experiment-execution",
+          "requirements": "The HotpotQA speculative pipeline is executed for all three Speculator models at both speculation widths k = 1 and k = 3 over the selected evaluation questions, producing the six accuracy measurements reported in Figure 4.",
+          "weight": 3,
+          "sub_tasks": [],
+          "task_category": "Code Execution",
+          "finegrained_task_category": "Experimental Setup"
+        },
+        {
+          "id": "hotpotqa-figure4-results",
+          "requirements": "Figure 4 is reproduced, reporting top-1 and top-3 API call prediction accuracy for the three Speculator models with gemini-2.5-flash as the Actor.",
+          "weight": 5,
+          "sub_tasks": [
+            {
+              "id": "hotpotqa-fig4-plot",
+              "requirements": "A grouped bar chart is generated with the three Speculator models on the x-axis and accuracy on the y-axis, showing two series labeled top-3 accuracies and top-1 accuracies with error bars, matching the layout of Figure 4.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Logging, Analysis & Presentation"
+            },
+            {
+              "id": "hotpotqa-gpt5nano-top1",
+              "requirements": "The GPT-5-nano Speculator attains a top-1 prediction accuracy of approximately 15.08%, matching the value labeled in Figure 4.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "hotpotqa-gpt5nano-top3",
+              "requirements": "The GPT-5-nano Speculator attains a top-3 prediction accuracy of approximately 31.67%, matching the value labeled in Figure 4.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "hotpotqa-gpt41nano-top1",
+              "requirements": "The GPT-4.1-nano Speculator attains a top-1 prediction accuracy of approximately 18.75%, matching the value labeled in Figure 4.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "hotpotqa-gpt41nano-top3",
+              "requirements": "The GPT-4.1-nano Speculator attains a top-3 prediction accuracy of approximately 46.25%, matching the value labeled in Figure 4. This is the best result in the figure and the source of the claim in Section 3.3 that the Speculator predicts the ground truth API call up to 46% of the time with top-3 prediction.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "hotpotqa-gemini-top1",
+              "requirements": "The Gemini-2.5-flash Speculator attains a top-1 prediction accuracy of approximately 19.58%, matching the value labeled in Figure 4.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "hotpotqa-gemini-top3",
+              "requirements": "The Gemini-2.5-flash Speculator attains a top-3 prediction accuracy of approximately 38.33%, matching the value labeled in Figure 4.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "hotpotqa-top3-exceeds-top1-all-models",
+              "requirements": "For every one of the three Speculator models the top-3 accuracy substantially exceeds the top-1 accuracy, reproducing the finding of Section 3.3 that a modest increase in speculation width yields substantial accuracy gains.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "hotpotqa-model-pattern-analysis",
+          "requirements": "The counterintuitive model ordering reported in Appendix B.2.2 is reproduced and explained.",
+          "weight": 2,
+          "sub_tasks": [
+            {
+              "id": "hotpotqa-stronger-models-lower-strict-accuracy",
+              "requirements": "The results reproduce the observation that a stronger Speculator does not monotonically yield higher strict-match accuracy, so that the ranking of models by strict-match accuracy differs from their ranking by general capability.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "hotpotqa-phrasing-variation-explanation",
+              "requirements": "The analysis attributes this ordering to phrasing discrepancies penalized by strict matching: stronger models issue more diverse and context-specific queries while weaker models produce simpler and more predictable outputs. Concrete predicted and ground-truth query pairs are surfaced as evidence, of the kind given in Appendix B.2.2 where a query phrased as a list of Nobel laureates in physics in the 1970s and one phrased as a 1970s Nobel Prize physics winners list are counted as non-matching.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Logging, Analysis & Presentation"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        }
+      ],
+      "task_category": null,
+      "finegrained_task_category": null
+    },
+    {
+      "id": "os-tuning-environment",
+      "requirements": "The lossy OS hyperparameter tuning extension of Section 4 has been implemented, tuning the Linux CFS parameter min_granularity against the sysbench cpu workload with a last-write-wins speculative control loop, and evaluated to reproduce the convergence trajectories of Figure 5 (left), the p95 latency table of Figure 5 (right), the cumulative cost results of Table 2 and Figure 9, and the step-response experiment of Figure 7.",
+      "weight": 4,
+      "sub_tasks": [
+        {
+          "id": "os-environment-setup",
+          "requirements": "The tuning environment and workload described in Section 4.1 and Appendix B.3.1 are set up.",
+          "weight": 3,
+          "sub_tasks": [
+            {
+              "id": "os-cfs-parameter-interface",
+              "requirements": "A programmatic interface reads and writes the Linux CFS parameter min_granularity_ns (for example through /proc/sys/kernel/sched_min_granularity_ns or an equivalent sysctl path), and applying a proposed value takes effect on the live system as a near-instant operation without requiring a restart.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Environment & Infrastructure Setup"
+            },
+            {
+              "id": "os-parameter-search-range",
+              "requirements": "The agents are constrained to the search range specified in Appendix B.3.1, from 50,000 to 50,000,000 nanoseconds (0.05 ms to 50 ms), and the kernel default of 3 ms on Linux 5.15 is recorded as the untuned reference setting.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "os-sysbench-install",
+              "requirements": "The sysbench cpu benchmark (Kopytov, 2020) is installed and a test invocation of the cpu workload completes successfully, emitting performance metrics that can be consumed programmatically by the tuning loop.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Environment & Infrastructure Setup"
+            },
+            {
+              "id": "os-sysbench-workload-config",
+              "requirements": "The workload is configured as specified in Appendix B.3.1: sysbench cpu runs on 16 concurrent threads pinned to two CPU cores, and the benchmark reports its performance metrics every second so that the Speculator can act on fresh measurements at a one second cadence.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "os-metric-parsing",
+              "requirements": "A parsing module extracts the p95 latency from the raw sysbench output after each reporting interval and returns it as a scalar objective signal that the Actor and Speculator consume when selecting the next configuration.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Data Processing & Preparation"
+            },
+            {
+              "id": "os-hardware-documented",
+              "requirements": "The machine configuration used for the experiment is recorded, matching the dedicated setup described in Appendix B.3.1: a two-socket Intel Xeon Silver 4114 10-core system at 2.20 GHz with 192 GB DDR4 and NVMe storage, running Ubuntu 22.04 on Linux kernel 5.15. Recording the configuration is required because scheduler tuning results are hardware dependent and are not interpretable without it.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Environment & Infrastructure Setup"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "os-speculative-control-loop",
+          "requirements": "The speculative control loop of Section 4.1 is implemented, coupling a one second Speculator with a 10 to 15 second Actor under a last-write-wins commit rule.",
+          "weight": 5,
+          "sub_tasks": [
+            {
+              "id": "os-speculator-one-second-cadence",
+              "requirements": "The Speculator proposes a min_granularity update once per second using the latest performance metric, and each proposal is applied immediately to the live system as a provisional adjustment.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "os-actor-ten-to-fifteen-second-cadence",
+              "requirements": "The Actor responds on a slower cadence of every 10 to 15 seconds, reflecting its deeper deliberation, and runs concurrently with the Speculator rather than blocking it.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "os-actor-reads-compressed-chronology",
+              "requirements": "The Actor's input is a compressed chronology of the Speculator's recent measurement and action pairs accumulated during the Actor's deliberation window, rather than the raw verbose logs of every Speculator step.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "os-last-write-wins",
+              "requirements": "The last-write-wins commit rule is implemented: when the Actor's decision arrives it is applied immediately and simply overwrites whatever provisional value the Speculator has installed, with no rollback machinery and no validation gate. This is what makes the extension lossy rather than lossless.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "os-actor-resets-speculator-context",
+              "requirements": "On each Actor decision the Actor's state resets the Speculator's context, so that the Speculator resumes from the validated narrative and does not drift on the basis of its own unvalidated history, as specified in Section 4.1.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "os-context-management",
+          "requirements": "The history compression and dual-context strategy of Appendix B.3.1 is implemented, since Appendix C.2.2 attributes the cost behavior of the combined system to it.",
+          "weight": 2,
+          "sub_tasks": [
+            {
+              "id": "os-baselines-receive-full-history",
+              "requirements": "In the Actor-only and Speculator-only baselines the agent receives the full unsummarized history of all previous iterations, with no compression applied.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "os-actor-compressed-summary",
+              "requirements": "In the combined system the Actor's prompt contains a fully compressed summary of the actions taken during its deliberation window, with each Speculator action listed as a concise pair of the proposed parameter and the resulting measurement.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "os-speculator-hybrid-context",
+              "requirements": "In the combined system the Speculator receives a hybrid context consisting of the same compressed history from the last Actor cycle supplemented by the full verbose replies from its own most recent actions, so that it retains immediate detail for rapid reactive decisions.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "os-prompting",
+          "requirements": "The prompt structure of Appendix B.3.2 is implemented for both agents.",
+          "weight": 1,
+          "sub_tasks": [
+            {
+              "id": "os-shared-expert-system-prompt",
+              "requirements": "Both agents receive a shared system prompt establishing the CFS tuning expert role, the objective of minimizing p95 latency for a CPU-bound workload, the tunable parameter and its range, and a warning that the performance metrics may be noisy so that consistent trends across configurations should be sought.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "os-role-specific-prompt-branch",
+              "requirements": "The system prompt branches by role, telling the Actor that it provides thoughtful well-analyzed recommendations from accumulated results and telling the Speculator that it provides immediate intuitive recommendations for each window.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "os-structured-response-format",
+              "requirements": "Agent responses are constrained to the two-line format of Appendix B.3.2, an analysis line followed by a config line carrying a JSON object with the integer min_granularity_ns value, and the parser extracts the proposed value from that format.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "os-three-configurations",
+          "requirements": "The three systems compared in Section 4.1 are implemented and run: Actor-only, Speculator-only, and the combined Speculator-Actor system.",
+          "weight": 4,
+          "sub_tasks": [
+            {
+              "id": "os-actor-only-config",
+              "requirements": "The Actor-only configuration is implemented as a slow but deliberative tuner operating at the 10 to 15 second interval with no Speculator involvement, applying a configuration change only after the Actor completes its deliberation.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "os-speculator-only-config",
+              "requirements": "The Speculator-only configuration is implemented as a fast tuner operating at the one second interval with no Actor involvement, described in Section 4.1 as fast but not extensive in its reasoning.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "os-joint-config",
+              "requirements": "The combined Speculator-Actor configuration is implemented, using speculative updates between Actor decisions under the last-write-wins rule, and constitutes the proposed lossy system.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "os-three-config-execution",
+              "requirements": "All three configurations are executed against the sysbench cpu workload over a run long enough to observe Actor-only convergence, collecting the configuration trajectory, the p95 latency, and the cumulative token and cost counters needed to populate Figure 5, Table 2, and Figure 9.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Experimental Setup"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "os-metrics-logging",
+          "requirements": "The measurements required by Section 4.2 and Appendix C.2.2 are logged persistently and uniformly across the three configurations.",
+          "weight": 3,
+          "sub_tasks": [
+            {
+              "id": "os-trajectory-logging",
+              "requirements": "The applied min_granularity value is logged with its timestamp after every adjustment, tagged with the configuration identifier and with whether the write came from the Actor or the Speculator, so that the convergence trajectories of Figure 5 (left) can be reconstructed without re-running the experiment.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Logging, Analysis & Presentation"
+            },
+            {
+              "id": "os-p95-latency-logging",
+              "requirements": "The p95 latency reported by sysbench is logged with its timestamp and configuration identifier throughout each run, enabling both the steady-state comparisons and the windowed averages reported in Figure 5 (right).",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Logging, Analysis & Presentation"
+            },
+            {
+              "id": "os-cumulative-token-logging",
+              "requirements": "A cumulative token counter is maintained and logged with its timestamp for each configuration throughout the run, so that token consumption can be read off at any elapsed time mark, as required by the token columns of Table 2.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Logging, Analysis & Presentation"
+            },
+            {
+              "id": "os-cumulative-cost-logging",
+              "requirements": "A cumulative monetary cost counter, expressed in cents, is maintained and logged with its timestamp for each configuration throughout the run, as required by the cost columns of Table 2.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Logging, Analysis & Presentation"
+            },
+            {
+              "id": "os-joint-cost-decomposition",
+              "requirements": "For the combined system the counters are additionally attributed to the Speculator and the Actor separately in addition to the total, yielding the five distinct series that Figure 9 plots.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Logging, Analysis & Presentation"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "os-convergence-results",
+          "requirements": "The convergence comparison of Figure 5 (left) and Section 4.2 is reproduced.",
+          "weight": 4,
+          "sub_tasks": [
+            {
+              "id": "os-fig5-left-plot",
+              "requirements": "Figure 5 (left) is reproduced as a plot of min_granularity in milliseconds on a logarithmic y-axis against elapsed time in seconds, showing all three configurations together with a shaded optimal region and a dashed horizontal line marking the OS default value.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Logging, Analysis & Presentation"
+            },
+            {
+              "id": "os-joint-converges-fast",
+              "requirements": "The combined Speculator-Actor system reaches the optimal setting of 0.2 ms min_granularity within roughly 10 to 15 seconds, reproducing the result stated in Section 4.2.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "os-actor-only-converges-slowly",
+              "requirements": "The Actor-only baseline requires roughly 200 seconds to converge, reproducing the result stated in Section 4.2.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "os-actor-only-trapped-in-bad-regions",
+              "requirements": "The Actor-only trajectory remains trapped in highly suboptimal regions for extended periods, with latency exceeding 120 ms during those stretches, reproducing the observation in Section 4.2 that rapid speculative exploration helps the Actor avoid pathological configurations.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "os-speculator-only-worse-optimum",
+              "requirements": "The Speculator-only baseline stabilizes rapidly but at a worse configuration, converging to 0.55 ms min_granularity with 36.24 ms latency, reproducing the values stated in Section 4.2.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "os-joint-better-final-optimum",
+              "requirements": "The combined system converges to a better final operating point than Speculator-only, reaching 0.2 ms min_granularity with 30.26 ms latency, reproducing the values stated in Section 4.2 and supporting the claim that without the Actor's deeper reasoning the Speculator cannot escape local minima.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "os-p95-latency-table",
+          "requirements": "The p95 latency table shown in Figure 5 (right) is reproduced, reporting the average p95 latency over a 20 second tuning experiment for three system states.",
+          "weight": 3,
+          "sub_tasks": [
+            {
+              "id": "os-p95-measurement-protocol",
+              "requirements": "The reported p95 latency values are computed as averages over a 20 second tuning experiment measuring the recovery behavior described in Appendix B.3.3, rather than as the steady-state latency at the converged setting. The two quantities are kept distinct in the reproduction, since Section 4.2 separately reports a converged latency of 30.26 ms for the combined system.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "os-p95-untuned",
+              "requirements": "The untuned system exhibits an average p95 latency of approximately 102.97 ms, matching the value in the table of Figure 5 (right). This row establishes the degraded initial state and must be present in the reproduced table.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "os-p95-actor-only",
+              "requirements": "The Actor-only configuration exhibits an average p95 latency of approximately 54.00 ms, matching the value in the table of Figure 5 (right).",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "os-p95-joint",
+              "requirements": "The combined Actor plus Speculator configuration exhibits an average p95 latency of approximately 37.93 ms, matching the value in the table of Figure 5 (right) and supporting the claim in Section 4.2 that fast speculative updates provide immediate mitigation while the Actor deliberates.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "os-cost-results",
+          "requirements": "The cost analysis of Section 4.2 and Appendix C.2.2 is reproduced, covering Table 2 (also referenced as Table 3 in the main text) and Figure 9.",
+          "weight": 4,
+          "sub_tasks": [
+            {
+              "id": "os-cost-table-reproduced",
+              "requirements": "The cumulative token and cost table is reproduced with cost expressed in cents, reporting one column pair for each of Actor-only, Speculator-only, and the combined Actor plus Speculator total, and one row for the base prompt and for each of the elapsed time marks 13 s, 20 s, 30 s, 60 s, 120 s, and 200 s, matching the structure of Table 2.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Logging, Analysis & Presentation"
+            },
+            {
+              "id": "os-cost-convergence-marks-highlighted",
+              "requirements": "The convergence point of each configuration is identified in the reproduced table, at roughly 13 s for the combined system, 20 s for Speculator-only, and 200 s for Actor-only, matching the entries emphasized in Table 2.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Logging, Analysis & Presentation"
+            },
+            {
+              "id": "os-cost-joint-at-convergence",
+              "requirements": "The combined Speculator-Actor system converges in roughly 13 seconds having spent only about 0.17 cents, matching the value stated in Section 4.2 and the 13 s row of Table 2.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "os-cost-actor-only-at-convergence",
+              "requirements": "The Actor-only baseline converges at roughly 200 seconds having spent about 2.18 cents, matching the value stated in Section 4.2 and the 200 s row of Table 2.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "os-cost-speculator-only-at-convergence",
+              "requirements": "The Speculator-only baseline converges at roughly 20 seconds having spent about 0.34 cents, matching the 20 s row of Table 2.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "os-cost-and-latency-both-decrease",
+              "requirements": "The headline claim of Section 4.2 is reproduced: despite issuing additional speculative calls, the combined system incurs a lower total cost than Actor-only because it converges far sooner, so cost and latency both decrease rather than trading off against each other. This is the property that distinguishes the lossy setting from the lossless environments, where extra speculation always costs extra tokens.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "os-fig9-cumulative-plot",
+              "requirements": "Figure 9 is reproduced as two panels plotting cumulative cost in USD and cumulative tokens against elapsed time on logarithmic y-axes, with five series covering Speculator-only, Actor-only, and the Speculator, Actor, and total components of the combined system, and with vertical lines marking each system's observed convergence point.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Logging, Analysis & Presentation"
+            },
+            {
+              "id": "os-cost-attribution-to-speculator-calls",
+              "requirements": "The analysis reproduces the attribution given in Appendix C.2.2: because history compression keeps the Actor's prompt size roughly stable instead of growing linearly, the cost gap between Actor-only and the combined system is driven primarily by the number of Speculator calls rather than by growth in context size per call.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Logging, Analysis & Presentation"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "os-reaction-time-experiment",
+          "requirements": "The controlled step-response experiment of Appendix B.3.3 and Figure 7 is reproduced, isolating the reaction-time benefit of speculation from the search-quality benefit.",
+          "weight": 3,
+          "sub_tasks": [
+            {
+              "id": "os-perturbation-protocol",
+              "requirements": "The system is deliberately perturbed at time t0 by setting min_granularity to the highly suboptimal value of 10 ms, and recovery is then observed over a 20 second window.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "os-actor-only-replay-baseline",
+              "requirements": "The Actor-only comparison in this experiment is constructed by replaying only the actions proposed by the Actor from the full Actor-Speculator trace, rather than by running an independent Actor-only tuning session, so that the two arms differ only in whether speculative writes are applied.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "os-fig7-step-response-plot",
+              "requirements": "Figure 7 is reproduced as a plot of min_granularity in milliseconds on a logarithmic y-axis against time in seconds over a 20 second window, showing the Speculator plus Actor trace and the Actor-only trace together with annotations marking when the speculator response and the actor response arrive.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Logging, Analysis & Presentation"
+            },
+            {
+              "id": "os-joint-recovers-within-one-second",
+              "requirements": "The Actor-Speculator system reacts almost instantly, with the Speculator observing the degradation and applying a corrective action that returns the system to an efficient state in about one second, reproducing the result stated in Appendix B.3.3.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "os-actor-only-endures-degradation",
+              "requirements": "The Actor-only baseline is forced to endure the degraded setting for more than 10 seconds because it must wait for the slower Actor to complete its deliberation cycle before it can act, reproducing the result stated in Appendix B.3.3.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        }
+      ],
+      "task_category": null,
+      "finegrained_task_category": null
+    },
+    {
+      "id": "cost-latency-analysis",
+      "requirements": "The cost-latency analysis of Section 5 and Appendices A and C has been reproduced: the breadth-focused latency result (Proposition 1) and cost result (Theorem 4), the confidence-aware selective speculation result (Theorem 3 and Corollary 5) together with its empirical threshold policy in chess, the depth-focused result (Theorem 6), and the empirical Pareto curve of Figure 6.",
+      "weight": 4,
+      "sub_tasks": [
+        {
+          "id": "pk-definition",
+          "requirements": "The quantity p(k) = 1 - (1 - p)^k, the probability that at least one of k independent speculative branches is correct, is implemented as a callable function of the per-branch accuracy p and the width k, and is used as the shared governing quantity in both the latency and the cost expressions.",
+          "weight": 1,
+          "sub_tasks": [],
+          "task_category": "Code Development",
+          "finegrained_task_category": "Method Implementation"
+        },
+        {
+          "id": "proposition1-breadth-latency",
+          "requirements": "Proposition 1 and its Appendix A proof are implemented and verified: the latency ratio of Algorithm 1 relative to sequential execution under speculator latency Exp(alpha) and true call latency Exp(beta) with beta < alpha.",
+          "weight": 4,
+          "sub_tasks": [
+            {
+              "id": "prop1-finite-T-formula",
+              "requirements": "The finite-horizon ratio of Proposition 1 is implemented as a callable function of alpha, beta, T, p, and k returning 1 - (1/T)(alpha/(alpha+beta))[(T-1)p(k)/(1+p(k)) + p(k)^2/(1+p(k))^2 - p(k)^2/(1+p(k))^2 (-p(k))^(T-1)].",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "prop1-asymptotic-limit",
+              "requirements": "The large-horizon limit of the Proposition 1 ratio is implemented as 1 - p(k)/(1+p(k)) * alpha/(alpha+beta), and evaluating the finite-horizon expression at increasing T is shown numerically to approach it.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "prop1-expected-time-saved-per-hit",
+              "requirements": "The per-hit time saving identity from Appendix A is implemented and verified: with A ~ Exp(alpha) and B ~ Exp(beta) independent, the expected saving on a correct guess is E[(B - A)^+] = alpha / (beta (alpha + beta)). The identity is checked numerically against sampled draws of A and B.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "prop1-hits-recurrence",
+              "requirements": "The recurrence for the expected number of hits from Appendix A is implemented with its stated initial conditions S_0 = 0 and S_1 = p(k): S_n = p(k)(1 + S_{n-2}) + (1 - p(k)) S_{n-1}. The recurrence encodes that a hit at one round removes the speculation window of the following round.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "prop1-hits-closed-form",
+              "requirements": "The closed-form solution S_n = p(k)/(1+p(k)) n + p(k)^2/(1+p(k))^2 (1 - (-p(k))^n) is implemented as a callable function.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "prop1-recurrence-closed-form-agreement",
+              "requirements": "The closed form is verified to satisfy the recurrence by evaluating both over a range of n and several values of p(k) and confirming agreement within numerical tolerance.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "prop1-Ts-expression",
+              "requirements": "The expected speculative runtime is assembled as E[T_s] = T/beta - S_{T-1} * alpha/(beta(alpha+beta)), combining the expected number of hits with the per-hit saving, and dividing by E[T_seq] = T/beta reproduces the Proposition 1 ratio.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "prop1-monte-carlo-validation",
+              "requirements": "The closed-form ratio is validated against a Monte Carlo simulation of the speculative process in which speculator latencies are drawn from Exp(alpha), true call latencies from Exp(beta), and each speculation window hits with probability p(k). The simulated ratio agrees with the closed form within a stated tolerance for at least two distinct parameter settings.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "prop1-fifty-percent-ceiling",
+              "requirements": "The ceiling noted after Proposition 1 is verified: as p approaches 1 and alpha grows large relative to beta, the ratio approaches 1/2, so breadth-focused speculation of this form cannot reduce end-to-end latency by more than 50% regardless of the width k.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "theorem4-breadth-cost",
+          "requirements": "Theorem 4 is implemented and verified: the relative cost increase of breadth-focused speculation, governed by the same p(k) that governs the latency saving.",
+          "weight": 4,
+          "sub_tasks": [
+            {
+              "id": "thm4-finite-T-cost-formula",
+              "requirements": "The finite-horizon cost increase ratio of Theorem 4 is implemented as a callable function of alpha, beta, T, p, k, and k-tilde returning k-tilde - (1/T)(k-tilde + alpha/(alpha+beta))[(T-1)p(k)/(1+p(k)) + p(k)^2/(1+p(k))^2 - p(k)^2/(1+p(k))^2 (-p(k))^(T-1)].",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "thm4-asymptotic-cost-bound",
+              "requirements": "The large-horizon cost bound is implemented as k-tilde - (k-tilde + alpha/(alpha+beta)) p(k)/(1+p(k)), matching the expression stated in Section 5.1 as an upper bound on the relative cost increase.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "thm4-k-tilde-semantics",
+              "requirements": "The parameter k-tilde is treated as the number of distinct actions produced across the k speculative branches and is accepted as an input separate from k, so that k-tilde equals k when all predictions are unique and is strictly smaller when duplicate speculations are killed, as specified in Appendix C.1.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "thm4-Mspec-derivation",
+              "requirements": "The intermediate cost expression from the Appendix C.1 proof is implemented, M_spec proportional to (T/beta)(k-tilde + 1) - S_{T-1}(k-tilde/beta + alpha/(beta(alpha+beta))), together with M_seq proportional to T/beta, and dividing them reproduces the stated ratio.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "thm4-monte-carlo-validation",
+              "requirements": "The cost ratio is validated against Monte Carlo simulation of the speculative process for at least two distinct parameter settings, with the simulated relative cost increase agreeing with the closed form within a stated tolerance.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "thm4-shared-pk-governance",
+              "requirements": "The analysis demonstrates that the latency ratio of Proposition 1 and the cost ratio of Theorem 4 are governed by the same quantity p(k), so that given an estimate of p(k) the width k can be tuned offline to trade cost against latency without further experiments, as argued in Section 5.1.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "theorem3-selective-speculation",
+          "requirements": "Theorem 3 and Corollary 5 are implemented and verified: confidence-aware selection of how many branches to launch at each speculation window.",
+          "weight": 4,
+          "sub_tasks": [
+            {
+              "id": "thm3-hit-probability-formula",
+              "requirements": "The cached-step probability q(m; p) = 1 - product over j = 1..m of (1 - p^(j)) is implemented over confidences sorted in descending order, with the convention q(0; p) = 0.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "thm3-latency-gain-and-reward",
+              "requirements": "The reward model of Appendix C.3 is implemented: the latency gain ell = r(a - b) is collected at epochs where a cached action is executed, a cost of c per launched branch is charged at speculation windows, and the objective is the expected sum of these per-epoch rewards over the horizon.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "thm3-optimal-breadth-argmax",
+              "requirements": "The optimal breadth rule of Theorem 3 is implemented, selecting m at each speculation window as an argmax over {0, ..., k} of q(m; p) * Delta_t - c * m given the realized confidence vector.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "thm3-bellman-recursion",
+              "requirements": "The Bellman equations of the Appendix C.3 proof are implemented by backward dynamic programming from the terminal condition, with V_t^(1) = ell + V_{t+1}^(0) for the cached mode and V_t^(0) taking the expectation over the accuracy distribution of the maximum over m of -c m + q(m; P) V_{t+1}^(1) + (1 - q(m; P)) V_{t+1}^(0).",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "thm3-delta-backward-recursion",
+              "requirements": "The scalar continuation values are derived from the Bellman solution and satisfy the stated backward recursion, with Delta_T = 0 and Delta_t = ell - E[max over m of {q(m; P) Delta_{t+1} - c m}]. The implementation accepts time-varying accuracy distributions and returns the full sequence of continuation values.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "thm3-stationary-g-star",
+              "requirements": "The stationary optimal average reward of Corollary 5 is implemented as the maximum over m of (q-bar(m) ell - c m) / (1 + q-bar(m)), where q-bar(m) is the expected hit probability when launching m branches under the time-homogeneous accuracy distribution.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "thm3-delta-star",
+              "requirements": "The stationary continuation value is computed as Delta-star = ell - g-star, collapsing the time-indexed continuation values into a single time-homogeneous scalar as stated in Corollary 5.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "thm3-greedy-descending-order",
+              "requirements": "The runtime policy sorts the realized per-branch confidences in descending order and adds branches greedily in that order, so that the most confident branch is always launched first.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "thm3-marginal-gain-stopping-rule",
+              "requirements": "Branch addition stops at the first m for which the marginal condition fails, that is when Delta-star times delta-q(m; p) falls below c, where delta-q(m; p) is the marginal hit probability from adding the next branch, equal to the product over j = 1..m of (1 - p^(j)) multiplied by p^(m+1).",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "thm3-diminishing-returns-verified",
+              "requirements": "The diminishing-returns property underpinning the greedy rule is verified numerically: delta-q(m; p) is confirmed to be non-increasing in m for sorted confidence vectors, so that the objective increments are non-increasing and the first failure of the marginal condition is the correct stopping point.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "thm3-runtime-complexity",
+              "requirements": "The runtime selection procedure requires only sorting the confidences and greedily adding branches, giving O(k) work per step once Delta-star has been estimated offline, as claimed in the interpretation paragraph of Section 5.2.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "chess-confidence-threshold-policy",
+          "requirements": "The empirical constant-threshold approximation of the stationary rule described in Section 5.2 is implemented inside the chess environment.",
+          "weight": 4,
+          "sub_tasks": [
+            {
+              "id": "conf-branch-probability-predictor",
+              "requirements": "A predictor is implemented that estimates the correctness probability of each generated speculative branch. It runs as a scoring step after the Speculator has produced its candidate moves and is distinct from the generation process itself.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "conf-fifty-percent-threshold",
+              "requirements": "The constant-threshold rule is applied: only branches whose predicted correctness probability exceeds 50% are continued and pre-launched, and the remainder are dropped before any API call is issued, implementing the simplified stationary threshold consistent with the structure of Theorem 3.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "conf-dynamic-branch-count",
+              "requirements": "The number of branches launched varies from step to step according to how many exceed the threshold, rather than being fixed, so that speculation width adapts to the difficulty of the position.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "theorem6-depth-speculation",
+          "requirements": "Theorem 6 and the depth-focused analysis of Section 5.3 and Appendix C.4 are implemented and verified.",
+          "weight": 4,
+          "sub_tasks": [
+            {
+              "id": "thm6-depth-policy",
+              "requirements": "The depth-focused policy is implemented: whenever either a speculative or a real call returns, the system launches one new real call and one new speculation on top of that branch, extending a single chain rather than fanning out in width.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "thm6-subtree-pruning",
+              "requirements": "When a real API result is inconsistent with the corresponding speculative guess, all descendants of that speculation are immediately discarded, so that inconsistent subtrees do not continue to consume resources.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "thm6-bounded-lookahead",
+              "requirements": "The implementation is verified to run at most floor(a/b) speculative steps ahead of the confirmed position, so that the number of active branches stays bounded and does not scale with the horizon T, as argued in Section 5.3.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "thm6-Tspec-derivation",
+              "requirements": "The expected depth-focused runtime is implemented as E[T_spec] = aT + (T-1)p(b-a), derived by taking the expectation over a binomial count of successful speculations across the T-1 speculation windows as shown in the Appendix C.4 proof.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "thm6-latency-formula",
+              "requirements": "The depth-focused latency saving ratio is implemented as a callable function returning (T-1)/T * p * (1 - b/a), obtained by dividing the saving by T_seq = aT.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "thm6-exact-cost-formula",
+              "requirements": "The exact depth-focused cost ratio of Theorem 6 is implemented, accounting for the floor(a/b) speculative steps that accumulate before a real response arrives: on a miss the step consumes a(floor(a/b) + 1) - b(1 + floor(a/b))floor(a/b)/2 and on a hit it consumes a + floor(a/b) b, combined with weights (1-p) and p and normalized by aT.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "thm6-approximate-cost-formula",
+              "requirements": "The simplified approximation (T-1)/T * ((1-p)(a/(2b) - 1/2) + p) is also implemented, and it is confirmed numerically to track the exact expression closely when a/b is large.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "thm6-monte-carlo-validation",
+              "requirements": "Both the depth-focused latency and cost formulas are validated against Monte Carlo simulation of the depth-focused policy under deterministic latencies a and b, agreeing within a stated tolerance.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "thm6-ceiling-comparison",
+              "requirements": "The comparison stated at the end of Section 5.3 is reproduced: the depth-focused latency coefficient is p rather than the p/(1+p) of the breadth-focused case, which raises the theoretical speedup ceiling from 1/2 to 1. Both expressions are evaluated in the limit and the two ceilings are confirmed.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "figure6-pareto-curve",
+          "requirements": "Figure 6 is reproduced, presenting the empirical cost-latency Pareto curve measured in the chess environment across speculation widths and the confidence-threshold policy.",
+          "weight": 4,
+          "sub_tasks": [
+            {
+              "id": "fig6-policy-sweep-execution",
+              "requirements": "The chess framework is executed under four policies, speculation widths of 1, 2, and 3 and the confidence-based threshold policy, recording for each run the percentage of time spent relative to sequential execution and the percentage of extra tokens used relative to sequential execution.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "fig6-target-steps-sweep",
+              "requirements": "Each policy is evaluated at the four target horizons shown in the Figure 6 legend, namely 20, 30, 40, and 50 steps, so that each policy contributes four points to the plot rather than one.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "fig6-plot-axes",
+              "requirements": "The plot places the percentage of time spent on the x-axis and the percentage of extra tokens used on the y-axis, with distinct marker shapes for the four target step counts and distinct colors for the four policies, matching the axes and legend of Figure 6. Both axes are oriented so that lower values are better, since less time spent means greater latency reduction and fewer extra tokens means lower cost.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Logging, Analysis & Presentation"
+            },
+            {
+              "id": "fig6-width-ordering",
+              "requirements": "Increasing the speculation width moves the measured points toward lower time spent and higher extra token usage, so that the 1, 2, and 3 speculation clusters are ordered along the frontier and the trade-off between speculative breadth and time savings is visible.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "fig6-nonlinear-k-dependence",
+              "requirements": "The measured points exhibit the non-linear dependence on k implied by p(k) = 1 - (1-p)^k that Section 5.1 refers to: the reduction in time spent obtained by moving from 1 to 2 speculations is larger than that obtained by moving from 2 to 3, while the extra token cost continues to grow roughly linearly in k.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "fig6-threshold-policy-lowest-token-cost",
+              "requirements": "The confidence-based threshold policy achieves the lowest additional token cost among the evaluated configurations, reproducing the empirical claim of Section 5.2 that confidence-based selection grows cost substantially more slowly than naively scaling the number of speculative branches.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "fig6-threshold-policy-latency-advantage",
+              "requirements": "The confidence-based threshold policy attains a lower percentage of time spent, and therefore greater latency reduction, than naively launching 1 or 2 speculations per step, reproducing the empirical claim of Section 5.2.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        }
+      ],
+      "task_category": null,
+      "finegrained_task_category": null
+    }
+  ],
+  "task_category": null,
+  "finegrained_task_category": null
+}

@@ -44,6 +44,13 @@ def blocks_to_text(blocks: list) -> str:
         elif btype == "equation":
             eq = _as_text(block.get("text", ""))
             parts.append(f"[Equation: {eq}]" if eq else "[Equation]")
+        elif btype == "chart":
+            caption = _as_text(block.get("chart_caption", ""))
+            parts.append(f"[Chart: {caption}]" if caption else "[Chart]")
+        elif btype == "code":
+            body = _as_text(block.get("code_body", ""))
+            caption = _as_text(block.get("code_caption", ""))
+            parts.append(f"[Code: {caption}]\n{body}" if caption else body)
     return "\n\n".join(p for p in parts if p)
 
 

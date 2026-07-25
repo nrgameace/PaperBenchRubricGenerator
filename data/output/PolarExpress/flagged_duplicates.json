@@ -1,0 +1,18 @@
+[
+  {
+    "leaf_ids": [
+      "gpt2-large-polar-express-best-all-lr",
+      "gpt2-small-polar-express-best-all-lr",
+      "weight-decay-polar-express-still-best"
+    ],
+    "branch_ids": [
+      "ablation-experiments",
+      "muon-gpt2-training"
+    ],
+    "requirements": {
+      "gpt2-large-polar-express-best-all-lr": "Figure 1 shows that muon-PolarExp achieves a strictly lower final validation loss than both muon-Jordan and muon-You on GPT-2-Large across all learning rates tested, with the advantage described in Section 4.2 as 'remarkably consistent across all learning rates and epochs'.",
+      "gpt2-small-polar-express-best-all-lr": "Figure 4 shows that muon-PolarExp achieves a strictly lower final validation loss than both muon-Jordan and muon-You on GPT-2-Small across all learning rates tested, consistent with Section 4.2's statement that the advantage is consistent across all learning rates.",
+      "weight-decay-polar-express-still-best": "Figure 12 shows that muon-PolarExp achieves a strictly lower final validation loss than both muon-Jordan and muon-You on both GPT-2-Small and GPT-2-Large across all learning rates tested when weight decay of 0.1 is used, consistent with Section 4.3's statement that 'the results are quite similar to Figures 1 and 4. We again find that muon-PolarExp outperforms the other methods'."
+    }
+  }
+]

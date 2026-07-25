@@ -1,0 +1,190 @@
+dispatch-sharded-simulation: Branch 'simulation-environment' hit the 40-node cap; forced to leaf.
+dispatch-recap-simulation: Branch 'simulation-environment' hit the 40-node cap; forced to leaf.
+loop-termination-full-single-turn: Branch 'simulation-environment' hit the 40-node cap; forced to leaf.
+loop-termination-concat-single-turn: Branch 'simulation-environment' hit the 40-node cap; forced to leaf.
+dispatch-full-single-user-turn: Branch 'simulation-environment' hit the 40-node cap; forced to leaf.
+dispatch-full-no-shard-loop: Branch 'simulation-environment' hit the 40-node cap; forced to leaf.
+main-sim-llm-claude3-haiku-runs: Branch 'main-simulation-experiment' hit the 40-node cap; forced to leaf.
+main-sim-llm-gpt4o-mini-runs: Branch 'main-simulation-experiment' hit the 40-node cap; forced to leaf.
+main-sim-llm-phi4-runs: Branch 'main-simulation-experiment' hit the 40-node cap; forced to leaf.
+main-sim-llm-command-a-runs: Branch 'main-simulation-experiment' hit the 40-node cap; forced to leaf.
+main-sim-llm-llama4-scout-runs: Branch 'main-simulation-experiment' hit the 40-node cap; forced to leaf.
+main-sim-llm-o3-runs: Branch 'main-simulation-experiment' hit the 40-node cap; forced to leaf.
+main-sim-llm-deepseek-r1-runs: Branch 'main-simulation-experiment' hit the 40-node cap; forced to leaf.
+main-sim-llm-gpt4o-runs: Branch 'main-simulation-experiment' hit the 40-node cap; forced to leaf.
+main-sim-run-storage-and-logging: Branch 'main-simulation-experiment' hit the 40-node cap; forced to leaf.
+olmo2-code-task-runs: Branch 'main-simulation-experiment' hit the 40-node cap; forced to leaf.
+olmo2-database-task-runs: Branch 'main-simulation-experiment' hit the 40-node cap; forced to leaf.
+olmo2-actions-task-runs: Branch 'main-simulation-experiment' hit the 40-node cap; forced to leaf.
+olmo2-math-task-runs: Branch 'main-simulation-experiment' hit the 40-node cap; forced to leaf.
+olmo2-data-to-text-task-runs: Branch 'main-simulation-experiment' hit the 40-node cap; forced to leaf.
+olmo2-conversation-history-storage: Branch 'main-simulation-experiment' hit the 40-node cap; forced to leaf.
+premature-answer-binning-implementation: Branch 'qualitative-analyses' hit the 40-node cap; forced to leaf.
+figure9-heatmap-generation: Branch 'qualitative-analyses' hit the 40-node cap; forced to leaf.
+figure9-turn8-first-last-bias-finding: Branch 'qualitative-analyses' hit the 40-node cap; forced to leaf.
+figure9-loss-in-middle-turns-pattern: Branch 'qualitative-analyses' hit the 40-node cap; forced to leaf.
+table4-five-of-six-tasks-degradation-finding: Branch 'qualitative-analyses' hit the 40-node cap; forced to leaf.
+task-construction-dataset-sizes: split-check split into 6 children (branch 'task-construction').
+strategy-classifier-role: split-check removed as duplicate of 'orchestrator-strategy-classifier-invocation'.
+dispatch-full-no-shard-loop: split-check removed as duplicate of 'dispatch-full-single-llm-call'.
+loop-termination-full-single-turn: split-check removed as duplicate of 'dispatch-full-single-llm-call'.
+loop-termination-concat-single-turn: split-check removed as duplicate of 'dispatch-concat-single-llm-call'.
+dispatch-concat-no-per-shard-iteration: split-check removed as duplicate of 'dispatch-concat-single-llm-call'.
+turn-cat-taxonomy-implementation: split-check child of 'turn-categorization-appendix-h' still enumerates >= 3 items after splitting (model under-split).
+turn-categorization-appendix-h: split-check split into 2 children (branch 'simulation-environment').
+orchestrator-strategy-classifier-invocation: split-check split into 2 children (branch 'simulation-environment').
+dispatch-full-single-user-turn: split-check split into 2 children (branch 'simulation-environment').
+dispatch-full-single-llm-call: split-check split into 2 children (branch 'simulation-environment').
+loop-termination-shard-count-tracking: split-check split into 2 children (branch 'simulation-environment').
+appendix-e-situation1-pbar-60: split-check removed as duplicate of 'appendix-e-situation1-aptitude-60'.
+full-setting-aptitude-90: split-check removed as duplicate of 'full-setting-pbar-90'.
+appendix-e-situation2-score-matrix-2: split-check child of 'appendix-e-situation2-pbar-60' still enumerates >= 3 items after splitting (model under-split).
+appendix-e-situation2-pbar-60: split-check split into 2 children (branch 'simulation-metrics').
+appendix-e-situation3-score-matrix-2: split-check child of 'appendix-e-situation3-unreliability-60' still enumerates >= 3 items after splitting (model under-split).
+appendix-e-situation3-unreliability-60: split-check split into 2 children (branch 'simulation-metrics').
+olmo2-conversation-history-storage: split-check removed as duplicate of 'main-sim-run-storage-and-logging'.
+main-sim-smaller-model-concat-degradation: split-check removed as duplicate of 'table1-color-coding-annotation'.
+model-access-openai-models: split-check child of 'main-sim-model-access-setup' still enumerates >= 3 items after splitting (model under-split).
+model-access-remaining-models: split-check child of 'main-sim-model-access-setup' still enumerates >= 3 items after splitting (model under-split).
+main-sim-model-access-setup: split-check split into 5 children (branch 'main-simulation-experiment').
+main-sim-llm-3-1-8b-runs: split-check split into 2 children (branch 'main-simulation-experiment').
+llama4-scout-full-concat-runs: split-check child of 'main-sim-llm-llama4-scout-runs' still enumerates >= 3 items after splitting (model under-split).
+llama4-scout-sharded-runs: split-check child of 'main-sim-llm-llama4-scout-runs' still enumerates >= 3 items after splitting (model under-split).
+main-sim-llm-llama4-scout-runs: split-check split into 2 children (branch 'main-simulation-experiment').
+table1-pbar-full-matrix-populated: split-check child of 'table1-pbar-matrix-computation' still enumerates >= 3 items after splitting (model under-split).
+table1-pbar-matrix-computation: split-check split into 2 children (branch 'main-simulation-experiment').
+table1-degradation-column: split-check split into 2 children (branch 'main-simulation-experiment').
+table1-all-15-llm-rows: split-check split into 3 children (branch 'main-simulation-experiment').
+main-sim-average-sharded-degradation: split-check split into 0 children (branch 'main-simulation-experiment').
+table1-color-coding-annotation: split-check split into 2 children (branch 'main-simulation-experiment').
+main-sim-concat-near-full: split-check split into 2 children (branch 'main-simulation-experiment').
+figure5b-aptitude-unreliability-data-preparation: split-check removed as duplicate of 'aptitude-reliability-computation'.
+single-turn-aptitude-reliability-trend: split-check removed as duplicate of 'figure5b-single-turn-negative-correlation-visible'.
+figure5b-sharded-uniform-high-unreliability-visible: split-check removed as duplicate of 'sharded-uniform-high-unreliability'.
+aptitude-reliability-computation: split-check split into 2 children (branch 'aptitude-reliability-analysis').
+sharded-uniform-high-unreliability: split-check split into 2 children (branch 'aptitude-reliability-analysis').
+gradual-sharding-instruction-count-31: split-check child of 'gradual-sharding-total-count-verification' still enumerates >= 3 items after splitting (model under-split).
+gradual-sharding-total-count-verification: split-check split into 3 children (branch 'gradual-sharding-experiment').
+gradual-sharding-performance-by-shard-count: split-check split into 2 children (branch 'gradual-sharding-experiment').
+gradual-sharding-degradation-at-two-shards: split-check split into 2 children (branch 'gradual-sharding-experiment').
+table3-average-row-values: split-check removed as duplicate of 'table3-reproduction'.
+table4-five-of-six-tasks-degradation-finding: split-check removed as duplicate of 'table4-actions-task-values'.
+table3-reproduction: split-check split into 2 children (branch 'qualitative-analyses').
+table3-earliest-vs-latest-bin-gap: split-check split into 2 children (branch 'qualitative-analyses').
+answer-bloat-correct-code-solutions-27pct-longer: split-check split into 2 children (branch 'qualitative-analyses').
+answer-bloat-correct-database-solutions-14pct-longer: split-check split into 2 children (branch 'qualitative-analyses').
+figure9-turn2-equal-citation-pattern: split-check split into 2 children (branch 'qualitative-analyses').
+figure9-turn8-middle-doc-citation-proportion: split-check child of 'figure9-turn8-first-last-bias-finding' still enumerates >= 3 items after splitting (model under-split).
+figure9-turn8-first-last-bias-finding: split-check split into 2 children (branch 'qualitative-analyses').
+table4-average-row-values: split-check split into 2 children (branch 'qualitative-analyses').
+table5-recap-snowball-results: split-check split into 2 children (branch 'mitigation-experiments').
+recap-outperforms-snowball-finding: split-check split into 2 children (branch 'mitigation-experiments').
+system-prompt-small-aggregate-improvement-finding: split-check split into 2 children (branch 'mitigation-experiments').
+temperature-ablation-results: split-check split into 2 children (branch 'mitigation-experiments').
+task-construction-code-count: split-check split into 2 children (branch 'task-construction').
+strategy-classifier-label-recorded: split-check removed as duplicate of 'turn-cat-applied-to-sharded'.
+strategy-classifier-sharded-only: split-check removed as duplicate of 'turn-cat-applied-to-sharded'.
+orchestrator-strategy-classifier-invocation: forced to leaf after its last child 'strategy-classifier-sharded-only' was removed as a duplicate.
+loop-termination-control-flow-to-extractor: split-check removed as duplicate of 'orchestrator-answer-extractor-invocation'.
+full-dispatch-extractor-after-single-call: split-check removed as duplicate of 'orchestrator-answer-extractor-invocation'.
+full-dispatch-one-llm-call: split-check removed as duplicate of 'orchestrator-target-llm-call'.
+dispatch-full-single-llm-call: forced to leaf after its last child 'full-dispatch-one-llm-call' was removed as a duplicate.
+dispatch-concat-single-llm-call: split-check removed as duplicate of 'orchestrator-target-llm-call'.
+full-dispatch-original-instruction: split-check removed as duplicate of 'full-simulation-type'.
+full-dispatch-no-modification: split-check removed as duplicate of 'full-simulation-type'.
+dispatch-full-single-user-turn: forced to leaf after its last child 'full-dispatch-no-modification' was removed as a duplicate.
+dispatch-concat-shards-joined-in-order: split-check removed as duplicate of 'concat-simulation-type'.
+dispatch-concat-single-user-turn-no-history: split-check removed as duplicate of 'concat-simulation-type'.
+dispatch-concat-simulation: forced to leaf after its last child 'dispatch-concat-single-user-turn-no-history' was removed as a duplicate.
+dispatch-sharded-simulation: split-check removed as duplicate of 'sharded-simulation-type'.
+dispatch-recap-simulation: split-check removed as duplicate of 'recap-simulation-type'.
+dispatch-snowball-simulation: split-check removed as duplicate of 'snowball-simulation-type'.
+orchestrator-conversation-history-accumulation: split-check removed as duplicate of 'orchestrator-target-llm-call'.
+shard-counter-termination-check: split-check removed as duplicate of 'shard-counter-init-increment'.
+loop-termination-sharded-all-shards: split-check removed as duplicate of 'sharded-simulation-type'.
+loop-termination-recap-all-shards: split-check removed as duplicate of 'recap-simulation-type'.
+loop-termination-snowball-all-shards: split-check removed as duplicate of 'snowball-simulation-type'.
+turn-cat-taxonomy-implementation: split-check split into 7 children (branch 'simulation-environment').
+turn-cat-applied-to-sharded: split-check split into 2 children (branch 'simulation-environment').
+orchestrator-target-llm-api: split-check split into 2 children (branch 'simulation-environment').
+full-setting-unreliability-0: split-check removed as duplicate of 'appendix-e-situation1-unreliability-0'.
+appendix-e-situation2-aptitude-90: split-check split into 2 children (branch 'simulation-metrics').
+appendix-e-situation2-unreliability-90: split-check split into 2 children (branch 'simulation-metrics').
+appendix-e-situation3-pbar-60-composition: split-check child of 'appendix-e-situation3-pbar-60' still enumerates >= 3 items after splitting (model under-split).
+appendix-e-situation3-pbar-60: split-check split into 2 children (branch 'simulation-metrics').
+appendix-e-situation3-aptitude-80: split-check split into 2 children (branch 'simulation-metrics').
+full-setting-pbar-90: split-check split into 2 children (branch 'simulation-metrics').
+appendix-e-combined-interpretation: split-check split into 3 children (branch 'simulation-metrics').
+table1-olmo2-phi4-task-exclusion: split-check removed as duplicate of 'olmo2-summary-task-exclusion'.
+table1-avg-sharded-degradation-value: split-check removed as duplicate of 'main-sim-average-sharded-degradation'.
+table1-pbar-per-model-task-setting: split-check removed as duplicate of 'table1-pbar-full-matrix-populated'.
+model-access-openai-models: split-check split into 4 children (branch 'main-simulation-experiment').
+model-access-anthropic-models: split-check split into 2 children (branch 'main-simulation-experiment').
+model-access-google-models: split-check split into 2 children (branch 'main-simulation-experiment').
+model-access-meta-llama-models: split-check split into 3 children (branch 'main-simulation-experiment').
+model-access-remaining-models: split-check split into 4 children (branch 'main-simulation-experiment').
+table1-pbar-matrix-values: split-check child of 'table1-pbar-full-matrix-populated' still enumerates >= 3 items after splitting (model under-split).
+table1-pbar-full-matrix-populated: split-check split into 2 children (branch 'main-simulation-experiment').
+table1-concat-red-background-coding: split-check split into 2 children (branch 'main-simulation-experiment').
+main-sim-task-specific-degradation-breakdown: split-check split into 3 children (branch 'main-simulation-experiment').
+gradual-sharding-continued-decline: split-check removed as duplicate of 'gradual-sharding-drop-at-two-shards'.
+gradual-sharding-pbar-computation: split-check split into 2 children (branch 'gradual-sharding-experiment').
+figure9-turn2-turn2-doc-citation-proportion: split-check removed as duplicate of 'figure9-turn2-turn1-doc-citation-proportion'.
+table3-earliest-bin-value: split-check removed as duplicate of 'table3-latest-bin-value'.
+table3-latest-bin-value: split-check split into 2 children (branch 'qualitative-analyses').
+answer-bloat-correct-code-full-length-and-ratio: split-check split into 2 children (branch 'qualitative-analyses').
+answer-bloat-correct-database-full-length-and-ratio: split-check split into 2 children (branch 'qualitative-analyses').
+figure9-turn2-turn1-doc-citation-proportion: split-check split into 2 children (branch 'qualitative-analyses').
+table4-average-row-shortest-short-median: split-check split into 3 children (branch 'qualitative-analyses').
+table4-average-row-long-longest: split-check split into 2 children (branch 'qualitative-analyses').
+table5-gpt4omini-values: split-check split into 5 children (branch 'mitigation-experiments').
+table5-gpt4o-values: split-check split into 5 children (branch 'mitigation-experiments').
+recap-outperforms-snowball-numeric: split-check split into 3 children (branch 'mitigation-experiments').
+table6-system-prompt-results: split-check split into 2 children (branch 'mitigation-experiments').
+system-prompt-task-breakdown-finding: split-check split into 4 children (branch 'mitigation-experiments').
+temperature-ablation-single-turn-improvement: split-check split into 2 children (branch 'mitigation-experiments').
+temperature-ablation-sharded-no-improvement: split-check split into 2 children (branch 'mitigation-experiments').
+task-construction-code-total-count: split-check split into 2 children (branch 'task-construction').
+orchestrator-strategy-classifier-invocation: split-check removed as duplicate of 'strategy-classifier-invoked-per-turn'.
+turn-cat-answer-attempt-impl: split-check split into 2 children (branch 'simulation-environment').
+turn-cat-clarification-impl: split-check split into 2 children (branch 'simulation-environment').
+turn-cat-interrogation-example: split-check child of 'turn-cat-interrogation-impl' still enumerates >= 3 items after splitting (model under-split).
+turn-cat-interrogation-impl: split-check split into 2 children (branch 'simulation-environment').
+turn-cat-discussion-desc: split-check child of 'turn-cat-discussion-impl' still enumerates >= 3 items after splitting (model under-split).
+turn-cat-discussion-impl: split-check split into 2 children (branch 'simulation-environment').
+turn-cat-hedging-impl: split-check split into 2 children (branch 'simulation-environment').
+turn-cat-refusal-impl: split-check split into 2 children (branch 'simulation-environment').
+turn-cat-missing-impl: split-check split into 2 children (branch 'simulation-environment').
+dispatch-full-single-user-turn: split-check split into 2 children (branch 'simulation-environment').
+dispatch-full-single-llm-call: split-check split into 2 children (branch 'simulation-environment').
+appendix-e-situation1-aptitude-60: split-check split into 2 children (branch 'simulation-metrics').
+appendix-e-situation1-unreliability-0: split-check split into 2 children (branch 'simulation-metrics').
+concat-not-explains-sharded-drop: split-check removed as duplicate of 'concat-avg-pct-of-full'.
+table1-pbar-matrix-values: split-check split into 3 children (branch 'main-simulation-experiment').
+main-sim-strong-models-also-degrade: split-check split into 2 children (branch 'main-simulation-experiment').
+sharded-50pp-best-worst-degradation: split-check removed as duplicate of 'sharded-all-models-high-unreliability'.
+gradual-sharding-drop-at-two-shards: split-check split into 2 children (branch 'gradual-sharding-experiment').
+figure9-turn2-turn1-doc-proportion-value: split-check removed as duplicate of 'figure9-turn2-equal-proportion-finding'.
+answer-bloat-correct-code-sharded-length: split-check removed as duplicate of 'answer-bloat-correct-code-sharded-full-ratio'.
+answer-bloat-correct-code-full-length: split-check removed as duplicate of 'answer-bloat-correct-code-sharded-full-ratio'.
+answer-bloat-correct-database-sharded-length: split-check removed as duplicate of 'answer-bloat-correct-database-sharded-full-ratio'.
+answer-bloat-correct-database-full-length: split-check removed as duplicate of 'answer-bloat-correct-database-sharded-full-ratio'.
+table3-latest-bin-value-64-4: split-check removed as duplicate of 'table3-latest-bin-half-earliest'.
+answer-bloat-correct-code-sharded-full-ratio: split-check split into 1 children (branch 'qualitative-analyses').
+answer-bloat-correct-database-sharded-full-ratio: split-check split into 1 children (branch 'qualitative-analyses').
+table3-per-model-monotonic-trend: split-check split into 2 children (branch 'qualitative-analyses').
+table3-latest-bin-half-earliest: split-check split into 2 children (branch 'qualitative-analyses').
+figure9-turn2-equal-proportion-finding: split-check split into 2 children (branch 'qualitative-analyses').
+figure9-turn8-turn2-turn3-citation-proportion: split-check child of 'figure9-turn8-middle-doc-citation-proportion' still enumerates >= 3 items after splitting (model under-split).
+figure9-turn8-middle-doc-citation-proportion: split-check split into 2 children (branch 'qualitative-analyses').
+recap-snowball-lag-behind-full-concat: split-check removed as duplicate of 'recap-outperforms-snowball-gpt4omini'.
+system-prompt-no-lost-mitigation: split-check removed as duplicate of 'system-prompt-avg-improvement'.
+snowball-mitigates-15-to-20pct-degradation: split-check split into 2 children (branch 'mitigation-experiments').
+table6-gpt4o-no-prompt-values: split-check split into 5 children (branch 'mitigation-experiments').
+table6-gpt4o-with-prompt-values: split-check split into 5 children (branch 'mitigation-experiments').
+system-prompt-avg-improvement: split-check split into 1 children (branch 'mitigation-experiments').
+system-prompt-math-db-improvement: split-check split into 2 children (branch 'mitigation-experiments').
+temp-ablation-full-concat-gpt4omini: split-check split into 2 children (branch 'mitigation-experiments').
+temp-ablation-full-concat-gpt4o: split-check split into 2 children (branch 'mitigation-experiments').
+temp-ablation-sharded-gpt4omini-no-improvement: split-check split into 2 children (branch 'mitigation-experiments').
+temp-ablation-sharded-gpt4o-minor-improvement: split-check split into 2 children (branch 'mitigation-experiments').

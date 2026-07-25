@@ -1,0 +1,139 @@
+weighted-kl-projection-prop1: Branch 'theory-framework-setup' hit the 40-node cap; forced to leaf.
+btl-preference-probability: Branch 'theory-framework-setup' hit the 40-node cap; forced to leaf.
+preference-ordering-sampling: Branch 'theory-framework-setup' hit the 40-node cap; forced to leaf.
+latent-reward-function-representation: Branch 'theory-framework-setup' hit the 40-node cap; forced to leaf.
+preference-dataset-construction: Branch 'theory-framework-setup' hit the 40-node cap; forced to leaf.
+implicit-reward-base-policy-zero: Branch 'theory-framework-setup' hit the 40-node cap; forced to leaf.
+pop-dpo-loss-outer-sum-structure: Branch 'theory-framework-setup' hit the 40-node cap; forced to leaf.
+pop-dpo-loss-n-weights: Branch 'theory-framework-setup' hit the 40-node cap; forced to leaf.
+pop-dpo-loss-binomial-empirical-counts: Branch 'theory-framework-setup' hit the 40-node cap; forced to leaf.
+pop-dpo-loss-equivalence-empirical-loss: Branch 'theory-framework-setup' hit the 40-node cap; forced to leaf.
+pop-dpo-loss-bernoulli-kl-connection: Branch 'theory-framework-setup' hit the 40-node cap; forced to leaf.
+pop-dpo-loss-policy-class-parametric: Branch 'theory-framework-setup' hit the 40-node cap; forced to leaf.
+pop-dpo-loss-symmetric-pair-handling: Branch 'theory-framework-setup' hit the 40-node cap; forced to leaf.
+pop-dpo-loss-n-imbalance-sensitivity: Branch 'theory-framework-setup' hit the 40-node cap; forced to leaf.
+pop-dpo-loss-weighted-projection-equivalence: Branch 'theory-framework-setup' hit the 40-node cap; forced to leaf.
+bandit-figure2-visualization: Branch 'didactic-bandit-failure-modes' hit the 40-node cap; forced to leaf.
+bandit-btl-true-preference-order: Branch 'didactic-bandit-failure-modes' hit the 40-node cap; forced to leaf.
+bandit-base-policy-expected-reward: Branch 'didactic-bandit-failure-modes' hit the 40-node cap; forced to leaf.
+bandit-btl-equivalent-reward-justification: Branch 'didactic-bandit-failure-modes' hit the 40-node cap; forced to leaf.
+bandit-misspecification-of-r-star: Branch 'didactic-bandit-failure-modes' hit the 40-node cap; forced to leaf.
+bandit-imbalance-ratio-verification: Branch 'didactic-bandit-failure-modes' hit the 40-node cap; forced to leaf.
+bandit-dominant-pair-kl-drive: Branch 'didactic-bandit-failure-modes' hit the 40-node cap; forced to leaf.
+bandit-implicit-reward-constrained-to-span: Branch 'didactic-bandit-failure-modes' hit the 40-node cap; forced to leaf.
+bandit-alternative-balanced-count-contrast: Branch 'didactic-bandit-failure-modes' hit the 40-node cap; forced to leaf.
+bandit-preference-reversal-implicit-reward-projection: Branch 'didactic-bandit-failure-modes' hit the 40-node cap; forced to leaf.
+bandit-preference-reversal-policy-probability-check: Branch 'didactic-bandit-failure-modes' hit the 40-node cap; forced to leaf.
+bandit-preference-reversal-btl-induced-order: Branch 'didactic-bandit-failure-modes' hit the 40-node cap; forced to leaf.
+bandit-balanced-count-setup-n12-dominant: Branch 'didactic-bandit-failure-modes' hit the 40-node cap; forced to leaf.
+bandit-balanced-kl-dominant-term: Branch 'didactic-bandit-failure-modes' hit the 40-node cap; forced to leaf.
+bandit-balanced-span-constraint-yields-correct-reward: Branch 'didactic-bandit-failure-modes' hit the 40-node cap; forced to leaf.
+bandit-balanced-theta-negative-value: Branch 'didactic-bandit-failure-modes' hit the 40-node cap; forced to leaf.
+bandit-balanced-implicit-reward-correctness-check: Branch 'didactic-bandit-failure-modes' hit the 40-node cap; forced to leaf.
+bandit-balanced-no-preference-reversal: Branch 'didactic-bandit-failure-modes' hit the 40-node cap; forced to leaf.
+bandit-balanced-no-likelihood-displacement: Branch 'didactic-bandit-failure-modes' hit the 40-node cap; forced to leaf.
+bandit-balanced-expected-reward-non-decrease: Branch 'didactic-bandit-failure-modes' hit the 40-node cap; forced to leaf.
+bandit-sensitivity-side-by-side-comparison: Branch 'didactic-bandit-failure-modes' hit the 40-node cap; forced to leaf.
+bandit-sensitivity-as-fifth-failure-mode: Branch 'didactic-bandit-failure-modes' hit the 40-node cap; forced to leaf.
+auxdpo-population-loss: Branch 'rlhf-local-geometry-auxdpo' hit the 40-node cap; forced to leaf.
+auxdpo-empirical-loss: Branch 'rlhf-local-geometry-auxdpo' hit the 40-node cap; forced to leaf.
+auxdpo-figure3-geometric-visualization: Branch 'rlhf-local-geometry-auxdpo' hit the 40-node cap; forced to leaf.
+auxdpo-bandit-superiority: Branch 'rlhf-local-geometry-auxdpo' hit the 40-node cap; forced to leaf.
+expected-reward-first-order-taylor: Branch 'rlhf-local-geometry-auxdpo' hit the 40-node cap; forced to leaf.
+kl-penalty-second-order-taylor: Branch 'rlhf-local-geometry-auxdpo' hit the 40-node cap; forced to leaf.
+d-rho-theta0-column-space-verification: Branch 'rlhf-local-geometry-auxdpo' hit the 40-node cap; forced to leaf.
+quadratic-approximation-optimal-theta-derivation: Branch 'rlhf-local-geometry-auxdpo' hit the 40-node cap; forced to leaf.
+fisher-matrix-positive-semidefinite-check: Branch 'rlhf-local-geometry-auxdpo' hit the 40-node cap; forced to leaf.
+a-rho-theta0-r-star-linear-term: Branch 'rlhf-local-geometry-auxdpo' hit the 40-node cap; forced to leaf.
+quadratic-approximation-concavity-verification: Branch 'rlhf-local-geometry-auxdpo' hit the 40-node cap; forced to leaf.
+bandit-local-quadratic-approximation-example: Branch 'rlhf-local-geometry-auxdpo' hit the 40-node cap; forced to leaf.
+natural-gradient-first-order-optimality-derivation: Branch 'rlhf-local-geometry-auxdpo' hit the 40-node cap; forced to leaf.
+fisher-pseudoinverse-computation: Branch 'rlhf-local-geometry-auxdpo' hit the 40-node cap; forced to leaf.
+natural-gradient-kakade-interpretation: Branch 'rlhf-local-geometry-auxdpo' hit the 40-node cap; forced to leaf.
+bandit-natural-gradient-explicit-computation: Branch 'rlhf-local-geometry-auxdpo' hit the 40-node cap; forced to leaf.
+natural-gradient-large-beta-accuracy: Branch 'rlhf-local-geometry-auxdpo' hit the 40-node cap; forced to leaf.
+req-beta-affine-subspace-implementation: Branch 'rlhf-local-geometry-auxdpo' hit the 40-node cap; forced to leaf.
+nullspace-a-rho-theta0-computation: Branch 'rlhf-local-geometry-auxdpo' hit the 40-node cap; forced to leaf.
+lemma6-nullspace-membership-verification: Branch 'rlhf-local-geometry-auxdpo' hit the 40-node cap; forced to leaf.
+proposition7-min-mahalanobis-norm-representative: Branch 'rlhf-local-geometry-auxdpo' hit the 40-node cap; forced to leaf.
+equiv-class-bijection-with-dpo-linearization: Branch 'rlhf-local-geometry-auxdpo' hit the 40-node cap; forced to leaf.
+mmlu-pro-evaluation-dataset-acquisition: Branch 'llm-alignment-experiments' hit the 40-node cap; forced to leaf.
+mmlu-pro-preference-conversion: Branch 'llm-alignment-experiments' hit the 40-node cap; forced to leaf.
+mmlu-pro-dataset-format-compatibility: Branch 'llm-alignment-experiments' hit the 40-node cap; forced to leaf.
+mmlu-pro-subject-coverage-verification: Branch 'llm-alignment-experiments' hit the 40-node cap; forced to leaf.
+dpo-baseline-implementation: Branch 'llm-alignment-experiments' hit the 40-node cap; forced to leaf.
+auxdpo-log-sigma-term: Branch 'llm-alignment-experiments' hit the 40-node cap; forced to leaf.
+auxdpo-delta-reward-difference-augmentation: Branch 'llm-alignment-experiments' hit the 40-node cap; forced to leaf.
+auxdpo-monte-carlo-nullspace-approx: Branch 'llm-alignment-experiments' hit the 40-node cap; forced to leaf.
+rewardbench-v2-category-coverage: Branch 'llm-alignment-experiments' hit the 40-node cap; forced to leaf.
+pop-dpo-loss-binomial-empirical-counts: split-check removed as duplicate of 'pairwise-preference-counts'.
+pop-dpo-loss-base-policy-theta0: split-check removed as duplicate of 'reference-policy-response-sampling'.
+pop-dpo-loss-implicit-reward-substitution: split-check removed as duplicate of 'implicit-reward-log-ratio-formula'.
+pop-dpo-loss-reward-difference-computation: split-check removed as duplicate of 'pop-dpo-loss-model-preference-prob'.
+pop-dpo-loss-tabular-policy-special-case: split-check removed as duplicate of 'pop-dpo-loss-realizable-case-check'.
+pop-dpo-loss-misspecified-case-setup: split-check removed as duplicate of 'implicit-reward-manifold-r-beta'.
+pop-dpo-loss-equivalence-verified: split-check child of 'pop-dpo-loss-equivalence-empirical-loss' still enumerates >= 3 items after splitting (model under-split).
+pop-dpo-loss-equivalence-empirical-loss: split-check split into 2 children (branch 'theory-framework-setup').
+pop-dpo-loss-bernoulli-kl-cross-entropy-impl: split-check child of 'pop-dpo-loss-bernoulli-kl-connection' still enumerates >= 3 items after splitting (model under-split).
+pop-dpo-loss-bernoulli-kl-connection: split-check split into 2 children (branch 'theory-framework-setup').
+pop-dpo-loss-realizable-case-check: split-check split into 2 children (branch 'theory-framework-setup').
+weighted-kl-projection-prop1: split-check split into 2 children (branch 'theory-framework-setup').
+pop-dpo-loss-comparison-empirical-loss: split-check split into 2 children (branch 'theory-framework-setup').
+pop-dpo-loss-kl-bernoulli-dkl: split-check split into 2 children (branch 'theory-framework-setup').
+pop-dpo-loss-weighted-projection-equivalence: split-check split into 2 children (branch 'theory-framework-setup').
+bandit-linear-softmax-policy: split-check removed as duplicate of 'bandit-uniform-base-policy'.
+bandit-jacobian-span: split-check removed as duplicate of 'bandit-policy-gradient-computation'.
+bandit-dominant-pair-kl-drive: split-check removed as duplicate of 'bandit-implicit-reward-constrained-to-span'.
+bandit-implicit-reward-constrained-to-span: split-check removed as duplicate of 'bandit-preference-reversal-implicit-reward-projection'.
+bandit-btl-equivalent-reward-justification: split-check removed as duplicate of 'bandit-latent-reward-vector-r-star'.
+bandit-misspecification-of-r-star: split-check removed as duplicate of 'bandit-one-dimensional-parameter-space'.
+bandit-preference-reversal-btl-induced-order: split-check removed as duplicate of 'bandit-preference-reversal-policy-probability-check'.
+bandit-balanced-kl-dominant-term: split-check removed as duplicate of 'bandit-balanced-span-constraint-yields-correct-reward'.
+bandit-balanced-implicit-reward-correctness-check: split-check removed as duplicate of 'bandit-balanced-span-constraint-yields-correct-reward'.
+bandit-balanced-no-preference-reversal: split-check removed as duplicate of 'bandit-balanced-theta-negative-value'.
+bandit-sensitivity-population-loss-regime: split-check removed as duplicate of 'bandit-dpo-population-loss-optimization'.
+bandit-alternative-balanced-count-contrast: split-check removed as duplicate of 'bandit-sensitivity-as-fifth-failure-mode'.
+bandit-btl-true-preference-order: split-check split into 3 children (branch 'didactic-bandit-failure-modes').
+bandit-policy-gradient-computation: split-check split into 2 children (branch 'didactic-bandit-failure-modes').
+bandit-likelihood-displacement-verification: split-check split into 2 children (branch 'didactic-bandit-failure-modes').
+bandit-reward-reduction-verification: split-check split into 2 children (branch 'didactic-bandit-failure-modes').
+bandit-sensitivity-as-fifth-failure-mode: split-check split into 2 children (branch 'didactic-bandit-failure-modes').
+bandit-preference-reversal-implicit-reward-projection: split-check split into 2 children (branch 'didactic-bandit-failure-modes').
+bandit-balanced-span-constraint-yields-correct-reward: split-check split into 2 children (branch 'didactic-bandit-failure-modes').
+bandit-balanced-no-likelihood-displacement: split-check split into 2 children (branch 'didactic-bandit-failure-modes').
+quadratic-approximation-optimal-theta-derivation: split-check removed as duplicate of 'natural-gradient-first-order-optimality-derivation'.
+natural-gradient-kakade-interpretation: split-check removed as duplicate of 'theta-star-natural-gradient-formula'.
+linear-system-solvability-verification: split-check removed as duplicate of 'natural-gradient-first-order-optimality-derivation'.
+natural-gradient-reward-equivalence-class-connection: split-check removed as duplicate of 'lemma6-nullspace-membership-verification'.
+bandit-local-quadratic-approximation-example: split-check split into 2 children (branch 'rlhf-local-geometry-auxdpo').
+natural-gradient-first-order-optimality-derivation: split-check split into 2 children (branch 'rlhf-local-geometry-auxdpo').
+bandit-ng-matrix-setup: split-check child of 'bandit-natural-gradient-explicit-computation' still enumerates >= 3 items after splitting (model under-split).
+bandit-natural-gradient-explicit-computation: split-check split into 3 children (branch 'rlhf-local-geometry-auxdpo').
+natural-gradient-dpo-vs-rlhf-comparison: split-check split into 2 children (branch 'rlhf-local-geometry-auxdpo').
+natural-gradient-large-beta-accuracy: split-check split into 2 children (branch 'rlhf-local-geometry-auxdpo').
+proposition7-min-mahalanobis-norm-representative: split-check split into 2 children (branch 'rlhf-local-geometry-auxdpo').
+equiv-class-bijection-with-dpo-linearization: split-check split into 2 children (branch 'rlhf-local-geometry-auxdpo').
+approximation-error-large-beta-verification: split-check split into 2 children (branch 'rlhf-local-geometry-auxdpo').
+mmlu-pro-correct-answer-chosen-response: split-check removed as duplicate of 'mmlu-pro-preference-conversion'.
+mmlu-pro-incorrect-answer-rejected-response: split-check removed as duplicate of 'mmlu-pro-preference-conversion'.
+mmlu-pro-preference-triplet-construction: split-check removed as duplicate of 'mmlu-pro-preference-conversion'.
+mmlu-pro-dataset-format-compatibility: split-check removed as duplicate of 'mmlu-pro-preference-conversion'.
+rewardbench-v2-direct-use-no-conversion: split-check removed as duplicate of 'rewardbench-v2-chosen-rejected-format'.
+mmlu-pro-subject-coverage-verification: split-check removed as duplicate of 'mmlu-pro-evaluation-dataset-acquisition'.
+mmlu-pro-total-size-verification: split-check removed as duplicate of 'mmlu-pro-evaluation-dataset-acquisition'.
+llm-preference-dataset-preparation: forced to leaf after its last child 'mmlu-pro-total-size-verification' was removed as a duplicate.
+llm-id-ood-eval-setup: split-check removed as duplicate of 'id-ood-dataset-splits-preparation'.
+auxdpo-delta-reward-difference-augmentation: split-check removed as duplicate of 'auxdpo-log-sigma-term'.
+auxdpo-monte-carlo-nullspace-approx: split-check removed as duplicate of 'auxdpo-nullspace-penalty-term'.
+llm-table2-subject-visualization: split-check removed as duplicate of 'llm-table2-mmlupro-subject-results'.
+llm-table1-auxdpo-best-performance: split-check removed as duplicate of 'llm-table1-results'.
+ultrafeedback-training-dataset-acquisition: split-check split into 2 children (branch 'llm-alignment-experiments').
+rewardbench-v2-download: split-check split into 2 children (branch 'llm-alignment-experiments').
+mmlu-pro-subject-coverage: split-check child of 'mmlu-pro-evaluation-dataset-acquisition' still enumerates >= 3 items after splitting (model under-split).
+mmlu-pro-evaluation-dataset-acquisition: split-check split into 2 children (branch 'llm-alignment-experiments').
+mmlu-pro-preference-conversion: split-check split into 2 children (branch 'llm-alignment-experiments').
+id-ood-dataset-splits-preparation: split-check split into 2 children (branch 'llm-alignment-experiments').
+llm-model-acquisition: split-check split into 3 children (branch 'llm-alignment-experiments').
+llm-accuracy-evaluation-metric: split-check split into 2 children (branch 'llm-alignment-experiments').
+llm-table1-results: split-check split into 3 children (branch 'llm-alignment-experiments').
+llm-table2-mmlupro-subject-results: split-check split into 4 children (branch 'llm-alignment-experiments').

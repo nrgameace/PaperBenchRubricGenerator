@@ -1,0 +1,43 @@
+degree5-linear-system-solve: Branch 'polar-express-algorithm' hit the 40-node cap; forced to leaf.
+greedy-composition-global-optimality-verification: Branch 'polar-express-algorithm' hit the 40-node cap; forced to leaf.
+spectral-norm-error-bound-from-final-lower-bound: Branch 'polar-express-algorithm' hit the 40-node cap; forced to leaf.
+equioscillation-4-points-recognition: Branch 'polar-express-algorithm' hit the 40-node cap; forced to leaf.
+degree5-vandermonde-linear-system: Branch 'polar-express-algorithm' hit the 40-node cap; forced to leaf.
+ablation-iter-count-gpt2-small-training-runs: Branch 'ablation-experiments' hit the 40-node cap; forced to leaf.
+ablation-iter-count-figure5-left-plot: Branch 'ablation-experiments' hit the 40-node cap; forced to leaf.
+ablation-iter-count-figure5-right-plot: Branch 'ablation-experiments' hit the 40-node cap; forced to leaf.
+ablation-5-plus-iter-saturation: Branch 'ablation-experiments' hit the 40-node cap; forced to leaf.
+runtime-figure5-right-panel-plot: Branch 'ablation-experiments' hit the 40-node cap; forced to leaf.
+weight-decay-gpt2-small-training-runs: Branch 'ablation-experiments' hit the 40-node cap; forced to leaf.
+weight-decay-gpt2-large-training-runs: Branch 'ablation-experiments' hit the 40-node cap; forced to leaf.
+weight-decay-results-similar-to-no-weight-decay: Branch 'ablation-experiments' hit the 40-node cap; forced to leaf.
+interval-lower-bound-scalar-eval: split-check removed as duplicate of 'lower-bound-update-via-polynomial-evaluation'.
+interval-upper-bound-symmetry-formula: split-check removed as duplicate of 'upper-bound-update-via-symmetry'.
+updated-bounds-feed-next-polynomial-solver: split-check removed as duplicate of 'bound-propagation-drives-next-polynomial'.
+scalar-recurrence-replaces-interval-sweep: split-check removed as duplicate of 'lower-bound-update-via-polynomial-evaluation'.
+precomputed-bound-schedule-storage: split-check removed as duplicate of 'offline-coefficient-storage'.
+degree5-linear-system-solve: split-check removed as duplicate of 'degree5-vandermonde-linear-system'.
+degree5-extrema-update-exchange: split-check removed as duplicate of 'degree5-interior-points-exchange-update'.
+offline-interval-propagation-loop: split-check removed as duplicate of 'offline-per-iteration-polynomial-call'.
+finite-precision-stabilizations: split-check removed as duplicate of 'offline-finite-precision-modifications'.
+per-iteration-error-tracking: split-check split into 2 children (branch 'polar-express-algorithm').
+offline-per-iteration-polynomial-call: split-check split into 2 children (branch 'polar-express-algorithm').
+offline-finite-precision-modifications: split-check split into 2 children (branch 'polar-express-algorithm').
+convergence-result-gpt2-small-ell-delay: split-check removed as duplicate of 'convergence-result-gpt2-gradient-polar-express-best'.
+convergence-result-polar-express-mistuned: split-check split into 2 children (branch 'convergence-experiment').
+gpt2-training-loss-matches-validation-improvement: split-check removed as duplicate of 'gpt2-wall-clock-parity'.
+gpt2-wall-clock-parity: split-check split into 2 children (branch 'muon-gpt2-training').
+runtime-result-iterative-preferred-over-svd: split-check removed as duplicate of 'ablation-5-6-iter-optimal-regime'.
+ablation-iter-count-figure5-right-plot: split-check removed as duplicate of 'ablation-iter-count-figure5-left-plot'.
+runtime-figure5-right-panel-plot: split-check removed as duplicate of 'ablation-iter-count-figure5-left-plot'.
+ablation-runtime-measurement: split-check removed as duplicate of 'ablation-iter-count-figure5-left-plot'.
+runtime-polar-express-2iter-timed: split-check removed as duplicate of 'runtime-timing-code-implementation'.
+runtime-polar-express-3iter-timed: split-check removed as duplicate of 'runtime-timing-code-implementation'.
+runtime-polar-express-5iter-timed: split-check removed as duplicate of 'runtime-timing-code-implementation'.
+runtime-polar-express-6iter-timed: split-check removed as duplicate of 'runtime-timing-code-implementation'.
+runtime-polar-express-10iter-timed: split-check removed as duplicate of 'runtime-timing-code-implementation'.
+runtime-polar-express-30iter-timed: split-check removed as duplicate of 'runtime-timing-code-implementation'.
+runtime-exact-svd-timed: split-check removed as duplicate of 'runtime-timing-code-implementation'.
+weight-decay-results-similar-to-no-weight-decay: split-check removed as duplicate of 'weight-decay-polar-express-still-best'.
+ablation-figure5-results: split-check split into 4 children (branch 'ablation-experiments').
+ablation-figure6-results: split-check split into 2 children (branch 'ablation-experiments').

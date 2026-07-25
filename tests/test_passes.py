@@ -233,6 +233,30 @@ def test_apply_expansion_forces_leaf_and_records_error_past_max_depth():
     validate_final(rubric)
 
 
+def test_apply_expansion_forces_leaf_and_records_error_on_zero_children():
+    rubric, queue, hints, _ = pb_passes.apply_base(
+        {"root": {"requirements": "r"}, "children": [{"requirements": "setup", "expandable": True, "expansion_hint": "env"}]})
+    node_id = queue[0]
+    errors = []
+    new_pending = pb_passes.apply_expansion(rubric, node_id, {"children": []}, hints, errors=errors)
+    target = find_node(rubric, node_id)
+    assert target["sub_tasks"] == []
+    assert target["task_category"] is not None
+    assert new_pending == []
+    assert node_id not in hints
+    assert len(errors) == 1 and node_id in errors[0] and "zero children" in errors[0]
+    validate_final(rubric)
+
+
+def test_apply_expansion_zero_children_guardrail_is_noop_without_errors_list():
+    rubric, queue, hints, _ = pb_passes.apply_base(
+        {"root": {"requirements": "r"}, "children": [{"requirements": "setup", "expandable": True, "expansion_hint": "env"}]})
+    node_id = queue[0]
+    new_pending = pb_passes.apply_expansion(rubric, node_id, {"children": []}, hints)
+    assert new_pending == []
+    validate_final(rubric)
+
+
 def test_apply_expansion_depth_guardrail_is_noop_without_errors_list():
     rubric, queue, hints, _ = pb_passes.apply_base(
         {"root": {"requirements": "r"}, "children": [{"requirements": "setup", "expandable": True, "expansion_hint": "env"}]})
@@ -495,13 +519,14 @@ def test_run_weight_llm_no_feedback_block_when_none():
 
 
 class _FakeBlock:
-    def __init__(self, text):
+    def __init__(self, text, type="text"):
         self.text = text
+        self.type = type
 
 
 class _FakeResponse:
     def __init__(self, text, stop_reason="end_turn"):
-        self.content = [_FakeBlock(text)]
+        self.content = text if isinstance(text, list) else [_FakeBlock(text)]
         self.stop_reason = stop_reason
         self.usage = SimpleNamespace(
             input_tokens=10, output_tokens=5,
@@ -692,6 +717,12 @@ def test_invoke_llm_no_tracker_still_returns_text():
     assert result == "hello"
 
 
+def test_invoke_llm_explicitly_disables_thinking():
+    client = _FakeClient("hello")
+    pb_passes.invoke_llm(client, [], [{"role": "user", "content": []}], "claude-opus-4-8")
+    assert client.messages.calls[0]["thinking"] == {"type": "disabled"}
+
+
 def test_invoke_llm_prints_current_usage_when_tracker_provided(capsys):
     from pb_cost import CostTracker
     tracker = CostTracker()
@@ -730,6 +761,18 @@ def test_invoke_llm_does_not_raise_when_stop_reason_is_end_turn():
     client = _FakeClient('{"a": 1}', stop_reason="end_turn")
     result = pb_passes.invoke_llm(client, [], [{"role": "user", "content": []}], "claude-sonnet-4-6")
     assert result == '{"a": 1}'
+
+
+def test_invoke_llm_skips_leading_thinking_block():
+    client = _FakeClient([_FakeBlock("", type="thinking"), _FakeBlock('{"a": 1}')])
+    result = pb_passes.invoke_llm(client, [], [{"role": "user", "content": []}], "claude-sonnet-4-6")
+    assert result == '{"a": 1}'
+
+
+def test_invoke_llm_raises_clear_error_when_no_text_block():
+    client = _FakeClient([_FakeBlock("", type="thinking")])
+    with pytest.raises(RuntimeError, match="contained no text block"):
+        pb_passes.invoke_llm(client, [], [{"role": "user", "content": []}], "claude-sonnet-4-6")
 
 
 # ── run_split_check_llm tests ─────────────────────────────────────────────────

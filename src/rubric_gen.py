@@ -37,7 +37,7 @@ from pb_state import (PHASE_BASE, PHASE_DONE, PHASE_EXPANSION, PHASE_WEIGHT, det
 
 HERE = Path(__file__).resolve().parent
 OPUS = "claude-opus-4-8"
-SONNET = "claude-sonnet-4-6"
+SONNET = "claude-sonnet-5"
 FEW_SHOT_RUBRIC_PATH = Path(os.environ.get("FEW_SHOT_RUBRIC_PATH", HERE.parent / "examples" / "example_rubric.json"))
 MAX_WEIGHT_RESOLUTION_RETRIES = 5
 
