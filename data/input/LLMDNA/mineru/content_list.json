@@ -1,0 +1,3810 @@
+[
+    {
+        "type": "text",
+        "text": "LLM DNA: TRACING MODEL EVOLUTION VIA FUNCTIONAL REPRESENTATIONS",
+        "text_level": 1,
+        "bbox": [
+            171,
+            98,
+            741,
+            146
+        ],
+        "page_idx": 0
+    },
+    {
+        "type": "text",
+        "text": "Zhaomin Wu<sup>1</sup>, Haodong Zhao<sup>2</sup>, Ziyang Wang<sup>1</sup>, Jizhou Guo<sup>3</sup>, Qian Wang<sup>1</sup>, Bingsheng He<sup>1</sup> <sup>1</sup>Department of Computer Science, National University of Singapore",
+        "bbox": [
+            181,
+            169,
+            818,
+            199
+        ],
+        "page_idx": 0
+    },
+    {
+        "type": "text",
+        "text": "<sup>2</sup>School of Computer Science, Shanghai Jiao Tong University",
+        "bbox": [
+            181,
+            199,
+            591,
+            214
+        ],
+        "page_idx": 0
+    },
+    {
+        "type": "text",
+        "text": "<sup>3</sup>Zhiyuan College, Shanghai Jiao Tong University zhaomin@nus.edu.sg, zhaohaodong@sjtu.edu.cn, wangziyang@u.nus.edu, sjtu18640985163@sjtu.edu.cn, e0493632@u.nus.edu, dcsheb@nus.edu.sg",
+        "bbox": [
+            181,
+            214,
+            513,
+            229
+        ],
+        "page_idx": 0
+    },
+    {
+        "type": "text",
+        "text": "",
+        "bbox": [
+            181,
+            228,
+            810,
+            256
+        ],
+        "page_idx": 0
+    },
+    {
+        "type": "text",
+        "text": "ABSTRACT",
+        "text_level": 2,
+        "bbox": [
+            450,
+            292,
+            547,
+            306
+        ],
+        "page_idx": 0
+    },
+    {
+        "type": "text",
+        "text": "The explosive growth of large language models (LLMs) has created a vast but opaque landscape: millions of models exist, yet their evolutionary relationships through fine-tuning, distillation, or adaptation are often undocumented or unclear, complicating LLM management. Existing methods are limited by task specificity, fixed model sets, or strict assumptions about tokenizers or architectures. Inspired by biological DNA, we address these limitations by mathematically defining LLM DNA as a low-dimensional, bi-Lipschitz representation of functional behavior. We prove that LLM DNA satisfies inheritance and genetic determinism properties and establish the existence of DNA. Building on this theory, we derive a general, scalable, training-free pipeline for DNA extraction. In experiments across 305 LLMs, DNA aligns with prior studies on limited subsets and achieves superior or competitive performance on various tasks. Beyond these tasks, DNA comparisons uncover previously undocumented relationships among LLMs. We further construct the evolutionary tree of LLMs using phylogenetic algorithms, which align with shifts from encoder-decoder to decoder-only architectures, reflect temporal progression, and reveal distinct evolutionary speeds across LLM families.",
+        "bbox": [
+            228,
+            324,
+            767,
+            547
+        ],
+        "page_idx": 0
+    },
+    {
+        "type": "text",
+        "text": "1 INTRODUCTION",
+        "text_level": 2,
+        "bbox": [
+            174,
+            575,
+            338,
+            590
+        ],
+        "page_idx": 0
+    },
+    {
+        "type": "text",
+        "text": "The proliferation of large language models (LLMs) (Zhao et al., 2023) has produced a vast and complex landscape of models. Hugging Face (Hugging Face, 2025) alone hosts millions of models spanning diverse families, architectures, and tokenizers, with the number increasing at an accelerating pace (Rahman et al., 2025). Amid this rapid growth, tracing the evolutionary paths of LLMs through fine-tuning, distillation, or adaptation is critical across several areas: safety auditing—tracking how security risks such as backdoors are transferred between LLMs (Cheng et al., 2024); model governance—verifying that adaptations and fine-tuning follow license requirements (Duan et al., 2025; Lee et al., 2025; Xu et al., 2025); and multi-agent systems—guiding the structure design and planning (Han et al., 2024). This motivates a central research question:",
+        "bbox": [
+            169,
+            607,
+            826,
+            734
+        ],
+        "page_idx": 0
+    },
+    {
+        "type": "text",
+        "text": "Can we develop a principledframework to define and analyze the “DNA” ofLLMs, enabling us to systematically characterize theirfunctional similarities and evolutionary relationships?",
+        "bbox": [
+            174,
+            739,
+            823,
+            768
+        ],
+        "page_idx": 0
+    },
+    {
+        "type": "text",
+        "text": "Existing approaches to defining and extracting LLM “DNA” remain premature. Most prior work compresses LLMs into task-specific representations for model routing (Ong et al., 2025) or ensemble learning (Huang et al., 2024). These representations are trained for specific objectives and neither generalize across tasks nor capture overall model characteristics. Zhuang et al. (2025) propose EmbedLLM, the first task-agnostic approach, which learns a compact representation for multiple downstream tasks. However, this representation is defined relative to a fixed set of LLMs—it changes when new models are added—and thus is not an intrinsic DNA of each model. Nikolic et al. (2025) and Zhu et al. (2025) further explore how to measure provenance or independence between two LLMs by calculating token similarity or parameter correlation, but these methods do not generalize to diverse LLMs with varying architectures and tokenizers. Collectively, these approaches do not furnish a formal and general definition of LLM DNA or a practical method for its extraction.",
+        "bbox": [
+            169,
+            773,
+            826,
+            900
+        ],
+        "page_idx": 0
+    },
+    {
+        "type": "header",
+        "text": "Published as a conference paper at ICLR 2026",
+        "bbox": [
+            171,
+            32,
+            480,
+            47
+        ],
+        "page_idx": 0
+    },
+    {
+        "type": "page_footnote",
+        "text": "<sup></sup> dna.xtra.science <sup>§</sup> github.com/Xtra-Computing/LLM-DNA <sup>3</sup> pypi.org/project/llm-dna",
+        "bbox": [
+            225,
+            909,
+            797,
+            924
+        ],
+        "page_idx": 0
+    },
+    {
+        "type": "page_number",
+        "text": "1",
+        "bbox": [
+            493,
+            948,
+            503,
+            959
+        ],
+        "page_idx": 0
+    },
+    {
+        "type": "text",
+        "text": "",
+        "bbox": [
+            169,
+            104,
+            826,
+            133
+        ],
+        "page_idx": 1
+    },
+    {
+        "type": "text",
+        "text": "To address this gap, we introduce the concept of LLM DNA: a compact, low-dimensional representation of a model’s functional behavior. By analogy to biological DNA, it should satisfy two foundational properties: inheritance—small perturbations to the model do not alter the DNA; and genetic determination—models with similar DNA exhibit similar characteristics. If such a DNA is well defined and extractable, established phylogenetic tools can be leveraged to analyze LLM evolution.",
+        "bbox": [
+            169,
+            138,
+            826,
+            210
+        ],
+        "page_idx": 1
+    },
+    {
+        "type": "text",
+        "text": "The challenges of defining and extracting of LLM DNA are two-fold. The theoretical challenge includes mathematically formalizing a DNA that satisfies both properties—inheritance and genetic determination—and proving the existence of DNA under such definition. The practical challenge is to design, given this definition, a general and scalable framework that efficiently extracts DNA across heterogeneous LLMs with distinct architectures, tokenizers, and prediction paradigms.",
+        "bbox": [
+            169,
+            215,
+            826,
+            287
+        ],
+        "page_idx": 1
+    },
+    {
+        "type": "text",
+        "text": "In this paper, we formally define LLM DNA as a low-dimensional vector that obtained via a bi-Lipschitz map from the LLM functional space. We prove that this definition naturally satisfies inheritance and genetic determination and, using the Johnson–Lindenstrauss (JL) lemma (Johnson et al., 1984), formally establish the existence of such DNA. To practically extract LLM DNA, we derive random linear projection as an effective extraction method from these theoretical foundations and design RepTrace—a general, scalable, training-free pipeline for DNA extraction. Finally, we build the evolutionary tree for 305 LLMs using RepTrace and report various new findings.",
+        "bbox": [
+            169,
+            292,
+            826,
+            392
+        ],
+        "page_idx": 1
+    },
+    {
+        "type": "text",
+        "text": "Contributions. (1) We formally define LLM DNA and prove that it satisfies inheritance and genetic determination properties, proving the existence of LLM DNA. (2) Building on these results, we propose a general, scalable, training-free pipeline for extracting LLM DNA. (3) Experiments on 305 models show that LLM DNA outperforms existing baselines on specific tasks and aligns with prior findings. (4) Using LLM DNAs, we construct a phylogenetic tree that aligns with known architectural and temporal shifts and reveals undocumented relationships among LLMs.",
+        "bbox": [
+            169,
+            397,
+            826,
+            483
+        ],
+        "page_idx": 1
+    },
+    {
+        "type": "text",
+        "text": "2 RELATED WORK",
+        "text_level": 2,
+        "bbox": [
+            171,
+            502,
+            346,
+            518
+        ],
+        "page_idx": 1
+    },
+    {
+        "type": "text",
+        "text": "LLM DNA relates to prior work using terms such as representation and fingerprint. We group this literature into two views: (i) a macroscopic view, which manages large groups of models by mapping each model to a representation for model routing and ensemble learning; and (ii) a microscopic view, which uses fingerprints to assess whether two LLMs are related for provenance or identity.",
+        "bbox": [
+            169,
+            534,
+            826,
+            592
+        ],
+        "page_idx": 1
+    },
+    {
+        "type": "text",
+        "text": "Representation of LLMs. This direction manages large LLM collections by encoding each LLM into a representation. Most methods are task-specific: Ong et al. (2025); Wang et al. (2024) learn representations for model routing, while Huang et al. (2024); Fang et al. (2024) encode models for ensemble learning. For instance, HybridLLM (Ding et al., 2024), trains a binary “easy-hard” classifier to route queries to a small or a larger model. RouteLLM (Ong et al., 2025) learns a supervised router that selects between stronger and weaker models based on query features. MetaLLM (Nguyen et al., 2024) formulates routing as a multi-armed bandit, adaptively trading off expected answer quality against invocation cost via online feedback. LLM-ensemble (Fang et al., 2024) learns the weights for different LLMs to predict a specific attribute value. These task-specific approaches rely on supervised training for particular tasks, making their learned representations not generalizable across tasks. Zhuang et al. (2025) propose EmbedLLM, the first compact embedding supporting multiple tasks (e.g., model routing and benchmark prediction), but it is defined over a fixed model set; adding models requires retraining and can shift the learned embeddings. Yax et al. (2025) propose PhyloLM, a state-of-the-art approach for constructing LLM phylogenies. It defines inter-model distances in a tokenizer-aware manner: for models with the same tokenizer, it uses Nei’s genetic distance over output token distributions; for different tokenizers, it approximates distance using the first four characters of concatenated tokens. As a result, the cross-tokenizer metric is dominated by early-token behavior and may not reflect sentence-level distributions. In contrast, our LLM DNA is a stable and generalizable sentence-level intrinsic property extractable independently for each LLM.",
+        "bbox": [
+            169,
+            597,
+            826,
+            863
+        ],
+        "page_idx": 1
+    },
+    {
+        "type": "text",
+        "text": "Fingerprint of LLMs. This line of work evaluates dependence or similarity between pairs of LLMs by mapping each model to a representation, or fingerprint. Unlike watermarks, which actively insert a fingerprint during training (Zhao et al., 2024; Liu et al., 2024; Tang et al., 2025), fingerprinting is post hoc and analyzes identifiable model properties without modifying training. Prior studies verify whether a remote LLM API serves the claimed model using strategic queries (Pasquini et al., 2025) or specialized prompts (Tsai et al., 2025) with response classification; Fu et al. (2025) further trains classifiers to capture stylistic signatures. Others go beyond text, leveraging parameters or token embeddings for provenance prediction (Nikolic et al., 2025; Zhu et al., 2025). However, these pairwise methods are often structure-dependent and hard to scale to heterogeneous LLMs. LLM DNA, however, is a general representation capturing structural relationships across diverse models.",
+        "bbox": [
+            169,
+            867,
+            826,
+            925
+        ],
+        "page_idx": 1
+    },
+    {
+        "type": "header",
+        "text": "Published as a conference paper at ICLR 2026",
+        "bbox": [
+            171,
+            32,
+            480,
+            47
+        ],
+        "page_idx": 1
+    },
+    {
+        "type": "page_number",
+        "text": "2",
+        "bbox": [
+            493,
+            948,
+            504,
+            959
+        ],
+        "page_idx": 1
+    },
+    {
+        "type": "text",
+        "text": "",
+        "bbox": [
+            169,
+            104,
+            826,
+            189
+        ],
+        "page_idx": 2
+    },
+    {
+        "type": "text",
+        "text": "3 DEFINITION AND EXISTENCE OF LLM DNA",
+        "text_level": 2,
+        "bbox": [
+            171,
+            209,
+            575,
+            224
+        ],
+        "page_idx": 2
+    },
+    {
+        "type": "text",
+        "text": "This section provides a formal definition of LLM DNA in Section 3.1. Furthermore, Section 3.2 proves the existence of DNA under this definition. Additionally, Appendix A.1 elaborates that this definition satisfies two properties analogous to those of biological DNA.",
+        "bbox": [
+            169,
+            241,
+            825,
+            284
+        ],
+        "page_idx": 2
+    },
+    {
+        "type": "text",
+        "text": "3.1 DEFINITION OF LLM DNA",
+        "text_level": 2,
+        "bbox": [
+            171,
+            301,
+            403,
+            315
+        ],
+        "page_idx": 2
+    },
+    {
+        "type": "text",
+        "text": "We formally define an LLM as a function from a discrete sequence of input texts to a vector of continuous logits (Definition 3.1). This definition applies to general LLMs with diverse architectures and adopts an end-to-end perspective. For the theoretical analysis, we assume the input length is finite, i.e., bounded by a constant m. Notably, “finiteness” does not imply smallness; the sets involved may still be arbitrarily large. Meanwhile, our practical stochastic-approximation pipeline in Section 4 does not depend on any particular value of m. Under this bound, the input space becomes finite, which directly yields Lemma A.4, a key step in establishing the existence of LLM DNA.",
+        "bbox": [
+            169,
+            327,
+            826,
+            426
+        ],
+        "page_idx": 2
+    },
+    {
+        "type": "text",
+        "text": "Definition 3.1 (Large Language Model). Let Σ be a finite character set. Let $\\Sigma ^ { * }$ be the set of all sequences of characters (strings) from Σ. For a maximum sequence length m $\\in \\mathbb { Z } ^ { + }$ , we define the space of admissible sequences as $S _ { m } : = \\{ x \\in \\Sigma ^ { * } \\mid | x | \\leq m \\bar  \\}$ . Let $N = | S _ { m } |$ . A Large Language Model (LLM) is a function $f : S _ { m } \\to { \\mathcal { O } }$ that maps an admissible input sequence to a vector of real-valued logits, with each logit corresponding to a possible output sequence in $S _ { m }$ . We denote the output space ofLLM as $\\mathcal { O } : = \\mathbb { R } ^ { N }$ . The set ofall LLMs constitutes the LLMfunction space, ${ \\mathcal F } .$",
+        "bbox": [
+            169,
+            429,
+            826,
+            513
+        ],
+        "page_idx": 2
+    },
+    {
+        "type": "text",
+        "text": "Definition 3.2 (DNA of an LLM). Let $( \\mathcal { F } , d _ { H } )$ be the metric space of LLM functions. The DNA of an LLM $f \\in { \\mathcal { F } }$ is a low-dimensional vector, denoted $\\tau _ { f } \\in \\mathcal { D } ,$ , where the DNA space $\\mathcal { D } = \\mathbb { R } ^ { L }$ is equipped with the standard Euclidean distance $d _ { \\tau } ( \\tau _ { 1 } , \\dot { \\tau _ { 2 } } ) = \\lVert \\tau _ { 1 } - \\tau _ { 2 } \\rVert _ { 2 }$ . The mapping from $\\mathcal { F }$ to D must satisfy a bi-Lipschitz condition; that is, there exist constants $c _ { 2 } > c _ { 1 } > 0$ such that for any two LLMs ${ \\bar { f } } _ { 1 } , f _ { 2 } \\in { \\bar { \\mathcal { F } } }$ with corresponding DNAs $\\tau _ { f _ { 1 } }$ and $\\tau _ { f _ { 2 } } ,$ it holds that: $c _ { 1 } \\cdot d _ { H } ( f _ { 1 } , f _ { 2 } ) \\leq$ $d _ { \\tau } ( \\tau _ { f _ { 1 } } , \\tau _ { f _ { 2 } } ) \\leq c _ { 2 } \\cdot d _ { H } ( f _ { 1 } , f _ { 2 } )$",
+        "bbox": [
+            169,
+            518,
+            825,
+            604
+        ],
+        "page_idx": 2
+    },
+    {
+        "type": "text",
+        "text": "Definition 3.2 guarantees that functionally similar LLMs have proximate DNAs, and vice versa. These lower and upper bounds in the bi-Lipschitz condition naturally guarantee two key properties of LLM DNA: (1) Inheritance—a lineage operation on an LLM, such as fine-tuning, produces descendants with similar DNAs; and (2) Genetic determinism—LLMs with similar DNAs exhibit similar functional behaviors. Both properties are formally stated and proved in Appendix A.1.",
+        "bbox": [
+            169,
+            614,
+            825,
+            686
+        ],
+        "page_idx": 2
+    },
+    {
+        "type": "text",
+        "text": "3.2 EXISTENCE OF LLM DNA",
+        "text_level": 2,
+        "bbox": [
+            171,
+            700,
+            401,
+            715
+        ],
+        "page_idx": 2
+    },
+    {
+        "type": "text",
+        "text": "This section provides a formal proof for the existence of the LLM DNA. The core idea is that an LLM’s function can be represented as a vector in a high-dimensional Hilbert space (Lemma A.4). This allows us to apply the Johnson-Lindenstrauss (JL) Lemma (Johnson et al., 1984), a powerful result in dimensionality reduction, to guarantee the existence of a low-dimensional embedding that preserves the geometry of the LLM functional space F.",
+        "bbox": [
+            169,
+            728,
+            825,
+            800
+        ],
+        "page_idx": 2
+    },
+    {
+        "type": "text",
+        "text": "Theorem 3.3 (Existence of LLM DNA). For any finite set of K LLMs $\\mathcal { F } _ { K } = \\{ f _ { 1 } , \\dotsc , f _ { K } \\} \\subset$ F, a DNA representation (Definition 3.2) with DNA space $\\mathbf { \\mathcal { D } } ~ = ~ \\mathbb { R } ^ { L }$ exists, satisfying for all $f _ { i } , f _ { j } \\in \\mathcal { F } _ { K } , \\ c _ { 1 } \\cdot d _ { H } ( f _ { i } , f _ { j } ) \\leq d _ { \\tau } ( \\tau _ { f _ { i } } , \\tau _ { f _ { j } } ) \\leq c _ { 2 } \\cdot d _ { H } ( f _ { i } , f _ { j } )$ , where the target dimension L is $L = O \\left( \\left[ ( c _ { 2 } + c _ { 1 } ) / ( c _ { 2 } - c _ { 1 } ) \\right] ^ { 2 } \\log K \\right)$",
+        "bbox": [
+            171,
+            801,
+            825,
+            869
+        ],
+        "page_idx": 2
+    },
+    {
+        "type": "text",
+        "text": "The proof of Theorem 3.3 appears in Appendix A.3. The required DNA dimension L trades off with the bi-Lipschitz constants $c _ { 1 } , c _ { 2 }$ , whose tightness—captured by $\\epsilon = ( c _ { 2 } - c _ { 1 } ) / ( c _ { 2 } + c _ { 1 } )$ —governs embedding distortion. High fidelity (small distortion) requires $c _ { 1 } \\approx c _ { 2 } .$ , yielding very small ϵ and, by $L = O ( \\epsilon ^ { - 2 } \\log K )$ , a large L. Conversely, tolerating more distortion (a larger gap between $c _ { 1 }$ and $c _ { 2 } )$ increases ϵ and permits a more compact, lower-dimensional DNA representation.",
+        "bbox": [
+            169,
+            882,
+            825,
+            925
+        ],
+        "page_idx": 2
+    },
+    {
+        "type": "header",
+        "text": "Published as a conference paper at ICLR 2026",
+        "bbox": [
+            171,
+            32,
+            480,
+            47
+        ],
+        "page_idx": 2
+    },
+    {
+        "type": "page_number",
+        "text": "3",
+        "bbox": [
+            493,
+            948,
+            504,
+            960
+        ],
+        "page_idx": 2
+    },
+    {
+        "type": "text",
+        "text": "",
+        "bbox": [
+            169,
+            104,
+            823,
+            133
+        ],
+        "page_idx": 3
+    },
+    {
+        "type": "text",
+        "text": "Theorem 3.3 not only guarantees the existence of an LLM DNA but also yields a practical construction. The proof leverages the constructive nature of the JL lemma: the required linear map E need not be specially engineered; a scaled random linear projection satisfies the desired bi-Lipschitz property with arbitrarily high probability. This insight is formalized in the following corollary.",
+        "bbox": [
+            169,
+            138,
+            825,
+            196
+        ],
+        "page_idx": 3
+    },
+    {
+        "type": "text",
+        "text": "Corollary 3.4 (Construct LLM DNA via Random Projection). For anyfinite set ofK LLMs $\\mathcal { F } _ { K } =$ $\\{ f _ { 1 } , \\dotsc , { \\dot { f } } _ { K } \\} \\subset { \\mathcal { F } }$ , the LLM DNA in Theorem 3.3 can be obtainedfrom a random linear projection $\\dot { E } : \\mathcal { F }  \\mathbb { R } ^ { L }$ with probability at least $1 - 2 / K ^ { 2 }$",
+        "bbox": [
+            171,
+            196,
+            825,
+            239
+        ],
+        "page_idx": 3
+    },
+    {
+        "type": "text",
+        "text": "Beyond the probability bound established in Corollary 3.4, Larsen & Nelson (2014) proved that random linear projection is the optimal linear dimensionality reduction method. Leveraging both its optimality and computational efficiency, we adopt random Gaussian projection for extracting LLM DNA, with practical details introduced in Section 4.",
+        "bbox": [
+            169,
+            250,
+            826,
+            306
+        ],
+        "page_idx": 3
+    },
+    {
+        "type": "text",
+        "text": "4 EXTRACT LLM DNA",
+        "text_level": 2,
+        "bbox": [
+            171,
+            325,
+            387,
+            340
+        ],
+        "page_idx": 3
+    },
+    {
+        "type": "text",
+        "text": "Extracting LLM DNA in practice entails two challenges: (i) instantiating the output space $\\mathcal { O }$ to reflect semantic content, since surface-form string comparisons are brittle; and (ii) evaluating functional distance over the full input space $S _ { m }$ , which is computationally prohibitive. We propose an extraction pipeline, RepTrace, which addresses these via a semantic response representation (Section 4.1) and an expectation-based functional distance that admits efficient approximation (Section 4.2). The full RepTrace pipeline is provided in Section 4.3 and illustrated in Figure 1.",
+        "bbox": [
+            169,
+            356,
+            826,
+            441
+        ],
+        "page_idx": 3
+    },
+    {
+        "type": "image",
+        "img_path": "images/e2b69d0530a69f355aada15763deb5e24886a426cdcc74fca0322c58351a3ab3.jpg",
+        "image_caption": [
+            "Figure 1: Visualization of RepTrace: LLM DNA extraction workflow"
+        ],
+        "image_footnote": [],
+        "content": "",
+        "bbox": [
+            238,
+            454,
+            758,
+            560
+        ],
+        "page_idx": 3
+    },
+    {
+        "type": "text",
+        "text": "4.1 CONSTRUCT SEMANTIC-AWARE REPRESENTATION",
+        "text_level": 2,
+        "bbox": [
+            171,
+            611,
+            568,
+            626
+        ],
+        "page_idx": 3
+    },
+    {
+        "type": "text",
+        "text": "This subsection details how to build a semantic-aware vector representation $\\phi ( f ( x _ { i } ) )$ for each LLM response $x _ { i }$ such that $\\| \\phi ( f _ { 1 } ( x _ { i } ) ) - \\phi ( f _ { 2 } ( x _ { i } ) ) \\| _ { 2 }$ effectively approximates $\\| f _ { 1 } ( { \\dot { x } } _ { j } ) - { \\dot { f } } _ { 2 } ( x _ { j } ) \\| \\colon$ <sub>2</sub>. Purely string-based comparisons ignore semantic information: for example, the words “holiday” and “vacation” are semantically similar yet differ completely as character sequences. To convert textual outputs into vectors that capture semantic meaning, we use a sentence-embedding model to map each response to a fixed-size embedding.",
+        "bbox": [
+            169,
+            637,
+            825,
+            723
+        ],
+        "page_idx": 3
+    },
+    {
+        "type": "text",
+        "text": "This design has three benefits: (1) it is LLM-agnostic for text-generation models, requiring no access to internal architectures or tokenizers as in many embedding/model-based methods (Yax et al., 2025); (2) it applies to closed-source LLMs because API-only models can still be queried for DNA computation; and (3) it accommodates new LLMs without recomputing existing DNAs, overcoming the limitation of EmbedLLM (Zhuang et al., 2025).",
+        "bbox": [
+            169,
+            728,
+            826,
+            799
+        ],
+        "page_idx": 3
+    },
+    {
+        "type": "text",
+        "text": "4.2 APPROXIMATE LLM FUNCTIONAL DISTANCE",
+        "text_level": 2,
+        "bbox": [
+            171,
+            814,
+            532,
+            829
+        ],
+        "page_idx": 3
+    },
+    {
+        "type": "text",
+        "text": "This subsection details our practical approach to measuring the distance between LLMs. Though direct computing functional distance is theoretically sound, its computation requires evaluating functions over the entire, combinatorially large input space $S _ { m }$ , which is infeasible. To bridge theory and practice, we introduce a tractable alternative: a Stochastic Functional Distance. This new metric is defined not over the full input space, but as a statistical expectation over a random sample of inputs, reflecting the practical scenario of evaluating models on a finite set of representative prompts.",
+        "bbox": [
+            169,
+            840,
+            826,
+            925
+        ],
+        "page_idx": 3
+    },
+    {
+        "type": "header",
+        "text": "Published as a conference paper at ICLR 2026",
+        "bbox": [
+            171,
+            32,
+            480,
+            47
+        ],
+        "page_idx": 3
+    },
+    {
+        "type": "page_number",
+        "text": "4",
+        "bbox": [
+            493,
+            948,
+            504,
+            959
+        ],
+        "page_idx": 3
+    },
+    {
+        "type": "text",
+        "text": "Definition 4.1 (Stochastic Functional Distance). Let $f _ { 1 } , f _ { 2 } \\in \\mathcal { F }$ be two LLM functions. Let µ be a probability measure on the input space ${ \\cal { S } } _ { m } ,$ , and let $t \\in \\mathbb { Z } ^ { + }$ be a fixed sample size. Let $\\boldsymbol { S } _ { t } \\ =$ $\\{ \\bar { x } _ { 1 } , \\ldots , x _ { t } \\}$ denote a set of t independent and identically distributed (i.i.d.) random variables representing inputs drawnfrom the distribution $\\mu .$ . The Stochastic Functional Distance $d _ { f } ( f _ { 1 } , f _ { 2 } )$ is defined as the expected Euclidean distance between the concatenated semantic representations ofthe $L L M s ^ { \\prime }$ outputs over a random sample $S _ { t } .$ : $d _ { f } ( f _ { 1 } , f _ { 2 } ) : = \\mathbb { E } _ { S _ { t } \\sim \\mu } \\left[ { \\sqrt { \\sum _ { x _ { j } \\in S _ { t } } \\| f _ { 1 } ( x _ { j } ) - f _ { 2 } ( x _ { j } ) \\| _ { 2 } ^ { 2 } } } \\right]$",
+        "bbox": [
+            169,
+            103,
+            825,
+            199
+        ],
+        "page_idx": 4
+    },
+    {
+        "type": "text",
+        "text": "A concentration bound provides a formal reliability guarantee for our empirical distance. The theorem below shows that the estimate concentrates sharply around the true Hilbert distance $d _ { H }$ : for any deviation level, the tail probability decays exponentially in the sample size t. Thus, the estimate offers a high-confidence measure of the underlying functional distance.",
+        "bbox": [
+            169,
+            210,
+            825,
+            268
+        ],
+        "page_idx": 4
+    },
+    {
+        "type": "text",
+        "text": "Lemma 4.2 (Concentration of Empirical Functional Distance). Let $f _ { 1 } , f _ { 2 } \\in \\mathcal { F }$ be two LLMfunctions. Let $\\begin{array} { r } { \\hat { d } _ { f } ^ { 2 } ~ = ~ \\sum _ { j = 1 } ^ { t } | | f _ { 1 } ( x _ { j } ) - f _ { 2 } ( x _ { j } ) | | _ { 2 } ^ { 2 } } \\end{array}$ be the squared empirical functional distance calculated from a sample of t i.i.d. inputs $\\{ x _ { 1 } , \\ldots , x _ { t } \\}$ . Let $d _ { H } ^ { 2 }$ be the true squared Hilbert distance. Assume the squared Euclidean distance between any two output vectors is bounded such that $\\| f _ { 1 } ( x ) - f _ { 2 } ( x ) \\| _ { 2 } ^ { 2 } \\bar { \\leq } C _ { \\mathrm { m a x } } f _ { }$ or any input x and for all functions of interest. Then, for any $\\epsilon > 0 _ { ; }$ , the following bound holdsfor the sample average: $\\begin{array} { r } { P \\left( \\left| \\frac { 1 } { t } \\hat { d } _ { f } ^ { 2 } - d _ { H } ^ { 2 } \\right| \\geq \\epsilon \\right) \\leq 2 \\exp \\left( - \\frac { 2 t \\epsilon ^ { 2 } } { C _ { \\operatorname* { m a x } } ^ { 2 } } \\right) } \\end{array}$",
+        "bbox": [
+            169,
+            273,
+            825,
+            375
+        ],
+        "page_idx": 4
+    },
+    {
+        "type": "text",
+        "text": "The proof of Lemma 4.2 is included in Appendix A.4. Based on the theoretical bound, we employ the empirical estimate in Definition 4.1 to compute the functional distance in practice. The process begins by sampling a set of t representative prompts, $\\boldsymbol { S } _ { t } ~ = ~ \\{ \\boldsymbol { x } _ { 1 } , \\ldots , \\boldsymbol { x } _ { t } \\}$ , from a distribution $\\mu$ that reflects real-world inputs. For a given LLM $f ,$ we collect the textual response for each prompt $x _ { j } \\in S _ { t }$ and encode it into a semantic vector as described in Section 4.1. These t response vectors are then concatenated end-to-end. This procedure yields a single, high-dimensional vector that serves as a functional representation for the LLM over the sampled inputs. The squared Euclidean distance between two such representations approximates the squared empirical functional distance $\\hat { d } _ { f } ^ { 2 }$ , which is further a robust and computable estimation of the true squared Hilbert distance $d _ { H } ^ { 2 }$",
+        "bbox": [
+            169,
+            387,
+            826,
+            520
+        ],
+        "page_idx": 4
+    },
+    {
+        "type": "text",
+        "text": "4.3 OVERALL PIPELINE",
+        "text_level": 2,
+        "bbox": [
+            171,
+            541,
+            354,
+            556
+        ],
+        "page_idx": 4
+    },
+    {
+        "type": "text",
+        "text": "This section presents RepTrace algorithm, a training-free end-to-end DNA extraction pipeline. The procedure is detailed in Algorithm 1 and visualized in Figure 1. We begin by selecting a sample input set $S _ { t }$ of t prompts drawn from real-world datasets. Each input $x _ { i }$ is fed to an LLM $f$ to generate a textual response $y _ { i }$ (line $4 ) _ { ; }$ , which is then encoded into a fixed-size semantic vector $e _ { i }$ using a sentence-embedding model (line 5). These t embedding vectors are then concatenated to form a single, high-dimensional functional representation $E _ { f }$ for the LLM (line 6). Finally, a pre-computed random Gaussian projection A (line 1) linearly projects this high-dimensional representation $E _ { f }$ into a low-dimensional vector $\\tau _ { f } \\in \\mathbb { R } ^ { L }$ (line $7 ) .$ , referred to as the DNA of the LLM.",
+        "bbox": [
+            169,
+            569,
+            826,
+            685
+        ],
+        "page_idx": 4
+    },
+    {
+        "type": "code",
+        "sub_type": "algorithm",
+        "code_caption": [],
+        "code_body": "<div class=\"mineru-algorithm\" style=\"white-space: pre-wrap; font-family:monospace;\">\nAlgorithm 1: RepTrace: LLM DNA Extraction Pipeline\nInput : Max length $m$; sample size $t$; DNA dimension $L$; sentence-embedding model $\\phi : \\Sigma^* \\to \\mathbb{R}^p$;\n    A sample input set $\\mathcal{S}_t = \\{x_1, \\ldots, x_t\\}$ drawn uniformly from real-world datasets;\n    A collection of LLMs $\\mathcal{F}_K = \\{f_1, \\ldots, f_K\\} \\subset \\mathcal{F}$.\nOutput: DNA vectors $\\{\\tau_f \\in \\mathbb{R}^L : f \\in \\mathcal{F}_K\\}$.\nInitialize random Gaussian projection: draw $A \\in \\mathbb{R}^{L \\times (p \\cdot t)}$ with $A_{jk} \\sim \\mathcal{N}(0, 1/\\sqrt{L})$.\nforeach $f \\in \\mathcal{F}_K$ do\n    for $i \\leftarrow 1$ to $t$ do\n        $y_i \\leftarrow f(x_i)$ // Textual response of $f$ on input $x_i$ $e_i \\leftarrow \\phi(y_i) \\in \\mathbb{R}^p$ // Semantic embedding\n    $E_f \\leftarrow [e_1, e_2, \\ldots, e_t] \\in \\mathbb{R}^{p \\cdot t}$ // Concatenate response embeddings\n    $\\tau_f \\leftarrow A E_f \\in \\mathbb{R}^L$ // Project into DNA space\nreturn $\\{\\tau_f : f \\in \\mathcal{F}_K\\}$\n</div>",
+        "bbox": [
+            158,
+            705,
+            821,
+            902
+        ],
+        "page_idx": 4
+    },
+    {
+        "type": "header",
+        "text": "Published as a conference paper at ICLR 2026",
+        "bbox": [
+            171,
+            32,
+            480,
+            47
+        ],
+        "page_idx": 4
+    },
+    {
+        "type": "page_number",
+        "text": "5",
+        "bbox": [
+            493,
+            948,
+            504,
+            960
+        ],
+        "page_idx": 4
+    },
+    {
+        "type": "text",
+        "text": "5 EXPERIMENTS",
+        "text_level": 2,
+        "bbox": [
+            171,
+            103,
+            328,
+            118
+        ],
+        "page_idx": 5
+    },
+    {
+        "type": "text",
+        "text": "This section provides a rigorous empirical validation of LLM DNA as a robust functional fingerprint. Following our experimental setup across 305 models (§5.1, §B), we demonstrate DNA’s efficacy in relationship detection (§5.2) and training-free model routing (§5.3). We verify the representation’s stability through stress tests involving data heterogeneity (§5.4), synthetic random inputs (§5.5), chat template variations (§5.6), and fine-tuning intensity (§5.7). Systematic ablations characterize the influence of bottleneck embedding models (§C.3), pre-aggregation dimensions p (§C.4), and DNA length L (§C.5). To address technical edge cases, we analyze parameter-size bias (§C.6), sametokenizer performance (§C.7), and relationship ”false positives” (§C.2). We conclude by leveraging these functional distances to reconstruct a phylogenetic tree of LLMs (§5.8, §C.1), providing a datadriven map of the field’s architectural evolution.",
+        "bbox": [
+            169,
+            136,
+            826,
+            277
+        ],
+        "page_idx": 5
+    },
+    {
+        "type": "text",
+        "text": "5.1 EXPERIMENTAL SETTING",
+        "text_level": 2,
+        "bbox": [
+            171,
+            297,
+            393,
+            311
+        ],
+        "page_idx": 5
+    },
+    {
+        "type": "text",
+        "text": "Datasets. We evaluate across a diverse set of datasets covering question answering, commonsense reasoning, and general natural language understanding. Specifically, the pipeline integrates six widely used benchmarks, including SQuAD (Rajpurkar et al., 2016), CommonsenseQA (Talmor et al., 2018), HellaSwag (Zellers et al., 2019), Winogrande (Sakaguchi et al., 2020), ARC-Challenge (Clark et al., 2018), and MMLU (Hendrycks et al., 2021). DNA extraction employs a mixture of all six datasets, with each dataset contributing 100 random samples. Besides, EmbedLLM (Zhuang et al., 2025) dataset is also used to evaluate model routing, though not involved in DNA extraction. For each dataset, prompts are drawn from their designated text fields (e.g., question, sentence, or ctx).",
+        "bbox": [
+            169,
+            325,
+            826,
+            450
+        ],
+        "page_idx": 5
+    },
+    {
+        "type": "text",
+        "text": "LLMs. This study spans 305 LLMs released by 153 organizations (e.g. Qwen, Llama, etc.) on Hugging Face. The evaluation focuses on text-generative models, covering both decoderonly and encoder-decoder architectures, with parameter scales ranging from 100M to 70B. Both instruction-tuned or base models are included in the evaluation. Text embeddings are extracted with the state-of-the-art open-source encoder Qwen/Qwen3-Embedding-8B by default, with performance comparison to sentence-transformers/all-mpnet-base-v2 and BAAI/bge-large-en-v1.5 presented. More model details are included in Appendix B.",
+        "bbox": [
+            169,
+            455,
+            826,
+            556
+        ],
+        "page_idx": 5
+    },
+    {
+        "type": "text",
+        "text": "5.2 DETECT LLM RELATIONSHIPS",
+        "text_level": 2,
+        "bbox": [
+            171,
+            575,
+            431,
+            590
+        ],
+        "page_idx": 5
+    },
+    {
+        "type": "text",
+        "text": "In this subsection, we validate DNA against Zhu et al. (2025), scale to 305 LLMs to demonstrate accurate relationship detection, and visualize the distribution to uncover undocumented model pairs.",
+        "bbox": [
+            169,
+            604,
+            825,
+            633
+        ],
+        "page_idx": 5
+    },
+    {
+        "type": "text",
+        "text": "Figure 2 shows the DNA distribution of the eight models (four correlated, four independent) in Table 1 of Zhu et al. (2025). The decision boundary is computed by a support vector machine (SVM) with an RBF kernel, indicating that the DNAs of correlated and independent models are clearly separated. This result shows that the DNA structure is consistent with both the experiments in Zhu et al. (2025) and the corresponding Hugging Face documentation.",
+        "bbox": [
+            169,
+            638,
+            826,
+            710
+        ],
+        "page_idx": 5
+    },
+    {
+        "type": "text",
+        "text": "Table 1 extends this experiment to 305 models. Using the official Hugging Face relationship (the “Model Tree”) as ground truth for correlated models, we obtain 83 correlated pairs. We additionally sample 83 random pairs and treat them as independent. The resulting dataset is split 8:2 into training and test sets. Three baselines are compared alongside our approach: Random—uniformly guessing independent or correlated; Greedy—predicting that all within-organization pairs are correlated and cross-organization pairs are independent; and PhyloLM (Yax et al., 2025)—genetic (Nei) distances to other LLMs in the training set are regarded as a signature vector. For PhyloLM and DNA, an SVM with RBF kernel is used for prediction. From Table 1, three observations emerge. First, DNA significantly outperforms the baselines and achieves a high AUC of 0.992, indicating accurate detection of relationships among heterogeneous LLMs. Second, DNA attains higher recall than precision; this does not necessarily indicate a flaw in DNA, but rather suggests the presence of undocumented relationships in the official model tree. A detailed case study of the misclassified pairs appears in Appendix C.2. Third, DNA quality is robust to the choice of sentence-embedding model. Using BGE (0.3B) and MPNet (0.1B), despite their much smaller parameter sizes, yields comparable—and in this relation prediction task, even better—performance.",
+        "bbox": [
+            169,
+            715,
+            826,
+            926
+        ],
+        "page_idx": 5
+    },
+    {
+        "type": "header",
+        "text": "Published as a conference paper at ICLR 2026",
+        "bbox": [
+            171,
+            32,
+            480,
+            47
+        ],
+        "page_idx": 5
+    },
+    {
+        "type": "page_number",
+        "text": "6",
+        "bbox": [
+            493,
+            948,
+            504,
+            960
+        ],
+        "page_idx": 5
+    },
+    {
+        "type": "chart",
+        "img_path": "images/1cd7a620831fa79b4c859fb7e8bc27686d9bd2f5c1a6e86895b915a60e86cb75.jpg",
+        "content": "",
+        "chart_caption": [
+            "Figure 2: DNA distribution of LLMs evaluated by Zhu et al. (2025). “Independent” and “Correlated” relative to Llama-2-7B-hf are based on public documents. The boundary is computed by an SVM with RBF kernel, indicating that the DNAs of “Independent” and “Correlated” models are clearly separated."
+        ],
+        "chart_footnote": [],
+        "bbox": [
+            184,
+            108,
+            483,
+            279
+        ],
+        "page_idx": 6
+    },
+    {
+        "type": "chart",
+        "img_path": "images/d296f9a763c3dfc5bf0fcedacf1edf072db0b18b33d9860a9fde8c7af93df1ff.jpg",
+        "content": "",
+        "chart_caption": [
+            "Figure 3: Mantel test between DNA extracted from two disjoint datasets. Each point represents a single pair of models, plotted by their distance in the first dataset versus their distance in the second, showing a strong correlation (Pearson-r = 0.7797) and high statistical significance (p-value < 0.0001)."
+        ],
+        "chart_footnote": [],
+        "bbox": [
+            529,
+            99,
+            823,
+            281
+        ],
+        "page_idx": 6
+    },
+    {
+        "type": "text",
+        "text": "Figure 4 presents the t-SNE visualization of all 305 models, resulting in three main observations. First, models from the same organization and model family cluster tightly (e.g., Qwen3, Llama), confirming that DNA can be used to detect relationships among LLMs. Second, fine-tuned models are closely related to their base models, confirming the inheritance property. For instance, DeepSeek-distilled Qwen models locate near the Qwen3 cluster (right, purple). Third, some relationships that are not well documented appear closely in the visualization. For example, both Microsoft $\\mathtt { o r c a - } 2 \\mathtt { - } 1 3 \\mathtt { b }$ and LMSYS vicuna-7b-v1.1, both of which are not in the “Model $\\mathrm { T r e e } ^ { , \\bullet }$ , state in their model cards that they are fine-tuned from Llama without specifying the version. In Figure 4, $\\mathtt { v i c u n a - 7 b - v 1 }$ .1 is located within the Llama-base cluster (left-middle, green), and orca-2-13b lies in the Llama-chat cluster (upper-middle, green), suggesting their likely base versions in fine-tuning. This demonstrates the capability of DNA to detect related LLMs.",
+        "bbox": [
+            169,
+            416,
+            826,
+            571
+        ],
+        "page_idx": 6
+    },
+    {
+        "type": "table",
+        "img_path": "images/d6ed85cbf709df711427a9966994c01b0008aa0f4fb8769bfd1611f44610a0db.jpg",
+        "table_caption": [
+            "Table 1: DNA LLM-relation detection test performance (mean ±standard deviation across five seeds)"
+        ],
+        "table_footnote": [],
+        "table_body": "<table><tr><td>Method</td><td>Accuracy</td><td>Precision</td><td>Recall</td><td>F1</td><td>AUC</td></tr><tr><td>Random</td><td>0.493 ±0.036</td><td>0.515 ±0.034</td><td>0.516 ±0.042</td><td>0.516 ±0.036</td><td>0.492 ±0.036</td></tr><tr><td>Greedy</td><td>0.593 ±0.018</td><td>0.759 ±0.081</td><td>0.329 ±0.000</td><td>0.458 ±0.014</td><td>0.606 ±0.023</td></tr><tr><td>PhyloLM + SVM</td><td>0.742 ±0.058</td><td>0.741 ±0.073</td><td>0.812 ±0.123</td><td>0.766 ±0.057</td><td>0.788 ±0.060</td></tr><tr><td>DNA (Qwen3) + SVM</td><td>0.919 ±0.048</td><td>0.898 ±0.049</td><td>0.957 ±0.072</td><td>0.925 ±0.047</td><td>0.979 ±0.027</td></tr><tr><td>DNA (BGE) + SVM</td><td>0.934 ±0.053</td><td>0.905 ±0.068</td><td>0.982 ±0.059</td><td>0.940 ±0.050</td><td>0.992 ±0.023</td></tr><tr><td>DNA (MPNet) + SVM</td><td>0.932 ±0.048</td><td>0.914 ±0.065</td><td>0.966 ±0.069</td><td>0.937 ±0.047</td><td>0.990 ±0.020</td></tr></table>",
+        "bbox": [
+            176,
+            607,
+            821,
+            717
+        ],
+        "page_idx": 6
+    },
+    {
+        "type": "table",
+        "img_path": "images/0a2f8e1f59b2e358f0800488a29cfbfdc3f1c7f694e6f46b9f95bd6012835c73.jpg",
+        "table_caption": [
+            "Table 2: DNA-based routing accuracy on test set"
+        ],
+        "table_footnote": [],
+        "table_body": "<table><tr><td>Random</td><td>Single Best</td><td>EmbedLLM (Matrix Factorisation)</td><td>DNA</td></tr><tr><td> $0.402 \\pm 0.016$ </td><td> $0.607 \\pm 0.000$ </td><td> $0.665 \\pm 0.003$ </td><td> $0.672 \\pm 0.008$ </td></tr></table>",
+        "bbox": [
+            230,
+            763,
+            767,
+            803
+        ],
+        "page_idx": 6
+    },
+    {
+        "type": "text",
+        "text": "5.3 MODEL ROUTING",
+        "text_level": 2,
+        "bbox": [
+            171,
+            828,
+            341,
+            843
+        ],
+        "page_idx": 6
+    },
+    {
+        "type": "text",
+        "text": "This section investigates how DNA can benefit model routing. We use the same dataset, data split, baselines, and metric as EmbedLLM (Zhuang et al., 2025). EmbedLLM learns a compact LLM representation during routing training. To compare the quality of DNA with EmbedLLM-learned embeddings, within the matrix factorization framework of EmbedLLM, we replace the LLM embedding layer and its subsequent linear layer with frozen DNAs. These DNAs are directly compared with the query embeddings to make routing decisions. Notably, 11 models reported by Zhuang et al. (2025) either no longer exist or failed to run; their results are therefore omitted. Hence, our numbers do not perfectly align with those in Zhuang et al. (2025).",
+        "bbox": [
+            169,
+            854,
+            826,
+            925
+        ],
+        "page_idx": 6
+    },
+    {
+        "type": "header",
+        "text": "Published as a conference paper at ICLR 2026",
+        "bbox": [
+            171,
+            32,
+            480,
+            47
+        ],
+        "page_idx": 6
+    },
+    {
+        "type": "page_number",
+        "text": "7",
+        "bbox": [
+            493,
+            948,
+            504,
+            959
+        ],
+        "page_idx": 6
+    },
+    {
+        "type": "chart",
+        "img_path": "images/4e8d2a79ee465336a59d4f93e60ff893b37b011eb0dcfe24531af0eaf79a7d8c.jpg",
+        "content": "",
+        "chart_caption": [
+            "Figure 4: Visualization of DNAs by t-SNE. Colors denote organizations releasing LLMs. Organizations with fewer than five LLMs are collapsed into “Others”. Background regions are obtained by localized DBSCAN started where each organization forms a group of more than three models."
+        ],
+        "chart_footnote": [],
+        "bbox": [
+            220,
+            106,
+            779,
+            426
+        ],
+        "page_idx": 7
+    },
+    {
+        "type": "text",
+        "text": "",
+        "bbox": [
+            169,
+            508,
+            825,
+            553
+        ],
+        "page_idx": 7
+    },
+    {
+        "type": "text",
+        "text": "Table 2 reports routing accuracy, defined by Zhuang et al. (2025) as the fraction of queries routed to an LLM that answers correctly. The results show that frozen DNA outperforms the embeddings learned by EmbedLLM. This result is notable because EmbedLLM explicitly learns representations on this routing dataset, whereas LLM DNA is training-free and task-agnostic. Achieving parity without task-specific optimization validates the quality of DNA and highlights its superior scalability: unlike EmbedLLM, our model supports arbitrary new models without retraining.",
+        "bbox": [
+            169,
+            558,
+            826,
+            643
+        ],
+        "page_idx": 7
+    },
+    {
+        "type": "text",
+        "text": "5.4 STABILITY OF DNA ON HETEROGENEOUS DATASETS",
+        "text_level": 2,
+        "bbox": [
+            171,
+            659,
+            584,
+            674
+        ],
+        "page_idx": 7
+    },
+    {
+        "type": "text",
+        "text": "This subsection examines how the choice of sampled distribution $S _ { t }$ influences the quality of the generated DNAs. We assess this effect with a Mantel test between DNAs extracted from two disjoint datasets. Specifically, we construct one dataset as the union of 100 samples from SQuAD and 100 samples from CommonsenseQA (squad cqa) and another as the union of 100 samples from HellaSwag and 100 samples from Winogrande (hs wg). We compute DNAs from the same set of models, then calculate the distances between randomly selected pairs of models, visualize them in Figure 3, and compute the Pearson correlation and its p-value. From Figure 3, we observe a strong correlation (Pearson $r > 0 . 7 5 )$ between the two distance structures with very high statistical significance $( p < 0 . 0 0 1 )$ ). These results indicate that the structure of DNAs does not depend on the sampled data from which it is extracted, indicating the stability of our DNA extraction approach.",
+        "bbox": [
+            169,
+            685,
+            826,
+            827
+        ],
+        "page_idx": 7
+    },
+    {
+        "type": "text",
+        "text": "5.5 DNA EXTRACTED FROM RANDOM DATA",
+        "text_level": 2,
+        "bbox": [
+            171,
+            842,
+            500,
+            856
+        ],
+        "page_idx": 7
+    },
+    {
+        "type": "text",
+        "text": "This subsection shows that LLM DNA remains discriminative even under random inputs. We generate 600 synthetic 100-word prompts using wonderwords.RandomWord (6×100, matching the main protocol), run each LLM to obtain outputs, embed them with Qwen3-8B-Embedding using the same DNA extraction pipeline, and evaluate DNAs via relation prediction. An example slice of the random inputs is: “disdain chapel intention gymnast activation ... codpiece hypothesis endothelium masonry”.",
+        "bbox": [
+            169,
+            867,
+            826,
+            925
+        ],
+        "page_idx": 7
+    },
+    {
+        "type": "header",
+        "text": "Published as a conference paper at ICLR 2026",
+        "bbox": [
+            171,
+            32,
+            480,
+            47
+        ],
+        "page_idx": 7
+    },
+    {
+        "type": "page_number",
+        "text": "8",
+        "bbox": [
+            493,
+            948,
+            504,
+            960
+        ],
+        "page_idx": 7
+    },
+    {
+        "type": "text",
+        "text": "",
+        "bbox": [
+            169,
+            104,
+            825,
+            133
+        ],
+        "page_idx": 8
+    },
+    {
+        "type": "text",
+        "text": "The results are reported in Table 3. Interestingly, the random-data setting even slightly outperforms the standard benchmark. This highlights that the DNA extraction method is largely insensitive to input-dataset bias. The key intuition is that DNA analyses (e.g., relationship prediction) target relative relationships among LLMs rather than absolute accuracy. Different datasets act as different “views” of the same model set: a suboptimal view may obscure some relations, but it is unlikely to fabricate spurious ones—for instance, it will not make two genuinely similar models appear unrelated. This observation also aligns with the stability we see under random projection.",
+        "bbox": [
+            169,
+            138,
+            826,
+            238
+        ],
+        "page_idx": 8
+    },
+    {
+        "type": "table",
+        "img_path": "images/a8442270aac1af4808caca721d6b28881b0949152eaaeb264f43d1bd44a4ee25.jpg",
+        "table_caption": [
+            "Table 3: DNA (Qwen3) relation prediction performance (DNA extracted from random inputs)"
+        ],
+        "table_footnote": [],
+        "table_body": "<table><tr><td>Method</td><td>Accuracy</td><td>Precision</td><td>Recall</td><td>F1</td><td>AUC</td></tr><tr><td>PhyloLM + SVM</td><td>0.742 ±0.058</td><td>0.741 ±0.073</td><td>0.812 ±0.123</td><td>0.766 ±0.057</td><td>0.788 ±0.060</td></tr><tr><td>DNA + SVM</td><td>0.919 ±0.048</td><td>0.898 ±0.049</td><td>0.957 ±0.072</td><td>0.925 ±0.047</td><td>0.979 ±0.027</td></tr><tr><td>DNA (Rand) + SVM</td><td>0.949 ±0.048</td><td>0.931 ±0.053</td><td>0.977 ±0.062</td><td>0.952 ±0.048</td><td>0.987 ±0.038</td></tr></table>",
+        "bbox": [
+            181,
+            277,
+            815,
+            342
+        ],
+        "page_idx": 8
+    },
+    {
+        "type": "text",
+        "text": "5.6 ABLATION STUDY FOR CHAT TEMPLATE",
+        "text_level": 2,
+        "bbox": [
+            171,
+            372,
+            498,
+            386
+        ],
+        "page_idx": 8
+    },
+    {
+        "type": "text",
+        "text": "We study how chat templates influence DNA extraction for instruction-tuned models. Chat templates inject the special tokens and formatting used during instruction tuning to elicit conversational behavior. For an instruction-tuned model (e.g., Llama3-Instruct), we compare two protocols: (i) bypass the template and feed the raw prompt directly (completion-style), and (ii) apply the template and compute DNA using only the extracted assistant’s response. For non-chat (base/completion) models, the extraction pipeline is unchanged. We report relationship prediction performance under the same setting as Table 4. Removing the chat template consistently improves accuracy by 1–3% across encoders, suggesting that for cross-family comparisons involving both chat-tuned and completion models, omitting templates yields a fairer and more direct functional comparison by evaluating chat-tuned models through the same completion-style interface as their base counterparts.",
+        "bbox": [
+            169,
+            398,
+            826,
+            539
+        ],
+        "page_idx": 8
+    },
+    {
+        "type": "table",
+        "img_path": "images/28350d002254d757c723c3ae14e4f0f15ad45a83e9ed62ea510fb95723fb275b.jpg",
+        "table_caption": [
+            "Table 4: DNA relation prediction performance: with vs without chat templates"
+        ],
+        "table_footnote": [],
+        "table_body": "<table><tr><td>Encoder</td><td>Template</td><td>Accuracy</td><td>Precision</td><td>Recall</td><td>F1</td><td>AUC</td></tr><tr><td rowspan=\"2\">Qwen3</td><td>w/ template</td><td>0.919 ±0.048</td><td>0.898 ±0.049</td><td>0.957 ±0.072</td><td>0.925 ±0.047</td><td>0.979 ±0.027</td></tr><tr><td>w/o template</td><td>0.930 ±0.045</td><td>0.916 ±0.067</td><td>0.961 ±0.071</td><td>0.935 ±0.044</td><td>0.994 ±0.021</td></tr><tr><td rowspan=\"2\">MPNet</td><td>w/ template</td><td>0.932 ±0.048</td><td>0.914 ±0.065</td><td>0.966 ±0.069</td><td>0.937 ±0.047</td><td>0.990 ±0.020</td></tr><tr><td>w/o template</td><td>0.958 ±0.047</td><td>0.943 ±0.060</td><td>0.982 ±0.059</td><td>0.960 ±0.047</td><td>0.994 ±0.016</td></tr><tr><td rowspan=\"2\">BGE</td><td>w/ template</td><td>0.934 ±0.053</td><td>0.905 ±0.068</td><td>0.982 ±0.059</td><td>0.940 ±0.050</td><td>0.992 ±0.023</td></tr><tr><td>w/o template</td><td>0.945 ±0.054</td><td>0.929 ±0.073</td><td>0.974 ±0.066</td><td>0.948 ±0.052</td><td>0.992 ±0.023</td></tr></table>",
+        "bbox": [
+            173,
+            579,
+            831,
+            693
+        ],
+        "page_idx": 8
+    },
+    {
+        "type": "text",
+        "text": "5.7 EFFECT OF FINE-TUNING ON THE DNA VALUES",
+        "text_level": 2,
+        "bbox": [
+            171,
+            722,
+            550,
+            738
+        ],
+        "page_idx": 8
+    },
+    {
+        "type": "text",
+        "text": "This subsection quantifies how fine-tuning changes DNA values. Starting from Llama3-8B-Instruct, we fully fine-tune all parameters on subsets of the NVIDIA OpenMathInstruct-2 dataset (Toshniwal et al., 2024) with sizes 10, 100, 1000, 10000. Since Llama3 was released before OpenMathInstruct-2, this dataset appears in neither its pretraining corpus nor our DNA extraction set. Figure 5 compares the DNAs of the original and fine-tuned models and reports their L distances to the original DNA.",
+        "bbox": [
+            169,
+            750,
+            826,
+            835
+        ],
+        "page_idx": 8
+    },
+    {
+        "type": "text",
+        "text": "We draw two conclusions. First, the DNA distance increases with the amount of fine-tuned data, showing a monotonic but nonlinear trend. Specifically, the distance rises sharply after fine-tuning on a tiny external subset (e.g., the first 10 samples causes $L _ { 2 } = 0 . 6 9 )$ and then grows more gradually (up to 0.80 with 10,000 samples) as additional samples are learned. Second, the global DNA structure remains stable: most subsequences preserve their dark/light patterns with only minor variation, suggesting that fine-tuning alters local traits while leaving inherited, intrinsic behaviors largely intact.",
+        "bbox": [
+            169,
+            840,
+            826,
+            926
+        ],
+        "page_idx": 8
+    },
+    {
+        "type": "header",
+        "text": "Published as a conference paper at ICLR 2026",
+        "bbox": [
+            171,
+            32,
+            480,
+            47
+        ],
+        "page_idx": 8
+    },
+    {
+        "type": "page_number",
+        "text": "9",
+        "bbox": [
+            493,
+            948,
+            504,
+            959
+        ],
+        "page_idx": 8
+    },
+    {
+        "type": "chart",
+        "img_path": "images/ed196e7893088baed3ba53928cda783c4edf5bedf9af5c1d96ef0cb152fba69b.jpg",
+        "content": "",
+        "chart_caption": [
+            "Figure 5: Shift of DNA values when (full-parameter) fine-tuning Llama3-8B-Instruct with OpenMathInstruct-2 subsets of size n"
+        ],
+        "chart_footnote": [],
+        "bbox": [
+            184,
+            102,
+            813,
+            263
+        ],
+        "page_idx": 9
+    },
+    {
+        "type": "text",
+        "text": "5.8 PHYLOGENETIC TREE OF LLM",
+        "text_level": 2,
+        "bbox": [
+            171,
+            335,
+            433,
+            351
+        ],
+        "page_idx": 9
+    },
+    {
+        "type": "text",
+        "text": "Analogous to phylogenetic analysis in biology, once LLM DNA is available, we can construct a phylogenetic tree to visualize model evolution. Specifically, we adopt the widely used Neighbor-Joining (NJ) method (Saitou & Nei, 1987) based on DNA distances, followed by the default midpointrooting strategy. Figure 6 visualizes this tree, with branches ordered by their leaf counts. Notably, without access to release dates, LLM DNA distances generally recover the actual evolution path, including: (i) architectural shifts from encoder-decoder (e.g., Flan-T5) to widely used decoder-only models (e.g., Llama, Qwen); (ii) temporal progression from 2023 to 2025; and (iii) lineage evolution within LLM families (e.g., Llama 2 to Llama 3). Moreover, since longer branches represent a greater functional distance between successive model families, the tree suggests distinct evolutionary speeds across model families; for instance, Qwen and Gemma evolve faster than the Llama series. A more detailed phylogenetic tree with one model per leaf is provided in Appendix C.1.",
+        "bbox": [
+            169,
+            364,
+            826,
+            520
+        ],
+        "page_idx": 9
+    },
+    {
+        "type": "chart",
+        "img_path": "images/722b8bb51e72a123adade0f27824c30d16c4b22984709c4ab530c60db7d07e3d.jpg",
+        "content": "",
+        "chart_caption": [
+            "Figure 6: Phylogenetic Tree of LLM families built from DNA $\\ell _ { 2 }$ distances with NJ algorithm"
+        ],
+        "chart_footnote": [],
+        "bbox": [
+            207,
+            537,
+            790,
+            715
+        ],
+        "page_idx": 9
+    },
+    {
+        "type": "text",
+        "text": "6 CONCLUSION",
+        "text_level": 2,
+        "bbox": [
+            171,
+            791,
+            321,
+            806
+        ],
+        "page_idx": 9
+    },
+    {
+        "type": "text",
+        "text": "In this paper, we introduced LLM DNA, a formal framework for representing the functional behavior of large language models. We mathematically defined LLM DNA as a low-dimensional vector, proved its existence, and established its key properties of inheritance and genetic determination. Based on this theory, we developed a practical, training-free pipeline to extract DNA from a wide range of models. Our experiments on 305 LLMs demonstrate that DNA can effectively detect both documented and undocumented evolutionary relationships, and constructing a phylogenetic tree from these DNAs provides a novel way to visualize the evolution of the LLM ecosystem.",
+        "bbox": [
+            169,
+            825,
+            826,
+            925
+        ],
+        "page_idx": 9
+    },
+    {
+        "type": "header",
+        "text": "Published as a conference paper at ICLR 2026",
+        "bbox": [
+            173,
+            32,
+            480,
+            47
+        ],
+        "page_idx": 9
+    },
+    {
+        "type": "page_number",
+        "text": "10",
+        "bbox": [
+            490,
+            948,
+            509,
+            960
+        ],
+        "page_idx": 9
+    },
+    {
+        "type": "text",
+        "text": "REPRODUCIBILITY STATEMENT",
+        "text_level": 2,
+        "bbox": [
+            171,
+            103,
+            439,
+            118
+        ],
+        "page_idx": 10
+    },
+    {
+        "type": "text",
+        "text": "To facilitate reproducibility, we release our source code at https://github.com/ Xtra-Computing/LLM-DNA and an interactive demo at https://dna.xtra.science. We also provide a PyPI package, available at https://pypi.org/project/llm-dna, which can be installed via pip install llm-dna. Regarding theoretical and experimental details, proofs appear in Appendix A, data specifications in Section 5.1, and hyperparameters, model details, and licenses in Appendix B.",
+        "bbox": [
+            169,
+            133,
+            825,
+            219
+        ],
+        "page_idx": 10
+    },
+    {
+        "type": "text",
+        "text": "ETHICAL STATEMENT",
+        "text_level": 2,
+        "bbox": [
+            171,
+            239,
+            359,
+            253
+        ],
+        "page_idx": 10
+    },
+    {
+        "type": "text",
+        "text": "This study does not involve human subjects. All models used are open source, and we comply with their licenses; our use is solely for research purposes. The technique does not pose any significant privacy or security risk.",
+        "bbox": [
+            169,
+            270,
+            825,
+            314
+        ],
+        "page_idx": 10
+    },
+    {
+        "type": "text",
+        "text": "ACKNOWLEDGEMENT",
+        "text_level": 2,
+        "bbox": [
+            173,
+            334,
+            359,
+            349
+        ],
+        "page_idx": 10
+    },
+    {
+        "type": "text",
+        "text": "This research/project is supported by the National Research Foundation, Singapore and Infocomm Media Development Authority under its Trust Tech Funding Initiative. Any opinions, findings and conclusions or recommendations expressed in this material are those of the author(s) and do not reflect the views of National Research Foundation, Singapore and Infocomm Media Development Authority.",
+        "bbox": [
+            169,
+            364,
+            825,
+            435
+        ],
+        "page_idx": 10
+    },
+    {
+        "type": "text",
+        "text": "Zhaomin Wu is also partially supported by a National Research Foundation (NRF) Postdoctoral Award.",
+        "bbox": [
+            169,
+            441,
+            825,
+            469
+        ],
+        "page_idx": 10
+    },
+    {
+        "type": "text",
+        "text": "REFERENCES",
+        "text_level": 2,
+        "bbox": [
+            173,
+            491,
+            287,
+            507
+        ],
+        "page_idx": 10
+    },
+    {
+        "type": "ref_text",
+        "text": "Pengzhou Cheng, Zongru Wu, Tianjie Ju, Wei Du, and Zhuosheng Zhang Gongshen Liu. Transferring backdoors between large language models by knowledge distillation. arXiv preprint arXiv:2408.09878, 2024.",
+        "bbox": [
+            173,
+            515,
+            823,
+            556
+        ],
+        "page_idx": 10
+    },
+    {
+        "type": "ref_text",
+        "text": "Peter Clark, Isaac Cowhey, Oren Etzioni, Tushar Khot, Ashish Sabharwal, Carissa Schoenick, and Oyvind Tafjord. Think you have solved question answering? try arc, the ai2 reasoning challenge. arXiv preprint arXiv:1803.05457, 2018.",
+        "bbox": [
+            174,
+            568,
+            823,
+            609
+        ],
+        "page_idx": 10
+    },
+    {
+        "type": "ref_text",
+        "text": "Sanjoy Dasgupta and Anupam Gupta. An elementary proof of a theorem of johnson and lindenstrauss. Random Structures & Algorithms, 22(1):60–65, 2003.",
+        "bbox": [
+            174,
+            619,
+            823,
+            648
+        ],
+        "page_idx": 10
+    },
+    {
+        "type": "ref_text",
+        "text": "Dujian Ding, Ankur Mallick, Chi Wang, Robert Sim, Subhabrata Mukherjee, Victor Ruhle, Laks VS Lakshmanan, and Ahmed Hassan Awadallah. Hybrid llm: Cost-efficient and quality-aware query routing. arXiv preprint arXiv:2404.14618, 2024.",
+        "bbox": [
+            174,
+            657,
+            823,
+            700
+        ],
+        "page_idx": 10
+    },
+    {
+        "type": "ref_text",
+        "text": "Tian Dong, Shaofeng Li, Guoxing Chen, Minhui Xue, Haojin Zhu, and Zhen Liu. Rai2: Responsible identity audit governing the artificial intelligence. In NDSS, 2023.",
+        "bbox": [
+            174,
+            710,
+            823,
+            739
+        ],
+        "page_idx": 10
+    },
+    {
+        "type": "ref_text",
+        "text": "Moming Duan, Mingzhe Du, Rui Zhao, Mengying Wang, Yinghui Wu, Nigel Shadbolt, and Bingsheng He. Position: Current model licensing practices are dragging us into a quagmire of legal noncompliance. In Forty-second International Conference on Machine Learning Position Paper Track, 2025.",
+        "bbox": [
+            174,
+            750,
+            823,
+            804
+        ],
+        "page_idx": 10
+    },
+    {
+        "type": "ref_text",
+        "text": "Chenhao Fang, Xiaohan Li, Zezhong Fan, Jianpeng Xu, Kaushiki Nag, Evren Korpeoglu, Sushant Kumar, and Kannan Achan. Llm-ensemble: Optimal large language model ensemble method for e-commerce product attribute value extraction. In Proceedings of the 47th International ACM SIGIR Conference on Research and Development in Information Retrieval, pp. 2910–2914, 2024.",
+        "bbox": [
+            173,
+            815,
+            823,
+            871
+        ],
+        "page_idx": 10
+    },
+    {
+        "type": "ref_text",
+        "text": "Zhiyuan Fu, Junfan Chen, Hongyu Sun, Ting Yang, Ruidong Li, and Yuqing Zhang. Fdllm: A text fingerprint detection method for llms in multi-language, multi-domain black-box environments. arXiv e-prints, pp. arXiv–2501, 2025.",
+        "bbox": [
+            174,
+            882,
+            823,
+            922
+        ],
+        "page_idx": 10
+    },
+    {
+        "type": "header",
+        "text": "Published as a conference paper at ICLR 2026",
+        "bbox": [
+            171,
+            32,
+            480,
+            47
+        ],
+        "page_idx": 10
+    },
+    {
+        "type": "page_number",
+        "text": "11",
+        "bbox": [
+            490,
+            948,
+            508,
+            959
+        ],
+        "page_idx": 10
+    },
+    {
+        "type": "ref_text",
+        "text": "Shanshan Han, Qifan Zhang, Yuhang Yao, Weizhao Jin, and Zhaozhuo Xu. Llm multi-agent systems: Challenges and open problems. arXiv preprint arXiv:2402.03578, 2024.",
+        "bbox": [
+            171,
+            104,
+            825,
+            133
+        ],
+        "page_idx": 11
+    },
+    {
+        "type": "ref_text",
+        "text": "Dan Hendrycks, Collin Burns, Steven Basart, Andy Zou, Mantas Mazeika, Dawn Song, and Jacob Steinhardt. Measuring massive multitask language understanding. Proceedings of the International Conference on Learning Representations (ICLR), 2021.",
+        "bbox": [
+            171,
+            141,
+            825,
+            184
+        ],
+        "page_idx": 11
+    },
+    {
+        "type": "ref_text",
+        "text": "Jie Huang and Kevin Chen-Chuan Chang. Towards reasoning in large language models: A survey. In Findings ofthe associationfor computational linguistics: ACL 2023, pp. 1049–1065, 2023.",
+        "bbox": [
+            171,
+            193,
+            823,
+            222
+        ],
+        "page_idx": 11
+    },
+    {
+        "type": "ref_text",
+        "text": "Yichong Huang, Xiaocheng Feng, Baohang Li, Yang Xiang, Hui Wang, Ting Liu, and Bing Qin. Ensemble learning for heterogeneous large language models with deep parallel collaboration. Advances in Neural Information Processing Systems, 37:119838–119860, 2024.",
+        "bbox": [
+            173,
+            231,
+            825,
+            273
+        ],
+        "page_idx": 11
+    },
+    {
+        "type": "ref_text",
+        "text": "Hugging Face. Hugging face. https://huggingface.co, 2025. Accessed: 2025-09-24.",
+        "bbox": [
+            171,
+            282,
+            794,
+            299
+        ],
+        "page_idx": 11
+    },
+    {
+        "type": "ref_text",
+        "text": "William B Johnson, Joram Lindenstrauss, et al. Extensions of lipschitz mappings into a hilbert space. Contemporary mathematics, 26(189-206):1, 1984.",
+        "bbox": [
+            173,
+            306,
+            825,
+            335
+        ],
+        "page_idx": 11
+    },
+    {
+        "type": "ref_text",
+        "text": "Kasper Green Larsen and Jelani Nelson. The johnson-lindenstrauss lemma is optimal for linear dimensionality reduction. arXiv preprint arXiv:1411.2404, 2014.",
+        "bbox": [
+            173,
+            344,
+            826,
+            375
+        ],
+        "page_idx": 11
+    },
+    {
+        "type": "ref_text",
+        "text": "Sunbowen Lee, Junting Zhou, Chang Ao, Kaige Li, Xinrun Du, Sirui He, Haihong Wu, Tianci Liu, Jiaheng Liu, Hamid Alinejad-Rokny, et al. Quantification of large language model distillation. arXiv preprint arXiv:2501.12619, 2025.",
+        "bbox": [
+            173,
+            382,
+            825,
+            425
+        ],
+        "page_idx": 11
+    },
+    {
+        "type": "ref_text",
+        "text": "Aiwei Liu, Leyi Pan, Xuming Hu, Shiao Meng, and Lijie Wen. A semantic invariant robust watermark for large language models. In The Twelfth International Conference on Learning Representations, 2024.",
+        "bbox": [
+            173,
+            434,
+            825,
+            476
+        ],
+        "page_idx": 11
+    },
+    {
+        "type": "ref_text",
+        "text": "Quang H Nguyen, Thinh Dao, Duy C Hoang, Juliette Decugis, Saurav Manchanda, Nitesh V Chawla, and Khoa D Doan. Metallm: A high-performant and cost-efficient dynamic framework for wrapping llms. arXiv preprint arXiv:2407.10834, 2024.",
+        "bbox": [
+            173,
+            486,
+            825,
+            529
+        ],
+        "page_idx": 11
+    },
+    {
+        "type": "ref_text",
+        "text": "Ivica Nikolic, Teodora Baluta, and Prateek Saxena. Model provenance testing for large language models. arXiv preprint arXiv:2502.00706, 2025.",
+        "bbox": [
+            171,
+            537,
+            825,
+            566
+        ],
+        "page_idx": 11
+    },
+    {
+        "type": "ref_text",
+        "text": "Isaac Ong, Amjad Almahairi, Vincent Wu, Wei-Lin Chiang, Tianhao Wu, Joseph E Gonzalez, M Waleed Kadous, and Ion Stoica. Routellm: Learning to route llms with preference data. In International Conference on Learning Representations (ICLR), 2025.",
+        "bbox": [
+            171,
+            575,
+            825,
+            619
+        ],
+        "page_idx": 11
+    },
+    {
+        "type": "ref_text",
+        "text": "Dario Pasquini, Evgenios M Kornaropoulos, and Giuseppe Ateniese. {LLMmap}: Fingerprinting for large language models. In 34th USENIX Security Symposium (USENIX Security 25), pp. 299–318, 2025.",
+        "bbox": [
+            173,
+            626,
+            825,
+            669
+        ],
+        "page_idx": 11
+    },
+    {
+        "type": "ref_text",
+        "text": "Mohammad Shahedur Rahman, Runbang Hu, Peng Gao, and Yuede Ji. Hugginggraph: Understanding the supply chain of llm ecosystem. arXiv preprint arXiv:2507.14240, 2025.",
+        "bbox": [
+            171,
+            678,
+            825,
+            709
+        ],
+        "page_idx": 11
+    },
+    {
+        "type": "ref_text",
+        "text": "Pranav Rajpurkar, Jian Zhang, Konstantin Lopyrev, and Percy Liang. Squad: 100,000+ questions for machine comprehension of text. arXiv preprint arXiv:1606.05250, 2016.",
+        "bbox": [
+            171,
+            715,
+            825,
+            746
+        ],
+        "page_idx": 11
+    },
+    {
+        "type": "ref_text",
+        "text": "Mark Russinovich, Ahmed Salem, and Ronen Eldan. Great, now write an article about that: The crescendo {Multi-Turn}{LLM} jailbreak attack. In 34th USENIX Security Symposium (USENIX Security 25), pp. 2421–2440, 2025.",
+        "bbox": [
+            173,
+            753,
+            825,
+            797
+        ],
+        "page_idx": 11
+    },
+    {
+        "type": "ref_text",
+        "text": "Naruya Saitou and Masatoshi Nei. The neighbor-joining method: a new method for reconstructing phylogenetic trees. Molecular biology and evolution, 4(4):406–425, 1987.",
+        "bbox": [
+            171,
+            806,
+            826,
+            835
+        ],
+        "page_idx": 11
+    },
+    {
+        "type": "ref_text",
+        "text": "Keisuke Sakaguchi, Ronan Le Bras, Chandra Bhagavatula, and Yejin Choi. Winogrande: An adversarial winograd schema challenge at scale. In Proceedings of the AAAI Conference on Artificial Intelligence, volume 34, pp. 8732–8740, 2020.",
+        "bbox": [
+            173,
+            844,
+            826,
+            887
+        ],
+        "page_idx": 11
+    },
+    {
+        "type": "ref_text",
+        "text": "Alon Talmor, Jonathan Herzig, Nicholas Lourie, and Jonathan Berant. Commonsenseqa: A question answering challenge targeting commonsense knowledge. arXiv preprint arXiv:1811.00937, 2018.",
+        "bbox": [
+            173,
+            895,
+            825,
+            924
+        ],
+        "page_idx": 11
+    },
+    {
+        "type": "header",
+        "text": "Published as a conference paper at ICLR 2026",
+        "bbox": [
+            171,
+            32,
+            480,
+            47
+        ],
+        "page_idx": 11
+    },
+    {
+        "type": "page_number",
+        "text": "12",
+        "bbox": [
+            490,
+            948,
+            509,
+            960
+        ],
+        "page_idx": 11
+    },
+    {
+        "type": "ref_text",
+        "text": "Ling Tang, Yuefeng Chen, Hui Xue, and Quanshi Zhang. Towards the resistance of neural network watermarking to fine-tuning. arXiv preprint arXiv:2505.01007, 2025.",
+        "bbox": [
+            171,
+            104,
+            825,
+            133
+        ],
+        "page_idx": 12
+    },
+    {
+        "type": "ref_text",
+        "text": "Shubham Toshniwal, Wei Du, Ivan Moshkov, Branislav Kisacanin, Alexan Ayrapetyan, and Igor Gitman. Openmathinstruct-2: Accelerating ai for math with massive open-source instruction data. arXiv preprint arXiv:2410.01560, 2024.",
+        "bbox": [
+            173,
+            141,
+            826,
+            184
+        ],
+        "page_idx": 12
+    },
+    {
+        "type": "ref_text",
+        "text": "Yun-Yun Tsai, Chuan Guo, Junfeng Yang, and Laurens van der Maaten. Rofl: Robust fingerprinting of language models. arXiv preprint arXiv:2505.12682, 2025.",
+        "bbox": [
+            173,
+            193,
+            825,
+            222
+        ],
+        "page_idx": 12
+    },
+    {
+        "type": "ref_text",
+        "text": "Xinyu Wang, Hainiu Xu, Lin Gui, and Yulan He. Towards unified task embeddings across multiple models: Bridging the gap for prompt-based large language models and beyond. arXiv preprint arXiv:2402.14522, 2024.",
+        "bbox": [
+            173,
+            231,
+            825,
+            273
+        ],
+        "page_idx": 12
+    },
+    {
+        "type": "ref_text",
+        "text": "Zhaomin Wu, Jizhou Guo, Junyi Hou, Bingsheng He, Lixin Fan, and Qiang Yang. Model-based large language model customization as service. In Proceedings of the 2025 Conference on Empirical Methods in Natural Language Processing, pp. 4904–4921, 2025.",
+        "bbox": [
+            171,
+            282,
+            825,
+            325
+        ],
+        "page_idx": 12
+    },
+    {
+        "type": "ref_text",
+        "text": "Zhaomin Wu, Mingzhe Du, See-Kiong Ng, and Bingsheng He. Beyond prompt-induced lies: Investigating llm deception on benign prompts. In Proceedings of the International Conference on Learning Representations (ICLR), 2026.",
+        "bbox": [
+            173,
+            334,
+            825,
+            377
+        ],
+        "page_idx": 12
+    },
+    {
+        "type": "ref_text",
+        "text": "Zhenhua Xu, Xubin Yue, Zhebo Wang, Qichen Liu, Xixiang Zhao, Jingxuan Zhang, Wenjun Zeng, Wengpeng Xing, Dezhang Kong, Changting Lin, et al. Copyright protection for large language models: A survey of methods, challenges, and trends. arXiv preprint arXiv:2508.11548, 2025.",
+        "bbox": [
+            173,
+            385,
+            825,
+            429
+        ],
+        "page_idx": 12
+    },
+    {
+        "type": "ref_text",
+        "text": "Wenkai Yang, Xiaohan Bi, Yankai Lin, Sishuo Chen, Jie Zhou, and Xu Sun. Watch out for your agents! investigating backdoor threats to llm-based agents. Advances in Neural Information Processing Systems, 37:100938–100964, 2024.",
+        "bbox": [
+            173,
+            436,
+            825,
+            479
+        ],
+        "page_idx": 12
+    },
+    {
+        "type": "ref_text",
+        "text": "Nicolas Yax, Pierre-Yves Oudeyer, and Stefano Palminteri. Phylolm: Inferring the phylogeny of large language models and predicting their performances in benchmarks. Proceedings of the International Conference on Learning Representations (ICLR), 2025.",
+        "bbox": [
+            171,
+            488,
+            826,
+            532
+        ],
+        "page_idx": 12
+    },
+    {
+        "type": "ref_text",
+        "text": "Rowan Zellers, Ari Holtzman, Yonatan Bisk, Ali Farhadi, and Yejin Choi. Hellaswag: Can a machine really finish your sentence? arXiv preprint arXiv:1905.07830, 2019.",
+        "bbox": [
+            171,
+            539,
+            825,
+            569
+        ],
+        "page_idx": 12
+    },
+    {
+        "type": "ref_text",
+        "text": "Haodong Zhao, Jinming Hu, Peixuan Li, Fangqi Li, Jinrui Sha, Tianjie Ju, Peixuan Chen, Zhuosheng Zhang, and Gongshen Liu. Nsmark: Null space based black-box watermarking defense framework for language models. arXiv preprint arXiv:2410.13907, 2024.",
+        "bbox": [
+            173,
+            577,
+            825,
+            621
+        ],
+        "page_idx": 12
+    },
+    {
+        "type": "ref_text",
+        "text": "Wayne Xin Zhao, Kun Zhou, Junyi Li, Tianyi Tang, Xiaolei Wang, Yupeng Hou, Yingqian Min, Beichen Zhang, Junjie Zhang, Zican Dong, et al. A survey of large language models. arXiv preprint arXiv:2303.18223, 1(2), 2023.",
+        "bbox": [
+            173,
+            628,
+            825,
+            672
+        ],
+        "page_idx": 12
+    },
+    {
+        "type": "ref_text",
+        "text": "Sally Zhu, Ahmed M Ahmed, Rohith Kuditipudi, and Percy Liang. Independence tests for language models. In Forty-second International Conference on Machine Learning, 2025.",
+        "bbox": [
+            173,
+            681,
+            825,
+            710
+        ],
+        "page_idx": 12
+    },
+    {
+        "type": "ref_text",
+        "text": "Richard Zhuang, Tianhao Wu, Zhaojin Wen, Andrew Li, Jiantao Jiao, and Kannan Ramchandran. Embedllm: Learning compact representations of large language models. International Conference on Learning Representations (ICLR), 2025.",
+        "bbox": [
+            173,
+            719,
+            823,
+            761
+        ],
+        "page_idx": 12
+    },
+    {
+        "type": "header",
+        "text": "Published as a conference paper at ICLR 2026",
+        "bbox": [
+            171,
+            32,
+            480,
+            47
+        ],
+        "page_idx": 12
+    },
+    {
+        "type": "page_number",
+        "text": "13",
+        "bbox": [
+            488,
+            948,
+            509,
+            960
+        ],
+        "page_idx": 12
+    },
+    {
+        "type": "text",
+        "text": "Appendix",
+        "text_level": 2,
+        "bbox": [
+            171,
+            130,
+            318,
+            159
+        ],
+        "page_idx": 13
+    },
+    {
+        "type": "text",
+        "text": "Table of Contents",
+        "text_level": 2,
+        "bbox": [
+            171,
+            181,
+            354,
+            200
+        ],
+        "page_idx": 13
+    },
+    {
+        "type": "text",
+        "text": "A Proof 14  \nA.1 LLM Properties: Inheritance and Genetic Determinism 14  \nA.2 LLM Functional Space is a Hilbert Space 15  \nA.3 Proof of Theorem 3.3 16  \nA.4 Proof of Theorem 4.2 17  \nA.5 Proof of Corollary 3.4 17  \nB Experimental Details 17  \nB.1 Hyperparameters 17  \nB.2 Environment 18  \nC Supplementary Experiments 18  \nC.1 Phylogenetic Tree of LLMs 18  \nC.2 Detailed Analysis of Falsely Predicted LLM Relationship 18  \nC.3 Ablation Study of Bottleneck Embedding Model 18  \nC.4 Ablation Study of the Embedding Model's Output Dimension $p$ 19  \nC.5 Ablation Study of the DNA Dimension $L$ 20  \nC.6 Effect of LLM's Parameter Size on DNA Quality 21  \nC.7 Relation Prediction for LLMs with Same Tokenizer 21  \nD Broader Impact 22  \nE Limitations 23  \nF Model Details 23  \nG Large Language Model Usage 24",
+        "bbox": [
+            205,
+            205,
+            795,
+            597
+        ],
+        "page_idx": 13
+    },
+    {
+        "type": "text",
+        "text": "A PROOF",
+        "text_level": 2,
+        "bbox": [
+            173,
+            628,
+            269,
+            645
+        ],
+        "page_idx": 13
+    },
+    {
+        "type": "text",
+        "text": "A.1 LLM PROPERTIES: INHERITANCE AND GENETIC DETERMINISM",
+        "text_level": 2,
+        "bbox": [
+            171,
+            659,
+            661,
+            675
+        ],
+        "page_idx": 13
+    },
+    {
+        "type": "text",
+        "text": "Before discussing the properties, we begin by defining the evolution of an LLM.",
+        "bbox": [
+            171,
+            686,
+            700,
+            700
+        ],
+        "page_idx": 13
+    },
+    {
+        "type": "text",
+        "text": "Definition A.1 (Evolution). Let F be the LLMfunction space in Definition 3.1, and let $d _ { H }$ be the Hilbert distance on ${ \\mathcal F } .$ . For a threshold $\\delta _ { H } > 0 $ , an evolution is afunction $\\mathcal { E } : \\mathcal { F }  \\mathcal { F }$ such thatfor any $f \\in { \\mathcal { F } } ,$",
+        "bbox": [
+            169,
+            704,
+            825,
+            747
+        ],
+        "page_idx": 13
+    },
+    {
+        "type": "equation",
+        "text": "$$\nd _ {H} \\big (f, \\mathcal {E} (f) \\big) <   \\delta_ {H}.\n$$",
+        "text_format": "latex",
+        "bbox": [
+            429,
+            744,
+            563,
+            762
+        ],
+        "page_idx": 13
+    },
+    {
+        "type": "text",
+        "text": "$I f f _ { 2 } = { \\mathcal { E } } ( f _ { 1 } )$ , we say $f _ { 2 }$ is evolvedfrom $f _ { 1 }$ within $\\delta _ { H }$ .",
+        "bbox": [
+            171,
+            763,
+            531,
+            781
+        ],
+        "page_idx": 13
+    },
+    {
+        "type": "text",
+        "text": "This notion covers a wide range of operations that induce a bounded shift in an LLM’s functional behavior, including but not limited to fine-tuning, distillation, and reinforcement learning, as they modify the LLM within a bounded Hilbert-distance threshold.",
+        "bbox": [
+            169,
+            791,
+            825,
+            834
+        ],
+        "page_idx": 13
+    },
+    {
+        "type": "text",
+        "text": "The definition of LLM DNA gives rise to several properties analogous to biological DNA. The two most fundamental are inheritance and genetic determinism introduced at the start of this section. Drawing a parallel with biology, inheritance suggests that an evolutionary process acting on an LLM, such as fine-tuning, produces descendants with similar DNAs. Genetic determinism indicates LLMs with similar DNAs behave similarly. Both properties can be mathematically derived from the definition of DNA (Definition 3.2) in following forms.",
+        "bbox": [
+            169,
+            839,
+            826,
+            925
+        ],
+        "page_idx": 13
+    },
+    {
+        "type": "header",
+        "text": "Published as a conference paper at ICLR 2026",
+        "bbox": [
+            171,
+            32,
+            480,
+            47
+        ],
+        "page_idx": 13
+    },
+    {
+        "type": "page_number",
+        "text": "14",
+        "bbox": [
+            490,
+            948,
+            509,
+            959
+        ],
+        "page_idx": 13
+    },
+    {
+        "type": "text",
+        "text": "Theorem A.2 (Inheritance). Let an LLM $f _ { 2 } \\in { \\mathcal { F } }$ be derived from an LLM $f _ { 1 } \\in { \\mathcal { F } } _ { : }$ , with corresponding $D N A s \\ \\tau _ { f _ { 2 } }$ and $\\tau _ { f _ { 1 } }$ . For any desired DNA proximity $\\epsilon _ { \\tau } > 0 ,$ , there exists a Hilbert distance threshold $\\delta _ { H } > 0$ such that $i f d _ { H } ( f _ { 1 } , f _ { 2 } ) < \\delta _ { H }$ , then $d _ { \\tau } ( \\tau _ { f _ { 1 } } , \\tau _ { f _ { 2 } } ) < \\epsilon _ { \\tau }$",
+        "bbox": [
+            169,
+            103,
+            825,
+            148
+        ],
+        "page_idx": 14
+    },
+    {
+        "type": "text",
+        "text": "Proof. This property is a direct consequence of the bi-Lipschitz condition in Definition 3.2. We must show that for any $\\epsilon _ { \\tau } > 0 $ , we can find a $\\delta _ { H } > 0$ satisfying the implication:",
+        "bbox": [
+            169,
+            161,
+            823,
+            191
+        ],
+        "page_idx": 14
+    },
+    {
+        "type": "equation",
+        "text": "$$\nd _ {H} (f _ {1}, f _ {2}) <   \\delta_ {H} \\implies d _ {\\tau} (\\tau_ {f _ {1}}, \\tau_ {f _ {2}}) <   \\epsilon_ {\\tau}\\tag{1}\n$$",
+        "text_format": "latex",
+        "bbox": [
+            357,
+            196,
+            635,
+            213
+        ],
+        "page_idx": 14
+    },
+    {
+        "type": "text",
+        "text": "The bi-Lipschitz condition provides the upper bound $d _ { \\tau } ( \\tau _ { f _ { 1 } } , \\tau _ { f _ { 2 } } ) \\leq c _ { 2 } \\cdot d _ { H } ( f _ { 1 } , f _ { 2 } )$ for some constant $c _ { 2 } > 0$ . Let us choose $\\delta _ { H } = \\epsilon _ { \\tau } / c _ { 2 }$ . Since $\\epsilon _ { \\tau } > 0$ and $c _ { 2 } > 0$ , our threshold $\\delta _ { H }$ is also positive. Now, assume $d _ { H } ( f _ { 1 } , f _ { 2 } ) < \\delta _ { H }$ for some pair of LLMs. It follows that:",
+        "bbox": [
+            171,
+            219,
+            823,
+            262
+        ],
+        "page_idx": 14
+    },
+    {
+        "type": "equation",
+        "text": "$$\n\\begin{array}{r l} d _ {\\tau} (\\tau_ {f _ {1}}, \\tau_ {f _ {2}}) & \\leq c _ {2} \\cdot d _ {H} (f _ {1}, f _ {2}) \\\\ & <   c _ {2} \\cdot \\delta_ {H} \\\\ & = c _ {2} \\cdot \\left(\\frac {\\epsilon_ {\\tau}}{c _ {2}}\\right) = \\epsilon_ {\\tau} \\end{array}\n$$",
+        "text_format": "latex",
+        "bbox": [
+            258,
+            268,
+            468,
+            337
+        ],
+        "page_idx": 14
+    },
+    {
+        "type": "text",
+        "text": "(by the Lipschitz condition)",
+        "bbox": [
+            550,
+            268,
+            738,
+            284
+        ],
+        "page_idx": 14
+    },
+    {
+        "type": "text",
+        "text": "(by assumption)",
+        "bbox": [
+            550,
+            286,
+            663,
+            301
+        ],
+        "page_idx": 14
+    },
+    {
+        "type": "text",
+        "text": "This confirms the implication in Equation 1, and the theorem holds.",
+        "bbox": [
+            171,
+            344,
+            617,
+            359
+        ],
+        "page_idx": 14
+    },
+    {
+        "type": "text",
+        "text": "Theorem A.3 (Genetic Determinism). Let $f _ { 1 } , f _ { 2 } \\in { \\mathcal { F } }$ be two LLMs with corresponding DNAs $\\tau _ { f _ { 1 } } , \\tau _ { f _ { 2 } } \\in \\mathcal { D }$ . For any desiredfunctional proximity $\\epsilon _ { H } > 0 ,$ , there exists a DNA distance threshold $\\delta _ { \\tau } > 0$ such that $i f d _ { \\tau } ( \\tau _ { f _ { 1 } } , \\tau _ { f _ { 2 } } ) < \\delta _ { \\tau } ,$ , then $d _ { H } ( f _ { 1 } , f _ { 2 } ) < \\epsilon _ { H }$",
+        "bbox": [
+            169,
+            366,
+            825,
+            410
+        ],
+        "page_idx": 14
+    },
+    {
+        "type": "text",
+        "text": "Proof. This property follows from the lower bound of the bi-Lipschitz condition. We need to show that for any given $\\epsilon _ { H } > 0$ , there is a $\\delta _ { \\tau } > 0$ such that:",
+        "bbox": [
+            169,
+            424,
+            823,
+            453
+        ],
+        "page_idx": 14
+    },
+    {
+        "type": "equation",
+        "text": "$$\nd _ {\\tau} (\\tau_ {f _ {1}}, \\tau_ {f _ {2}}) <   \\delta_ {\\tau} \\implies d _ {H} (f _ {1}, f _ {2}) <   \\epsilon_ {H}\\tag{2}\n$$",
+        "text_format": "latex",
+        "bbox": [
+            359,
+            459,
+            635,
+            474
+        ],
+        "page_idx": 14
+    },
+    {
+        "type": "text",
+        "text": "The bi-Lipschitz condition states that $c _ { 1 } \\cdot d _ { H } ( f _ { 1 } , f _ { 2 } ) \\leq d _ { \\tau } ( \\tau _ { f _ { 1 } } , \\tau _ { f _ { 2 } } )$ for some constant $c _ { 1 } > 0$ Rearranging this gives a bound on the Hilbert distance:",
+        "bbox": [
+            169,
+            481,
+            823,
+            511
+        ],
+        "page_idx": 14
+    },
+    {
+        "type": "equation",
+        "text": "$$\nd _ {H} (f _ {1}, f _ {2}) \\leq \\frac {1}{c _ {1}} d _ {\\tau} (\\tau_ {f _ {1}}, \\tau_ {f _ {2}})\\tag{3}\n$$",
+        "text_format": "latex",
+        "bbox": [
+            400,
+            517,
+            594,
+            547
+        ],
+        "page_idx": 14
+    },
+    {
+        "type": "text",
+        "text": "Let us choose $\\delta _ { \\tau } \\ = \\ \\epsilon _ { H } \\cdot c _ { 1 }$ . Since $\\epsilon _ { H } ~ > ~ 0$ and $c _ { 1 } > 0$ , it follows that $\\delta _ { \\tau } ~ > ~ 0$ . Assuming $d _ { \\tau } ( \\tau _ { f _ { 1 } } , \\tau _ { f _ { 2 } } ) < \\delta _ { \\tau }$ , we have:",
+        "bbox": [
+            169,
+            551,
+            823,
+            583
+        ],
+        "page_idx": 14
+    },
+    {
+        "type": "equation",
+        "text": "$$\n\\begin{array}{r l} & {d _ {H} (f _ {1}, f _ {2}) \\leq \\frac {1}{c _ {1}} d _ {\\tau} (\\tau_ {f _ {1}}, \\tau_ {f _ {2}})} \\\\ & {\\qquad <   \\frac {1}{c _ {1}} \\delta_ {\\tau}} \\\\ & {\\qquad = \\frac {1}{c _ {1}} (\\epsilon_ {H} \\cdot c _ {1}) = \\epsilon_ {H}} \\end{array}\n$$",
+        "text_format": "latex",
+        "bbox": [
+            277,
+            588,
+            493,
+            684
+        ],
+        "page_idx": 14
+    },
+    {
+        "type": "text",
+        "text": "(from Equation 3)",
+        "bbox": [
+            594,
+            595,
+            718,
+            612
+        ],
+        "page_idx": 14
+    },
+    {
+        "type": "text",
+        "text": "(by assumption)",
+        "bbox": [
+            594,
+            628,
+            705,
+            643
+        ],
+        "page_idx": 14
+    },
+    {
+        "type": "text",
+        "text": "Thus, the implication holds, proving the theorem.",
+        "bbox": [
+            171,
+            689,
+            500,
+            704
+        ],
+        "page_idx": 14
+    },
+    {
+        "type": "text",
+        "text": "A.2 LLM FUNCTIONAL SPACE IS A HILBERT SPACE",
+        "text_level": 2,
+        "bbox": [
+            171,
+            720,
+            550,
+            734
+        ],
+        "page_idx": 14
+    },
+    {
+        "type": "text",
+        "text": "Lemma A.4 (LLM Functional Space is a Hilbert Space). Let $\\mathcal { F }$ be the space of LLM functions mapping from the finite input space $ { \\boldsymbol { S } } _ { m } = \\{ x _ { 1 } , \\dots , x _ { N } \\}$ to the vector space of outputs $\\overset { \\cdot \\mathrm { ~ \\textstyle ~ \\bigcup ~ } } { \\mathcal { O } } : = \\mathbb { R } ^ { N }$ Let ${ \\bar { \\mu } } : { \\bar { S } } _ { m }  [ 0 , { \\bar { 1 } } ]$ be a probability distribution on the input space, assigning a probability $\\mu ( x _ { i } )$ to each sequence such that $\\begin{array} { r } { \\sum _ { i = 1 } ^ { N } \\mu ( x _ { i } ) = 1 } \\end{array}$ . The pair $( \\mathcal { F } , d _ { H } )$ forms a Hilbert space, where the distance metric $d _ { H }$ is defined as: $\\begin{array} { r } { d _ { H } ( f _ { 1 } , f _ { 2 } ) = \\sqrt { \\sum _ { i = 1 } ^ { N } \\mu ( x _ { i } ) \\| f _ { 1 } ( x _ { i } ) - f _ { 2 } ( x _ { i } ) \\| _ { 2 } ^ { 2 } } } \\end{array}$",
+        "bbox": [
+            169,
+            746,
+            825,
+            829
+        ],
+        "page_idx": 14
+    },
+    {
+        "type": "text",
+        "text": "Proof. We prove this by showing that $\\mathcal { F }$ is a vector space equipped with a valid inner product.",
+        "bbox": [
+            169,
+            845,
+            790,
+            859
+        ],
+        "page_idx": 14
+    },
+    {
+        "type": "text",
+        "text": "Vector Space Structure. Any function $f \\in { \\mathcal { F } }$ is uniquely determined by the tuple of its outputs. We can represent f by its concatenated output vector $\\mathbf { v } _ { f } : = ( f ( x _ { 1 } ) , \\ldots , f ( x _ { N } ) ) \\in \\mathcal { O } ^ { N }$ . This establishes a natural isomorphism between $\\mathcal { F }$ and the vector space $\\mathcal { O } ^ { N }$ , from which $\\mathcal { F }$ inherits its vector space structure.",
+        "bbox": [
+            169,
+            866,
+            825,
+            924
+        ],
+        "page_idx": 14
+    },
+    {
+        "type": "header",
+        "text": "Published as a conference paper at ICLR 2026",
+        "bbox": [
+            171,
+            32,
+            480,
+            47
+        ],
+        "page_idx": 14
+    },
+    {
+        "type": "page_number",
+        "text": "15",
+        "bbox": [
+            490,
+            948,
+            509,
+            960
+        ],
+        "page_idx": 14
+    },
+    {
+        "type": "text",
+        "text": "Inner Product Validation. We define a weighted inner product on $\\mathcal { F }$ as:",
+        "bbox": [
+            169,
+            104,
+            651,
+            119
+        ],
+        "page_idx": 15
+    },
+    {
+        "type": "equation",
+        "text": "$$\n\\langle f _ {1}, f _ {2} \\rangle_ {H} := \\sum_ {i = 1} ^ {N} \\mu (x _ {i}) \\langle f _ {1} (x _ {i}), f _ {2} (x _ {i}) \\rangle_ {\\mathcal {O}}\\tag{4}\n$$",
+        "text_format": "latex",
+        "bbox": [
+            361,
+            125,
+            635,
+            166
+        ],
+        "page_idx": 15
+    },
+    {
+        "type": "text",
+        "text": "where $\\langle \\cdot , \\cdot \\rangle _ { \\mathcal { O } }$ is the standard dot product on $\\mathcal { O } = \\mathbb { R } ^ { N }$ . This function inherits linearity and symmetry from the standard dot product. Positive-definiteness is guaranteed by the condition that $\\mu ( x _ { i } ) > 0$ for all i. The distance metric induced by this inner product is precisely $d _ { H } \\mathbf { : }$",
+        "bbox": [
+            169,
+            172,
+            825,
+            218
+        ],
+        "page_idx": 15
+    },
+    {
+        "type": "equation",
+        "text": "$$\nd _ {H} (f _ {1}, f _ {2}) := \\sqrt {\\langle f _ {1} - f _ {2} , f _ {1} - f _ {2} \\rangle_ {H}} = \\sqrt {\\sum_ {i = 1} ^ {N} \\mu (x _ {i}) \\| f _ {1} (x _ {i}) - f _ {2} (x _ {i}) \\| _ {2} ^ {2}}\\tag{5}\n$$",
+        "text_format": "latex",
+        "bbox": [
+            254,
+            224,
+            741,
+            270
+        ],
+        "page_idx": 15
+    },
+    {
+        "type": "text",
+        "text": "As a complete inner product space, $( \\mathcal { F } , d _ { H } )$ is a Hilbert space.",
+        "bbox": [
+            169,
+            277,
+            584,
+            292
+        ],
+        "page_idx": 15
+    },
+    {
+        "type": "text",
+        "text": "A.3 PROOF OF THEOREM 3.3",
+        "text_level": 2,
+        "bbox": [
+            171,
+            309,
+            392,
+            323
+        ],
+        "page_idx": 15
+    },
+    {
+        "type": "text",
+        "text": "Theorem 3.3 (Existence of LLM DNA). For any finite set of K LLMs $\\mathcal { F } _ { K } = \\{ f _ { 1 } , \\dotsc , f _ { K } \\} \\subset$ ${ \\mathcal { F } } , a$ DNA representation (Definition 3.2) with DNA space $\\mathbf { \\mathcal { D } } ~ = ~ \\mathbb { R } ^ { L }$ exists, satisfying for all $f _ { i } , f _ { j } \\in \\mathcal { F } _ { K } , \\ c _ { 1 } \\cdot d _ { H } ( f _ { i } , f _ { j } ) \\leq d _ { \\tau } ( \\tau _ { f _ { i } } , \\tau _ { f _ { j } } ) \\leq c _ { 2 } \\cdot d _ { H } ( f _ { i } , f _ { j } )$ , where the target dimension $L$ is $L = O \\left( [ ( c _ { 2 } + c _ { 1 } ) / ( c _ { 2 } - c _ { 1 } ) ] ^ { 2 } \\log K \\right)$",
+        "bbox": [
+            169,
+            334,
+            825,
+            402
+        ],
+        "page_idx": 15
+    },
+    {
+        "type": "text",
+        "text": "Proof. We aim to construct a mapping from the LLM function space $\\mathcal { F }$ to a low-dimensional DNA space D that satisfies the bi-Lipschitz condition in Definition 3.2 for any given constants $c _ { 2 } > c _ { 1 } >$ 0. This is achieved by applying the Johnson-Lindenstrauss (JL) Lemma.",
+        "bbox": [
+            169,
+            416,
+            823,
+            460
+        ],
+        "page_idx": 15
+    },
+    {
+        "type": "text",
+        "text": "First, we define a symmetric distortion parameter ϵ and a scaling factor α from our target constants $c _ { 1 }$ and $c _ { 2 } { : }$",
+        "bbox": [
+            169,
+            465,
+            825,
+            494
+        ],
+        "page_idx": 15
+    },
+    {
+        "type": "equation",
+        "text": "$$\n\\epsilon = \\frac {c _ {2} - c _ {1}}{c _ {2} + c _ {1}}, \\quad \\alpha = \\frac {c _ {1} + c _ {2}}{2}\\tag{6}\n$$",
+        "text_format": "latex",
+        "bbox": [
+            400,
+            492,
+            594,
+            521
+        ],
+        "page_idx": 15
+    },
+    {
+        "type": "text",
+        "text": "Since $c _ { 2 } > c _ { 1 } > 0$ , it follows that $\\epsilon \\in ( 0 , 1 )$ , which is a valid distortion parameter for the JL Lemma.",
+        "bbox": [
+            169,
+            523,
+            823,
+            540
+        ],
+        "page_idx": 15
+    },
+    {
+        "type": "text",
+        "text": "We invoke the JL Lemma with this ϵ. The lemma applies because, as shown in Lemma $\\mathsf { A } . 4 , ( \\mathcal { F } , d _ { H } )$ is a Hilbert space, even when $d _ { H }$ is defined with the weighting function $\\mu ( x )$ . The lemma guarantees the existence of a linear map $E : \\mathcal { F }  \\mathbb { R } ^ { L }$ , with dimension $L = { \\cal O } ( \\epsilon ^ { - 2 } \\log K )$ , that embeds the vector representations of the functions. For any finite set $\\{ f _ { 1 } , \\dotsc , f _ { K } \\} \\subset \\mathcal { F }$ , the following holds for any pair $f _ { i } , f _ { j }$",
+        "bbox": [
+            169,
+            542,
+            825,
+            618
+        ],
+        "page_idx": 15
+    },
+    {
+        "type": "equation",
+        "text": "$$\n(1 - \\epsilon) d _ {H} (f _ {i}, f _ {j}) \\leq \\| E (f _ {i}) - E (f _ {j}) \\| _ {2} \\leq (1 + \\epsilon) d _ {H} (f _ {i}, f _ {j})\\tag{7}\n$$",
+        "text_format": "latex",
+        "bbox": [
+            295,
+            621,
+            700,
+            638
+        ],
+        "page_idx": 15
+    },
+    {
+        "type": "text",
+        "text": "Now, we define our final DNA mapping by scaling the output of E. The DNA of an LLM f is $\\tau _ { f } : = \\alpha \\cdot E ( f )$ . The distance in the DNA space is therefore $d _ { \\tau } ( \\tau _ { f _ { i } } , \\tau _ { f _ { j } } ) = \\| \\tau _ { f _ { i } } - \\tau _ { f _ { j } } \\| _ { 2 } =$ $\\| \\mathbf { \\bar { \\boldsymbol { \\alpha } } } \\boldsymbol { E } ( f _ { i } ) - \\boldsymbol { \\alpha } \\dot { \\boldsymbol { E } } ( f _ { j } ) \\| _ { 2 } = \\boldsymbol { \\alpha } \\| \\boldsymbol { E } ( f _ { i } ) - \\boldsymbol { E } ( f _ { j } ) \\| _ { 2 }$",
+        "bbox": [
+            171,
+            643,
+            823,
+            689
+        ],
+        "page_idx": 15
+    },
+    {
+        "type": "text",
+        "text": "By multiplying the inequality in Equation 7 by our scaling factor $\\alpha > 0 ,$ , we get:",
+        "bbox": [
+            171,
+            693,
+            700,
+            709
+        ],
+        "page_idx": 15
+    },
+    {
+        "type": "equation",
+        "text": "$$\n\\alpha (1 - \\epsilon) d _ {H} (f _ {i}, f _ {j}) \\leq \\alpha \\| E (f _ {i}) - E (f _ {j}) \\| _ {2} \\leq \\alpha (1 + \\epsilon) d _ {H} (f _ {i}, f _ {j})\n$$",
+        "text_format": "latex",
+        "bbox": [
+            277,
+            714,
+            715,
+            731
+        ],
+        "page_idx": 15
+    },
+    {
+        "type": "text",
+        "text": "We can now check the bounds. For the lower bound:",
+        "bbox": [
+            171,
+            736,
+            521,
+            750
+        ],
+        "page_idx": 15
+    },
+    {
+        "type": "equation",
+        "text": "$$\n\\alpha (1 - \\epsilon) = \\left(\\frac {c _ {1} + c _ {2}}{2}\\right) \\left(1 - \\frac {c _ {2} - c _ {1}}{c _ {2} + c _ {1}}\\right) = \\left(\\frac {c _ {1} + c _ {2}}{2}\\right) \\left(\\frac {c _ {2} + c _ {1} - c _ {2} + c _ {1}}{c _ {2} + c _ {1}}\\right) = \\frac {2 c _ {1}}{2} = c _ {1}\n$$",
+        "text_format": "latex",
+        "bbox": [
+            197,
+            753,
+            797,
+            787
+        ],
+        "page_idx": 15
+    },
+    {
+        "type": "text",
+        "text": "For the upper bound:",
+        "bbox": [
+            171,
+            792,
+            315,
+            808
+        ],
+        "page_idx": 15
+    },
+    {
+        "type": "equation",
+        "text": "$$\n\\alpha (1 + \\epsilon) = \\left(\\frac {c _ {1} + c _ {2}}{2}\\right) \\left(1 + \\frac {c _ {2} - c _ {1}}{c _ {2} + c _ {1}}\\right) = \\left(\\frac {c _ {1} + c _ {2}}{2}\\right) \\left(\\frac {c _ {2} + c _ {1} + c _ {2} - c _ {1}}{c _ {2} + c _ {1}}\\right) = \\frac {2 c _ {2}}{2} = c _ {2}\n$$",
+        "text_format": "latex",
+        "bbox": [
+            197,
+            813,
+            797,
+            847
+        ],
+        "page_idx": 15
+    },
+    {
+        "type": "text",
+        "text": "Substituting these results and the definition of $d _ { \\tau }$ into our inequality, we obtain:",
+        "bbox": [
+            171,
+            852,
+            697,
+            868
+        ],
+        "page_idx": 15
+    },
+    {
+        "type": "equation",
+        "text": "$$\nc _ {1} \\cdot d _ {H} (f _ {i}, f _ {j}) \\leq d _ {\\tau} (\\tau_ {f _ {i}}, \\tau_ {f _ {j}}) \\leq c _ {2} \\cdot d _ {H} (f _ {i}, f _ {j})\n$$",
+        "text_format": "latex",
+        "bbox": [
+            339,
+            875,
+            656,
+            891
+        ],
+        "page_idx": 15
+    },
+    {
+        "type": "text",
+        "text": "This explicitly provides the required inequality. Thus, a valid DNA mapping exists for any choice of constants $c _ { 2 } > c _ { 1 } > 0$ □",
+        "bbox": [
+            169,
+            895,
+            825,
+            924
+        ],
+        "page_idx": 15
+    },
+    {
+        "type": "header",
+        "text": "Published as a conference paper at ICLR 2026",
+        "bbox": [
+            171,
+            32,
+            480,
+            47
+        ],
+        "page_idx": 15
+    },
+    {
+        "type": "page_number",
+        "text": "16",
+        "bbox": [
+            490,
+            948,
+            509,
+            960
+        ],
+        "page_idx": 15
+    },
+    {
+        "type": "text",
+        "text": "A.4 PROOF OF THEOREM 4.2",
+        "text_level": 2,
+        "bbox": [
+            171,
+            104,
+            392,
+            118
+        ],
+        "page_idx": 16
+    },
+    {
+        "type": "text",
+        "text": "Lemma 4.2 (Concentration of Empirical Functional Distance). Let $f _ { 1 } , f _ { 2 } \\in \\mathcal { F }$ be two LLMfunctions. Let $\\begin{array} { r } { \\hat { d } _ { f } ^ { 2 } ~ = ~ \\sum _ { j = 1 } ^ { t } | | f _ { 1 } ( x _ { j } ) - f _ { 2 } ( x _ { j } ) | | _ { 2 } ^ { 2 } } \\end{array}$ be the squared empirical functional distance calculated from a sample of t i.i.d. inputs $\\{ x _ { 1 } , \\ldots , x _ { t } \\}$ . Let $d _ { H } ^ { 2 }$ be the true squared Hilbert distance. Assume the squared Euclidean distance between any two output vectors is bounded such that $\\| f _ { 1 } ( x ) - f _ { 2 } ( x ) \\| _ { 2 } ^ { 2 } \\overset { } { \\leq } C _ { \\mathrm { m a x } }$ for any input x and for all functions of interest. Then, for any $\\epsilon > 0$ , the following bound holdsfor the sample average: $\\begin{array} { r } { P \\left( \\left| \\frac { 1 } { t } \\hat { d } _ { f } ^ { 2 } - d _ { H } ^ { 2 } \\right| \\geq \\epsilon \\right) \\leq 2 \\exp \\left( - \\frac { 2 t \\epsilon ^ { 2 } } { C _ { \\operatorname* { m a x } } ^ { 2 } } \\right) } \\end{array}$",
+        "bbox": [
+            169,
+            128,
+            825,
+            229
+        ],
+        "page_idx": 16
+    },
+    {
+        "type": "text",
+        "text": "Proof. Let the sample of t inputs, drawn i.i.d. from the distribution $\\mu ,$ be $\\{ x _ { 1 } , \\ldots , x _ { t } \\}$ . Let $Z _ { 1 } , \\ldots , Z _ { t }$ be a sequence of i.i.d. random variables, where each variable $Z _ { j }$ represents the squared Euclidean distance between the output logit vectors for a randomly drawn input $x _ { j } { \\mathrm { : } }$",
+        "bbox": [
+            169,
+            244,
+            825,
+            287
+        ],
+        "page_idx": 16
+    },
+    {
+        "type": "equation",
+        "text": "$$\nZ _ {j} := \\| f _ {1} (x _ {j}) - f _ {2} (x _ {j}) \\| _ {2} ^ {2}\n$$",
+        "text_format": "latex",
+        "bbox": [
+            406,
+            295,
+            589,
+            313
+        ],
+        "page_idx": 16
+    },
+    {
+        "type": "text",
+        "text": "By the assumption, each $Z _ { j }$ is bounded within the range $[ 0 , C _ { \\mathrm { m a x } } ]$ . The true squared Hilbert distance is, by definition, the expectation of this random variable:",
+        "bbox": [
+            169,
+            318,
+            825,
+            348
+        ],
+        "page_idx": 16
+    },
+    {
+        "type": "equation",
+        "text": "$$\nd _ {H} ^ {2} = \\mathbb {E} [ Z _ {j} ]\n$$",
+        "text_format": "latex",
+        "bbox": [
+            454,
+            352,
+            540,
+            371
+        ],
+        "page_idx": 16
+    },
+    {
+        "type": "text",
+        "text": "The sample mean of these t variables is precisely the averaged squared empirical functional distance:",
+        "bbox": [
+            171,
+            376,
+            823,
+            392
+        ],
+        "page_idx": 16
+    },
+    {
+        "type": "equation",
+        "text": "$$\n\\frac {1}{t} \\hat {d} _ {f} ^ {2} = \\frac {1}{t} \\sum_ {j = 1} ^ {t} Z _ {j}\n$$",
+        "text_format": "latex",
+        "bbox": [
+            441,
+            398,
+            555,
+            440
+        ],
+        "page_idx": 16
+    },
+    {
+        "type": "text",
+        "text": "Hoeffding’s inequality provides a bound on the probability that a sample mean of bounded, independent random variables deviates from its expected value. For a set of i.i.d. variables $\\{ Y _ { 1 } , \\ldots , Y _ { t } \\}$ bounded in $[ a , b ]$ , the inequality states:",
+        "bbox": [
+            169,
+            446,
+            823,
+            491
+        ],
+        "page_idx": 16
+    },
+    {
+        "type": "equation",
+        "text": "$$\nP \\left(\\left| \\frac {1}{t} \\sum_ {j = 1} ^ {t} Y _ {j} - \\mathbb {E} [ Y ] \\right| \\geq \\epsilon\\right) \\leq 2 \\exp \\left(- \\frac {2 t \\epsilon^ {2}}{(b - a) ^ {2}}\\right)\n$$",
+        "text_format": "latex",
+        "bbox": [
+            320,
+            497,
+            674,
+            544
+        ],
+        "page_idx": 16
+    },
+    {
+        "type": "text",
+        "text": "We apply this inequality to our variables $Z _ { j }$ . In our context, the sample mean is $\\textstyle { \\frac { 1 } { t } } { \\hat { d } } _ { f } ^ { 2 }$ , the expectation is $d _ { H } ^ { 2 }$ , and the range $[ a , b ] \\mathrm { i s } [ 0 , C _ { \\mathrm { m a x } } ]$ , making $( b - a ) ^ { 2 } = C _ { \\mathrm { m a x } } ^ { 2 }$ . Substituting these into the general form directly yields the desired result:",
+        "bbox": [
+            171,
+            554,
+            823,
+            599
+        ],
+        "page_idx": 16
+    },
+    {
+        "type": "equation",
+        "text": "$$\nP \\left(\\left| \\frac {1}{t} \\hat {d} _ {f} ^ {2} - d _ {H} ^ {2} \\right| \\geq \\epsilon\\right) \\leq 2 \\exp \\left(- \\frac {2 t \\epsilon^ {2}}{C _ {\\max} ^ {2}}\\right)\n$$",
+        "text_format": "latex",
+        "bbox": [
+            352,
+            606,
+            640,
+            641
+        ],
+        "page_idx": 16
+    },
+    {
+        "type": "text",
+        "text": "This completes the proof.",
+        "bbox": [
+            171,
+            646,
+            343,
+            662
+        ],
+        "page_idx": 16
+    },
+    {
+        "type": "text",
+        "text": "A.5 PROOF OF COROLLARY 3.4",
+        "text_level": 2,
+        "bbox": [
+            171,
+            678,
+            408,
+            693
+        ],
+        "page_idx": 16
+    },
+    {
+        "type": "text",
+        "text": "Corollary 3.4 (Construct LLM DNA via Random Projection). For anyfinite set ofK LLMs $\\mathcal { F } _ { K } =$ $\\{ f _ { 1 } , \\ldots , f _ { K } \\} \\subset \\mathcal { F }$ , the LLM DNA in Theorem 3.3 can be obtainedfrom a random linear projection $E : \\mathcal { F }  \\mathbb { R } ^ { L }$ with probability at least $1 - 2 / K ^ { 2 }$",
+        "bbox": [
+            171,
+            704,
+            823,
+            747
+        ],
+        "page_idx": 16
+    },
+    {
+        "type": "text",
+        "text": "Proof. Since Lemma A.4 shows that $\\mathcal { F }$ is a Hilbert space, the JL lemma applies. Invoking a standard formulation of the lemma $( \\mathrm { e . g . }$ , Theorem 2.1 in Dasgupta & Gupta (2003)) for the set of vector representations of LLMs in $\\mathcal { F } _ { K }$ yields the desired projection and associated probability bound.",
+        "bbox": [
+            169,
+            762,
+            825,
+            806
+        ],
+        "page_idx": 16
+    },
+    {
+        "type": "text",
+        "text": "B EXPERIMENTAL DETAILS",
+        "text_level": 2,
+        "bbox": [
+            171,
+            824,
+            421,
+            840
+        ],
+        "page_idx": 16
+    },
+    {
+        "type": "text",
+        "text": "B.1 HYPERPARAMETERS",
+        "text_level": 2,
+        "bbox": [
+            171,
+            856,
+            361,
+            871
+        ],
+        "page_idx": 16
+    },
+    {
+        "type": "text",
+        "text": "Unless otherwise specified, we adopt the following default configuration. The DNA dimensionality is reduced to 128 using Gaussian Random Projection by default. Text embeddings are extracted with the state-of-the-art open-source encoder Qwen/Qwen3-Embedding-8B, using a maximum input length of 1024 tokens with cls pooling. This model is also used to encode questions in routing experiment for semantic consistency. For text generation, we set max length = 1024, temperature = 0.7, top p = 0.9, if these options are applicable. Models with fewer than 7B parameters are run in BF16/FP16 precision without quantization, while larger models are automatically quantized to 8-bit for memory efficiency. For instruction-tuned models, the provided chat template is applied and only the responses are used for DNA extraction. All other parameters follow HuggingFace defaults. All applicable experiments are conducted on five seeds with mean and standard deviation reported.",
+        "bbox": [
+            169,
+            882,
+            825,
+            925
+        ],
+        "page_idx": 16
+    },
+    {
+        "type": "header",
+        "text": "Published as a conference paper at ICLR 2026",
+        "bbox": [
+            171,
+            32,
+            480,
+            47
+        ],
+        "page_idx": 16
+    },
+    {
+        "type": "page_number",
+        "text": "17",
+        "bbox": [
+            490,
+            948,
+            509,
+            959
+        ],
+        "page_idx": 16
+    },
+    {
+        "type": "text",
+        "text": "",
+        "bbox": [
+            169,
+            104,
+            826,
+            215
+        ],
+        "page_idx": 17
+    },
+    {
+        "type": "text",
+        "text": "B.2 ENVIRONMENT",
+        "text_level": 2,
+        "bbox": [
+            171,
+            232,
+            326,
+            247
+        ],
+        "page_idx": 17
+    },
+    {
+        "type": "text",
+        "text": "DNA extraction for each model is conducted on a single GPU. Models with up to 30B parameters are executed on NVIDIA A100 or H100 GPUs with 80GB memory, while models between 30B and 70B parameters are deployed on H200 GPUs with 140GB memory. In total, the storage footprint of the 305 models amounts to approximately 20 TB.",
+        "bbox": [
+            169,
+            258,
+            826,
+            315
+        ],
+        "page_idx": 17
+    },
+    {
+        "type": "text",
+        "text": "C SUPPLEMENTARY EXPERIMENTS",
+        "text_level": 2,
+        "bbox": [
+            171,
+            335,
+            483,
+            351
+        ],
+        "page_idx": 17
+    },
+    {
+        "type": "text",
+        "text": "C.1 PHYLOGENETIC TREE OF LLMS",
+        "text_level": 2,
+        "bbox": [
+            171,
+            366,
+            442,
+            381
+        ],
+        "page_idx": 17
+    },
+    {
+        "type": "text",
+        "text": "Analogous to phylogenetic research in biology, once the DNA of LLMs is available, we can construct a phylogenetic tree to visualize how LLMs evolve. Unlike existing phylogenetic trees based on release histories or documentation, our phylogenetic tree is derived directly from model behavior. This enables us to uncover latent relationships between models, including close connections that may not have been explicitly documented.",
+        "bbox": [
+            169,
+            393,
+            826,
+            464
+        ],
+        "page_idx": 17
+    },
+    {
+        "type": "text",
+        "text": "To construct the phylogenetic tree, we adopt the widely used Neighbor-Joining (NJ) method from biology (Saitou & Nei, 1987). The core assumption of this method is to find a tree that minimizes the total “evolutionary effort,” quantified as the sum of edge lengths. The evolutionary root is estimated by the midpoint of the longest path in the tree. We apply this method to LLM DNA by treating each LLM as a species and using Euclidean distance between DNA vectors as the pairwise distance measure. As an expanded version of Figure 6, the full phylogenetic tree is shown in Figure 7, from which several interesting observations emerge:",
+        "bbox": [
+            169,
+            469,
+            826,
+            569
+        ],
+        "page_idx": 17
+    },
+    {
+        "type": "text",
+        "text": "1. LLMs from the same family are consistently colocated (e.g., Google Flan models, Qwen3 models, Llama 3 models), confirming that the DNA representation captures series-level similarity.",
+        "bbox": [
+            171,
+            579,
+            825,
+            621
+        ],
+        "page_idx": 17
+    },
+    {
+        "type": "text",
+        "text": "2. The DNA-based model tree aligns with the temporal evolution of LLMs, progressing (i) from Gemma to Gemma 3 along root-to-leaf paths and (ii) from early encoder–decoder architectures (e.g., Flan-T5) to prevalent decoder-only architectures. This indicates that DNA is an effective tool for studying LLM evolution.",
+        "bbox": [
+            171,
+            622,
+            826,
+            679
+        ],
+        "page_idx": 17
+    },
+    {
+        "type": "text",
+        "text": "C.2 DETAILED ANALYSIS OF FALSELY PREDICTED LLM RELATIONSHIP",
+        "text_level": 2,
+        "bbox": [
+            171,
+            700,
+            689,
+            715
+        ],
+        "page_idx": 17
+    },
+    {
+        "type": "text",
+        "text": "To investigate the causes of DNA false positives, we manually examined these cases with notable examples listed in Table 5. We found that a substantial portion involve pairs absent from the Hugging Face model tree yet verifiably related based on public documentation, or belonging to the same families and thus likely related. The pairs listed in Table 5 confirm that many “false positives” arise from incomplete labeling of the model-tree data rather than from the DNA method itself. Moreover, LLM DNA offers a principled way to enrich the model tree.",
+        "bbox": [
+            169,
+            727,
+            826,
+            813
+        ],
+        "page_idx": 17
+    },
+    {
+        "type": "text",
+        "text": "C.3 ABLATION STUDY OF BOTTLENECK EMBEDDING MODEL",
+        "text_level": 2,
+        "bbox": [
+            171,
+            827,
+            616,
+            843
+        ],
+        "page_idx": 17
+    },
+    {
+        "type": "text",
+        "text": "This ablation study evaluates the effect of the bottleneck embedding model on the computed DNA. In addition to Qwen-8B-Embedding, we compute DNA using two popular sentence-embedding models from different organizations and with different sizes: all-mpnet-base-v2 (0.1B parameters) and bge-large-en-v1.5 (0.3B parameters). We then perform a Mantel test—a standard statistical test for correlating two distance matrices—pairwise across the three DNA variants. Specifically, we sample 10,000 random DNA pairs, compute their distances, and report the Spearman correlation and p-value in Figure 8. All pairs of embedding model exhibit strong agreement, with high correlations $( r > 0 . 7 5 )$ and strong statistical significance $( p < 0 . 0 0 0 \\bar { 1 } )$ . These results indicate that the choice of embedding model has marginal impact on the overall DNA structure; even a small (0.1B) embedding model yields comparable DNA.",
+        "bbox": [
+            169,
+            854,
+            826,
+            925
+        ],
+        "page_idx": 17
+    },
+    {
+        "type": "header",
+        "text": "Published as a conference paper at ICLR 2026",
+        "bbox": [
+            171,
+            32,
+            480,
+            47
+        ],
+        "page_idx": 17
+    },
+    {
+        "type": "page_number",
+        "text": "18",
+        "bbox": [
+            490,
+            948,
+            509,
+            960
+        ],
+        "page_idx": 17
+    },
+    {
+        "type": "image",
+        "img_path": "images/bd2c35751bdda1bc5fc01a3e279a33a6e40359e89875743178783c4fd672442a.jpg",
+        "image_caption": [
+            "Figure 7: Phylogenetic tree of representative LLMs constructed using the Neighbor-Joining algorithm on their DNA embeddings."
+        ],
+        "image_footnote": [],
+        "content": "",
+        "bbox": [
+            191,
+            99,
+            807,
+            699
+        ],
+        "page_idx": 18
+    },
+    {
+        "type": "text",
+        "text": "",
+        "bbox": [
+            169,
+            767,
+            826,
+            839
+        ],
+        "page_idx": 18
+    },
+    {
+        "type": "text",
+        "text": "C.4 ABLATION STUDY OF THE EMBEDDING MODEL’S OUTPUT DIMENSION p",
+        "text_level": 2,
+        "bbox": [
+            171,
+            854,
+            725,
+            869
+        ],
+        "page_idx": 18
+    },
+    {
+        "type": "text",
+        "text": "This ablation study investigates the effect of the pre-aggregation embedding dimension p from Qwen3-8B-Embedding on DNA quality. We vary $p \\in 4 , 6 4$ , 128, 1024, 4096 and evaluate each setting on the same relationship prediction task used in Table 1. The results are shown in Figure 9.",
+        "bbox": [
+            169,
+            882,
+            826,
+            925
+        ],
+        "page_idx": 18
+    },
+    {
+        "type": "header",
+        "text": "Published as a conference paper at ICLR 2026",
+        "bbox": [
+            171,
+            32,
+            480,
+            47
+        ],
+        "page_idx": 18
+    },
+    {
+        "type": "page_number",
+        "text": "19",
+        "bbox": [
+            490,
+            948,
+            509,
+            960
+        ],
+        "page_idx": 18
+    },
+    {
+        "type": "table",
+        "img_path": "images/95306d95225f1b53b4ceecd784ae9456126ad4f8d048296f008660af7e703da3.jpg",
+        "table_caption": [
+            "Table 5: Examples of Undocumented Relationships Identified by LLM DNA"
+        ],
+        "table_footnote": [],
+        "table_body": "<table><tr><td>Model 1</td><td>Model 2</td></tr><tr><td>Qwen/Qwen2.5-7B-Instruct</td><td>Qwen/Qwen3-1.7B</td></tr><tr><td>Qwen/Qwen2.5-7B-Instruct</td><td>Qwen/Qwen3-14B</td></tr><tr><td>Qwen/Qwen2.5-7B-Instruct</td><td>Qwen/Qwen3-8B</td></tr><tr><td>Qwen/Qwen2.5-Coder-7B-Instruct</td><td>Qwen/Qwen3-4B-Thinking-2507-FP8</td></tr><tr><td>Qwen/Qwen3-4B</td><td>Qwen/Qwen2.5-Coder-7B</td></tr><tr><td>Qwen/Qwen3-4B</td><td>Qwen/Qwen3-8B</td></tr><tr><td>Qwen/Qwen3-4B-Thinking-2507-FP8</td><td>Qwen/Qwen2.5-0.5B-Instruct</td></tr><tr><td>Qwen/Qwen3-4B-Thinking-2507-FP8</td><td>Qwen/Qwen2.5-7B</td></tr><tr><td>Qwen/Qwen3-8B</td><td>Qwen/Qwen3-4B-Thinking-2507-FP8</td></tr><tr><td>prithivMLmods/rStar-Coder-Qwen3-0.6B</td><td>Qwen/Qwen2.5-Coder-7B</td></tr><tr><td>prithivMLmods/rStar-Coder-Qwen3-0.6B</td><td>janhq/Jan-v1-4B</td></tr><tr><td>prithivMLmods/rStar-Coder-Qwen3-0.6B</td><td>meta-llama/Meta-Llama-3-8B-Instruct</td></tr><tr><td>prithivMLmods/rStar-Coder-Qwen3-0.6B</td><td>openai/gpt-oss-20b</td></tr><tr><td>tiiuae/falcon-7b-instruct</td><td>Qwen/Qwen2.5-Coder-7B</td></tr><tr><td>tomg-group-umd/DynaGuard-8B</td><td>Qwen/Qwen3-14B</td></tr></table>",
+        "bbox": [
+            243,
+            127,
+            754,
+            343
+        ],
+        "page_idx": 19
+    },
+    {
+        "type": "chart",
+        "img_path": "images/657a482212af391ed8a516197179d9b4a72408c425c5880452eee7b632fd707e.jpg",
+        "content": "",
+        "chart_caption": [],
+        "chart_footnote": [],
+        "bbox": [
+            181,
+            357,
+            390,
+            518
+        ],
+        "page_idx": 19
+    },
+    {
+        "type": "chart",
+        "img_path": "images/ad2577b0156be65a341134e01fb684ef477676c84d08afd8354d557791d603b6.jpg",
+        "content": "",
+        "chart_caption": [],
+        "chart_footnote": [],
+        "bbox": [
+            390,
+            357,
+            602,
+            518
+        ],
+        "page_idx": 19
+    },
+    {
+        "type": "chart",
+        "img_path": "images/57cce409bc76288bf61e78b89b55db9107e52dfa5b272a7e8f45ce7fe1d0a8e6.jpg",
+        "content": "",
+        "chart_caption": [
+            "Figure 8: Mantel test result across three different bottleneck sentence-embedding models"
+        ],
+        "chart_footnote": [],
+        "bbox": [
+            604,
+            357,
+            816,
+            518
+        ],
+        "page_idx": 19
+    },
+    {
+        "type": "text",
+        "text": "Across all metrics, performance remains largely unchanged, indicating that p has only a marginal impact. This suggests that DNA quality is not primarily driven by the embedding model’s output dimension, but by the subsequent aggregation process. It also reinforces the observation in Table 1 that even simple sentence-embedding models can achieve strong relation prediction performance.",
+        "bbox": [
+            169,
+            570,
+            825,
+            641
+        ],
+        "page_idx": 19
+    },
+    {
+        "type": "chart",
+        "img_path": "images/fc5d061ba585005c2c6ff29342caedbc71aef2f5352dca4a4569fe6cef40f4d8.jpg",
+        "content": "",
+        "chart_caption": [
+            "Figure 9: Relationship prediction performance (Table 1) under different output dimensions p of the sentence-embedding model. Results are averaged over five random seeds; error bars denote standard deviation."
+        ],
+        "chart_footnote": [],
+        "bbox": [
+            181,
+            647,
+            818,
+            748
+        ],
+        "page_idx": 19
+    },
+    {
+        "type": "text",
+        "text": "C.5 ABLATION STUDY OF THE DNA DIMENSION L",
+        "text_level": 2,
+        "bbox": [
+            171,
+            828,
+            544,
+            843
+        ],
+        "page_idx": 19
+    },
+    {
+        "type": "text",
+        "text": "This ablation study examines how the DNA dimension L affects DNA quality. We vary L in 4, 32, 128, 1024, 4096 and evaluate each setting on the same relationship prediction task used in Table 1. The results are shown in Figure 10. DNA quality improves as L increases and converges around L = 128. Very low dimensions (e.g., L = 4) underperform because they discard structural information from the original high-dimensional space. Thus, selecting L involves a tradeoff between quality and efficiency: larger dimensions preserve more structural detail and improve accuracy, but incurs increasing downstream computation and storage costs; smaller dimensions are cheaper and faster, but can overly compress the space and lose critical structure, leading to degraded DNA quality. We therefore use L = 128 in all experiments. Note that this choice is specific to our current evaluation scale of approximately 300 LLMs; for substantially larger model sets, a larger L may be required.",
+        "bbox": [
+            169,
+            854,
+            826,
+            924
+        ],
+        "page_idx": 19
+    },
+    {
+        "type": "header",
+        "text": "Published as a conference paper at ICLR 2026",
+        "bbox": [
+            171,
+            32,
+            480,
+            47
+        ],
+        "page_idx": 19
+    },
+    {
+        "type": "page_number",
+        "text": "20",
+        "bbox": [
+            488,
+            946,
+            509,
+            960
+        ],
+        "page_idx": 19
+    },
+    {
+        "type": "text",
+        "text": "",
+        "bbox": [
+            169,
+            104,
+            826,
+            188
+        ],
+        "page_idx": 20
+    },
+    {
+        "type": "chart",
+        "img_path": "images/7cccc5f3d17dbf8dbb4f6a1a5bf8ce2c909ec58741e6add5f98ef8c2c3d3cb2d.jpg",
+        "content": "",
+        "chart_caption": [],
+        "chart_footnote": [],
+        "bbox": [
+            179,
+            199,
+            313,
+            294
+        ],
+        "page_idx": 20
+    },
+    {
+        "type": "chart",
+        "img_path": "images/177ce32ff8e2e7f264945326d79ca17c1400af81d0bc50650c63a24f2c8066ac.jpg",
+        "content": "",
+        "chart_caption": [],
+        "chart_footnote": [],
+        "bbox": [
+            313,
+            200,
+            439,
+            297
+        ],
+        "page_idx": 20
+    },
+    {
+        "type": "chart",
+        "img_path": "images/b875feb43a65f63e9faac4a82e237e336e8b600e07b798ac3b15a628a2d1bb0c.jpg",
+        "content": "",
+        "chart_caption": [],
+        "chart_footnote": [],
+        "bbox": [
+            439,
+            199,
+            565,
+            297
+        ],
+        "page_idx": 20
+    },
+    {
+        "type": "chart",
+        "img_path": "images/d3f597544593149964fededdcb32b9026002f71c0bc74b8a94adb83dbdb8ead0.jpg",
+        "content": "",
+        "chart_caption": [],
+        "chart_footnote": [],
+        "bbox": [
+            565,
+            200,
+            691,
+            292
+        ],
+        "page_idx": 20
+    },
+    {
+        "type": "chart",
+        "img_path": "images/99e454e6166b130d0ed68afaf359b3324ca35676aa0840666fa6c816207e7cb4.jpg",
+        "content": "",
+        "chart_caption": [
+            "Figure 10: Relationship prediction performance (Table 1) under different DNA dimensions L. Results are averaged over five random seeds; error bars denote standard deviation."
+        ],
+        "chart_footnote": [],
+        "bbox": [
+            689,
+            199,
+            816,
+            297
+        ],
+        "page_idx": 20
+    },
+    {
+        "type": "text",
+        "text": "C.6 EFFECT OF LLM’S PARAMETER SIZE ON DNA QUALITY",
+        "text_level": 2,
+        "bbox": [
+            171,
+            362,
+            612,
+            376
+        ],
+        "page_idx": 20
+    },
+    {
+        "type": "text",
+        "text": "This subsection investigates whether the performance of LLM DNA is biased by model scale—specifically, whether the method effectiveness varies significantly between small and large models. To rigorously test this, we conduct a post-hoc error analysis completely separate from the DNA classification pipeline. The DNA classifier first predicts relationships using only functional embeddings, without access to metadata such as parameter counts. After fixing these predictions, we calculate the cumulative parameter size for every test pair (the sum of parameters of both models). We then compute the Point-Biserial correlation $( r _ { p b } )$ and fit an independent logistic regression model to determine if this cumulative size can predict the correctness of the DNA classifier’s output (1 for correct, 0 for incorrect). Table 6 reports the performance metrics alongside the correlation coefficient and the p-value of the size coefficient derived from the regression analysis.",
+        "bbox": [
+            169,
+            387,
+            826,
+            529
+        ],
+        "page_idx": 20
+    },
+    {
+        "type": "text",
+        "text": "The results yield two key observations. First, DNA quality is statistically independent of LLM size: across all DNA-based methods, the Point-Biserial correlations are negligible (ranging from -0.006 to 0.023), and the p-values for the size coefficient are substantial (ranging from 0.63 to 0.69), well above the standard significance threshold of 0.05. This indicates that the method’s ability to detect evolutionary relationships does not degrade for larger models nor improve for smaller ones. Second, robustness is consistent across different encoders regardless of their own size: the lack of size bias (high p-value) remains constant across the large Qwen3 (8B) encoder and the much smaller BGE (0.3B) and MPNet (0.1B) encoders. This suggests that LLM DNA captures intrinsic functional behaviors that persist across model scales, rather than relying on complexity metrics associated with parameter count.",
+        "bbox": [
+            169,
+            534,
+            826,
+            674
+        ],
+        "page_idx": 20
+    },
+    {
+        "type": "table",
+        "img_path": "images/de4412ff0983d353b34bd7dc5e44ea1d585610d7cae8fa783144c49f396d8e42.jpg",
+        "table_caption": [
+            "Table 6: Point-Biserial correlation $( r _ { p b } )$ and statistical significance (p-value) between LLM size and relation prediction accuracy"
+        ],
+        "table_footnote": [],
+        "table_body": "<table><tr><td>Method</td><td>Accuracy</td><td>F1</td><td>AUC</td><td>Corr. ( $r_{pb}$ )</td><td>p-value (Size)</td></tr><tr><td>PhyloLM</td><td>0.742 ±0.058</td><td>0.766 ±0.057</td><td>0.788 ±0.060</td><td>-0.097 ±0.195</td><td>0.5202</td></tr><tr><td>DNA (Qwen3)</td><td>0.919 ±0.048</td><td>0.925 ±0.047</td><td>0.979 ±0.027</td><td>0.025 ±0.123</td><td>0.6349</td></tr><tr><td>DNA (BGE)</td><td>0.934 ±0.053</td><td>0.940 ±0.050</td><td>0.992 ±0.023</td><td>0.013 ±0.125</td><td>0.6550</td></tr><tr><td>DNA (MPNet)</td><td>0.932 ±0.048</td><td>0.937 ±0.047</td><td>0.990 ±0.020</td><td>0.023 ±0.122</td><td>0.6903</td></tr></table>",
+        "bbox": [
+            194,
+            724,
+            800,
+            803
+        ],
+        "page_idx": 20
+    },
+    {
+        "type": "text",
+        "text": "C.7 RELATION PREDICTION FOR LLMS WITH SAME TOKENIZER",
+        "text_level": 2,
+        "bbox": [
+            171,
+            828,
+            637,
+            843
+        ],
+        "page_idx": 20
+    },
+    {
+        "type": "text",
+        "text": "Though our state-of-the-art baseline PhyloLM (Yax et al., 2025) is designed to compare general LLMs across both same- and different-tokenizer settings, it introduces different comparison strategies for these two cases. In particular, when models share a tokenizer, PhyloLM can directly leverage exact token distributions, which typically yields stronger performance than its cross-tokenizer variant based on the first four characters (as shown in Table 1). To provide a fair and transparent comparison under PhyloLM’s same-tokenizer regime, we further compare PhyloLM with LLM DNA on a single-tokenizer subset. This setting is more challenging because models with the same tokenizer are typically closer in function and thus harder to distinguish. Concretely, we filter the dataset to include only models using Qwen2Tokenizer, the most commonly adopted tokenizer among our evaluated LLMs, and perform the same relation prediction task. The results are reported in Table 7.",
+        "bbox": [
+            169,
+            854,
+            826,
+            925
+        ],
+        "page_idx": 20
+    },
+    {
+        "type": "header",
+        "text": "Published as a conference paper at ICLR 2026",
+        "bbox": [
+            171,
+            32,
+            480,
+            47
+        ],
+        "page_idx": 20
+    },
+    {
+        "type": "page_number",
+        "text": "21",
+        "bbox": [
+            488,
+            948,
+            508,
+            959
+        ],
+        "page_idx": 20
+    },
+    {
+        "type": "text",
+        "text": "",
+        "bbox": [
+            169,
+            104,
+            826,
+            175
+        ],
+        "page_idx": 21
+    },
+    {
+        "type": "text",
+        "text": "Comparing Table 7 with Table 1 yields several key findings. First, all methods except PhyloLM exhibit a clear performance drop in the same-tokenizer setting: for example, DNA (MPNet) decreases from 0.93 to 0.86 in accuracy, and Greedy drops from 0.59 to 0.42. In contrast, PhyloLM slightly improves its accuracy (0.742 to 0.755) and achieves a notable precision gain (0.74 to 0.83), confirming that the same-tokenizer case is indeed more challenging while PhyloLM remains robust. Second, despite the reduced gap, PhyloLM is still consistently outperformed by DNA. This may be because PhyloLM primarily evaluates the distribution of the first token, which may be insufficient to capture long-range sentence-level distributions that are better reflected in DNA. We note that this comparison used Qwen2Tokenizer to align the two methods instead of using the first 4 characters which is technically a slightly different version of PhyloLM. We also emphasize that the comparison is conducted on relation prediction, a task native to LLM DNA rather than the primary focus of PhyloLM. This does not diminish PhyloLM’s demonstrated effectiveness in its intended applications, such as benchmark performance prediction. In future work, to enable a fairer and more comprehensive comparison, we will evaluate both methods on the datasets and tasks originally used to develop PhyloLM, such as model performance prediction benchmarks. Furthermore, we will investigate more deeply how sentence-level, long-range patterns affect LLM representations.",
+        "bbox": [
+            169,
+            180,
+            826,
+            404
+        ],
+        "page_idx": 21
+    },
+    {
+        "type": "table",
+        "img_path": "images/e286fe32bcc8b812e8b887836edc101c009a99581b8cbffa366544fc3bc0d130.jpg",
+        "table_caption": [
+            "Table 7: DNA relation pediction performance for LLMs with Qwen2Tokenizer"
+        ],
+        "table_footnote": [],
+        "table_body": "<table><tr><td>Method</td><td>Accuracy</td><td>Precision</td><td>Recall</td><td>F1</td><td>AUC</td></tr><tr><td>Random</td><td>0.511 ±0.054</td><td>0.682 ±0.073</td><td>0.529 ±0.054</td><td>0.593 ±0.047</td><td>0.501 ±0.068</td></tr><tr><td>Greedy</td><td>0.428 ±0.043</td><td>0.687 ±0.101</td><td>0.294 ±0.000</td><td>0.410 ±0.018</td><td>0.500 ±0.049</td></tr><tr><td>PhyloLM + SVM</td><td>0.755 ±0.136</td><td>0.832 ±0.080</td><td>0.800 ±0.204</td><td>0.801 ±0.149</td><td>0.760 ±0.180</td></tr><tr><td>DNA (Qwen3) + SVM</td><td>0.834 ±0.092</td><td>0.863 ±0.073</td><td>0.907 ±0.123</td><td>0.878 ±0.072</td><td>0.926 ±0.105</td></tr><tr><td>DNA (BGE) + SVM</td><td>0.869 ±0.078</td><td>0.865 ±0.069</td><td>0.966 ±0.094</td><td>0.909 ±0.059</td><td>0.944 ±0.087</td></tr><tr><td>DNA (MPNet) + SVM</td><td>0.866 ±0.088</td><td>0.879 ±0.099</td><td>0.948 ±0.098</td><td>0.906 ±0.065</td><td>0.960 ±0.079</td></tr></table>",
+        "bbox": [
+            176,
+            441,
+            820,
+            551
+        ],
+        "page_idx": 21
+    },
+    {
+        "type": "text",
+        "text": "D BROADER IMPACT",
+        "text_level": 2,
+        "bbox": [
+            171,
+            580,
+            364,
+            598
+        ],
+        "page_idx": 21
+    },
+    {
+        "type": "text",
+        "text": "The utility of the phylogenetic tree extends beyond historical visualization, offering actionable insights into three key aspects of model management.",
+        "bbox": [
+            169,
+            613,
+            823,
+            643
+        ],
+        "page_idx": 21
+    },
+    {
+        "type": "text",
+        "text": "License Governance. As the number of models grows rapidly, non-compliance with model licenses is becoming a critical concern. Such behaviors include fine-tuning or distillation from a model without giving proper credit or respecting license terms. For example, it has been alleged that certain proprietary models are derived from open-source counterparts like Qwen-2.5-14B, a claim often difficult to verify through metadata alone. While existing license-analysis tools such as ModelGo primarily rely on explicit claims, our phylogenetic analysis provides a functional indication of lineage. Similar methods have been explored in other domains; for instance, RAI2 (Dong et al., 2023) develops identification techniques for Computer Vision (CV) models to accurately identify model provenance and detect unauthorized reuse. In the language domain, our tree clusters models like Microsoft’s orca-2-13b and LMSYS’s vicuna-7b-v1.1 tightly, identifying a shared lineage that is not explicitly documented in Hugging Face. Ultimately, the phylogenetic tree offers a datadriven framework for flagging potential license violations and strengthening governance across the AI ecosystem.",
+        "bbox": [
+            169,
+            657,
+            826,
+            840
+        ],
+        "page_idx": 21
+    },
+    {
+        "type": "text",
+        "text": "Model Selection. Our framework facilitates informed model selection by analyzing the interplay between functional inheritance and iteration velocity. First, the phylogenetic lineage allows users to identify families where specialized capabilities—such as reasoning patterns (Huang & Chang, 2023) or domain knowledge (Wu et al., 2025)—are likely transferred down from ancestor models, ensuring the retention of desired baseline traits. Second, the “evolutionary rate” (branch length) serves as a proxy for Iteration Velocity, quantifying the magnitude of functional change between versions. This reveals a fundamental trade-off between novelty and stability: while a high iteration velocity offers significant behavioral shifts advantageous for experimental use cases, models with lower velocity (higher backward compatibility) are often preferable for production environments—particularly multi-agent systems—to minimize the risk of breaking established agent workflows or prompt dependencies.",
+        "bbox": [
+            169,
+            854,
+            826,
+            925
+        ],
+        "page_idx": 21
+    },
+    {
+        "type": "header",
+        "text": "Published as a conference paper at ICLR 2026",
+        "bbox": [
+            171,
+            32,
+            480,
+            47
+        ],
+        "page_idx": 21
+    },
+    {
+        "type": "page_number",
+        "text": "22",
+        "bbox": [
+            488,
+            946,
+            509,
+            959
+        ],
+        "page_idx": 21
+    },
+    {
+        "type": "text",
+        "text": "",
+        "bbox": [
+            169,
+            104,
+            826,
+            189
+        ],
+        "page_idx": 22
+    },
+    {
+        "type": "text",
+        "text": "Risk Mitigation. Finally, the phylogenetic tree facilitates proactive risk mitigation by tracing the propagation of safety risks. Our findings on inheritance suggest that vulnerabilities—such as implanted backdoors (Yang et al., 2024), jailbreak susceptibility (Russinovich et al., 2025), or deception behaviors (Wu et al., 2026)—are probably transferred down model lineages. Consequently, the tree allows auditors to propagate known risk profiles from ancestor models to their descendants. If a parent model is flagged as unsafe, its descendants identified by the tree can be immediately prioritized for safety interventions. This enables auditors to mitigate deployment risks efficiently, focusing resources on high-risk lineages without requiring exhaustive ground-up testing for every new model iteration.",
+        "bbox": [
+            169,
+            203,
+            826,
+            330
+        ],
+        "page_idx": 22
+    },
+    {
+        "type": "text",
+        "text": "E LIMITATIONS",
+        "text_level": 2,
+        "bbox": [
+            171,
+            349,
+            320,
+            364
+        ],
+        "page_idx": 22
+    },
+    {
+        "type": "text",
+        "text": "This section discusses the limitations of our work.",
+        "bbox": [
+            171,
+            380,
+            504,
+            393
+        ],
+        "page_idx": 22
+    },
+    {
+        "type": "text",
+        "text": "Traits and DNA subsequences. Our formal definition of LLM DNA does not assign mathematical meaning to DNA subsequences. However, in Section 5.7, we observe that fine-tuning alters only specific subsequences while leaving the overall pattern largely intact. This suggests that certain DNA subsequences may encode distinct model traits (e.g., mathematical reasoning). A theoretical characterization of how different evolutions affect such traits is an important and challenging direction for future work. In the long run, this could enable more precise understanding, management, and even targeted modification of LLM DNA, drawing a closer parallel to how biogenetics studies and manipulates inherited properties.",
+        "bbox": [
+            169,
+            409,
+            826,
+            523
+        ],
+        "page_idx": 22
+    },
+    {
+        "type": "text",
+        "text": "Adaptive attacks on DNA. Our current DNA extraction is not designed to be robust against adaptive attacks. If an attacker knows the extraction data, they could deliberately train a model toward a malicious objective—e.g., producing a substantially different DNA while functionally copying another model—in order to evade lineage detection, patents, or license constraints. A straightforward mitigation is to keep extraction datasets closed-source or to re-extract DNA using a fresh dataset when needed. A more principled direction is to scale the extraction set so that overfitting to it becomes prohibitively expensive and would noticeably degrade general performance. Developing such security guarantees remains a key topic for future work.",
+        "bbox": [
+            169,
+            536,
+            826,
+            650
+        ],
+        "page_idx": 22
+    },
+    {
+        "type": "text",
+        "text": "Data bias and contamination. Our DNA extraction relies on six public datasets, which may introduce evaluation bias or contamination. Bias could cause us to overlook certain differences or overestimate similarity among some model groups, while contamination could arise if parts of the extraction data were seen during pretraining. Nonetheless, their impact on our evaluation is limited. As shown in Section 5.5, DNA remains effective even when evaluated on purely random input data. This observation supports that DNA primarily captures relative relationships among LLMs, rather than depending on absolute accuracy on any particular dataset. One remaining challenge is that certain model APIs, such as the Claude series, may reject outputs generated from random strings; these cases require more advanced randomized methods to bypass such safety or formatting barriers.",
+        "bbox": [
+            169,
+            662,
+            826,
+            790
+        ],
+        "page_idx": 22
+    },
+    {
+        "type": "text",
+        "text": "F MODEL DETAILS",
+        "text_level": 2,
+        "bbox": [
+            171,
+            809,
+            351,
+            824
+        ],
+        "page_idx": 22
+    },
+    {
+        "type": "text",
+        "text": "In this section, we present the full list of models used, including their architectures, parameter counts, and licenses. This paper focuses on text-generation models, including decoder-only models (e.g., GPT) and encoder-decoder models (e.g., T5). For completion models, the completed text is treated as the response; for instruction-tuned models, the entire response extracted from the template is used. This may include any model-generated reasoning traces (e.g., in Qwen3), which are also considered part of the response. All uses comply with the respective model licenses.",
+        "bbox": [
+            169,
+            840,
+            826,
+            925
+        ],
+        "page_idx": 22
+    },
+    {
+        "type": "header",
+        "text": "Published as a conference paper at ICLR 2026",
+        "bbox": [
+            171,
+            32,
+            480,
+            47
+        ],
+        "page_idx": 22
+    },
+    {
+        "type": "page_number",
+        "text": "23",
+        "bbox": [
+            488,
+            946,
+            509,
+            960
+        ],
+        "page_idx": 22
+    },
+    {
+        "type": "text",
+        "text": "G LARGE LANGUAGE MODEL USAGE",
+        "text_level": 2,
+        "bbox": [
+            171,
+            102,
+            504,
+            118
+        ],
+        "page_idx": 23
+    },
+    {
+        "type": "text",
+        "text": "Large language models assisted in verifying theoretical results, implementing source code, and polishing this paper. The theoretical results and proofs were drafted by humans and verified by Gemini-2.5-Pro. Code implementation was primarily assisted by Claude-4-Sonnet and GPT-5-Codex, and the code’s correctness and alignment with the paper were checked by Gemini-2.5-Pro. Manuscript polishing was assisted by Gemini-2.5-Pro and GPT-5.",
+        "bbox": [
+            169,
+            133,
+            826,
+            205
+        ],
+        "page_idx": 23
+    },
+    {
+        "type": "header",
+        "text": "Published as a conference paper at ICLR 2026",
+        "bbox": [
+            171,
+            32,
+            480,
+            47
+        ],
+        "page_idx": 23
+    },
+    {
+        "type": "page_number",
+        "text": "24",
+        "bbox": [
+            488,
+            946,
+            509,
+            959
+        ],
+        "page_idx": 23
+    },
+    {
+        "type": "table",
+        "img_path": "images/6072ee4ce9f64a64f1fab87b6a68f6122d35d51995447abb4ad036b4ac172105.jpg",
+        "table_caption": [
+            "Table 8: Full list of used 305 models, including their architectures, parameter counts, and licenses"
+        ],
+        "table_footnote": [],
+        "table_body": "<table><tr><td>Model</td><td>Architecture</td><td>Parameters</td><td>License</td></tr><tr><td>01-ai/Yi-1.5-34B-Chat</td><td>Decoder Only</td><td>34B</td><td>Apache-2.0</td></tr><tr><td>01-ai/Yi-1.5-9B-Chat</td><td>Decoder Only</td><td>9B</td><td>Apache-2.0</td></tr><tr><td>01-ai/Yi-34B-Chat</td><td>Decoder Only</td><td>34B</td><td>Apache-2.0</td></tr><tr><td>01-ai/Yi-6B</td><td>Decoder Only</td><td>6B</td><td>Apache-2.0</td></tr><tr><td>01-ai/Yi-6B-200K</td><td>Decoder Only</td><td>6B</td><td>Apache-2.0</td></tr><tr><td>01-ai/Yi-6B-Chat</td><td>Decoder Only</td><td>6B</td><td>Apache-2.0</td></tr><tr><td>01-ai/Yi-9B-200K</td><td>Decoder Only</td><td>9B</td><td>Apache-2.0</td></tr><tr><td>AdaptLLM/finance-chat</td><td>Decoder Only</td><td>7B</td><td>Llama-2</td></tr><tr><td>AdaptLLM/medicine-LLM</td><td>Decoder Only</td><td>7B</td><td>Unknown</td></tr><tr><td>AdaptLLM/medicine-LLM-13B</td><td>Decoder Only</td><td>13B</td><td>Apache-2.0</td></tr><tr><td>AdaptLLM/medicine-chat</td><td>Decoder Only</td><td>7B</td><td>Llama-2</td></tr><tr><td>Aurore-Reveil/Koto-Small-7B-IT</td><td>Decoder Only</td><td>8B</td><td>MIT</td></tr><tr><td>BioMistral/BioMistral-7B</td><td>Decoder Only</td><td>7B</td><td>Apache-2.0</td></tr><tr><td>BioMistral/BioMistral-7B-DARE</td><td>Decoder Only</td><td>7B</td><td>Apache-2.0</td></tr><tr><td>Biomimicry-AI/ANIMA-Nectar-v2</td><td>Decoder Only</td><td>7B</td><td>MIT</td></tr><tr><td>ByteDance-Seed/Seed-Coder-8B-Instruct</td><td>Decoder Only</td><td>8B</td><td>MIT</td></tr><tr><td>CausalLM/34b-beta</td><td>Decoder Only</td><td>34B</td><td>GPL-3.0</td></tr><tr><td>ChrisMcCormick/deepseek-tiny-v0.1</td><td>Decoder Only</td><td>17.1M</td><td>Apache-2.0</td></tr><tr><td>ClosedCharacter/Peach-2.0-9B-8k-Roleplay</td><td>Decoder Only</td><td>9B</td><td>MIT</td></tr><tr><td>ConvexAI/Luminex-34B-v0.1</td><td>Decoder Only</td><td>34B</td><td>Other</td></tr><tr><td>ConvexAI/Luminex-34B-v0.2</td><td>Decoder Only</td><td>34B</td><td>Other</td></tr><tr><td>CorticalStack/pastiche-crown-clown-7b-dare-dpo</td><td>Decoder Only</td><td>7B</td><td>Apache-2.0</td></tr><tr><td>CultriX/NeuralTrix-bf16</td><td>Decoder Only</td><td>7B</td><td>Apache-2.0</td></tr><tr><td>DatarusAI/Datarus-R1-14B-preview</td><td>Decoder Only</td><td>15B</td><td>Apache-2.0</td></tr><tr><td>DavidAU/Qwen3-Horror-Instruct-Uncensored-...</td><td>Decoder Only</td><td>4B</td><td>Apache-2.0</td></tr><tr><td>DeepHat/DeepHat-V1-7B</td><td>Decoder Only</td><td>8B</td><td>Apache-2.0</td></tr><tr><td>EleutherAI/gpt-j-6b</td><td>Decoder Only</td><td>6B</td><td>Apache-2.0</td></tr><tr><td>EleutherAI/gpt-neo-1.3B</td><td>Decoder Only</td><td>1B</td><td>MIT</td></tr><tr><td>EleutherAI/gpt-neox-20b</td><td>Decoder Only</td><td>21B</td><td>Apache-2.0</td></tr><tr><td>EleutherAI/lemma_34b</td><td>Decoder Only</td><td>34B</td><td>Llama-2</td></tr><tr><td>EleutherAI/lemma_7b</td><td>Decoder Only</td><td>7B</td><td>Llama-2</td></tr><tr><td>EleutherAI/polyglot-ko-3.8b</td><td>Decoder Only</td><td>3.8B</td><td>Apache-2.0</td></tr><tr><td>EleutherAI/pythia-1.4b</td><td>Decoder Only</td><td>2B</td><td>Apache-2.0</td></tr><tr><td>EleutherAI/pythia-12b</td><td>Decoder Only</td><td>12B</td><td>Apache-2.0</td></tr><tr><td>EleutherAI/pythia-1b</td><td>Decoder Only</td><td>1B</td><td>Apache-2.0</td></tr><tr><td>EleutherAI/pythia-2.8b</td><td>Decoder Only</td><td>3B</td><td>Apache-2.0</td></tr><tr><td>EleutherAI/pythia-6.9b</td><td>Decoder Only</td><td>7B</td><td>Apache-2.0</td></tr><tr><td>FallenMerick/MN-Violet-Lotus-12B</td><td>Decoder Only</td><td>12B</td><td>CC-BY-4.0</td></tr><tr><td>FelixChao/llama2-13b-math1.2</td><td>Decoder Only</td><td>13B</td><td>Unknown</td></tr><tr><td>FelixChao/vicuna-7B-chemical</td><td>Decoder Only</td><td>7B</td><td>Apache-2.0</td></tr><tr><td>FelixChao/vicuna-7B-physics</td><td>Decoder Only</td><td>7B</td><td>Unknown</td></tr><tr><td>FlareRebellion/WeirdCompound-v1.6-24b</td><td>Decoder Only</td><td>24B</td><td>Unknown</td></tr><tr><td>Harshvir/Llama-2-7B-physics</td><td>Decoder Only</td><td>7B</td><td>Unknown</td></tr><tr><td>HuggingFaceH4/zephyr-7b-beta</td><td>Decoder Only</td><td>7B</td><td>MIT</td></tr><tr><td>HuggingFaceTB/SmolLM-135M</td><td>Decoder Only</td><td>0.1B</td><td>Apache-2.0</td></tr><tr><td>HuggingFaceTB/SmolLM2-135M</td><td>Decoder Only</td><td>0.1B</td><td>Apache-2.0</td></tr><tr><td>HuggingFaceTB/SmolLM3-3B</td><td>Decoder Only</td><td>3B</td><td>Apache-2.0</td></tr><tr><td>Intel/neural-chat-7b-v3-3</td><td>Decoder Only</td><td>7B</td><td>Apache-2.0</td></tr><tr><td>K-intelligence/Midm-2.0-Base-Instruct</td><td>Decoder Only</td><td>12B</td><td>MIT</td></tr><tr><td>KoboldAI/GPT-Neo-2.7B-Horni-LN</td><td>Decoder Only</td><td>2.7B</td><td>Unknown</td></tr><tr><td>KoboldAI/OPT-13B-Erebus</td><td>Decoder Only</td><td>13B</td><td>Other</td></tr><tr><td>LGAI-EXAONE/EXAONE-4.0-1.2B</td><td>Decoder Only</td><td>1B</td><td>Other</td></tr><tr><td>LLM360/Amber</td><td>Decoder Only</td><td>7B</td><td>Apache-2.0</td></tr><tr><td>LatitudeGames/Wayfarer-2-12B</td><td>Decoder Only</td><td>12B</td><td>Apache-2.0</td></tr><tr><td>LeoLM/leo-hessianai-13b</td><td>Decoder Only</td><td>13B</td><td>Unknown</td></tr><tr><td>LiquidAI/LFM2-1.2B</td><td>Decoder Only</td><td>1B</td><td>Other</td></tr><tr><td>LiquidAI/LFM2-350M</td><td>Decoder Only</td><td>0.4B</td><td>Other</td></tr><tr><td>MaziyarPanahi/WizardLM-Math-70B-v0.1</td><td>Decoder Only</td><td>69B</td><td>AGPL-3.0</td></tr><tr><td>Neko-Institute-of-Science/metharme-7b</td><td>Decoder Only</td><td>7B</td><td>Unknown</td></tr><tr><td>Neko-Institute-of-Science/pygmalion-7b</td><td>Decoder Only</td><td>7B</td><td>Unknown</td></tr><tr><td>Nexusflow/Starling-LM-7B-beta</td><td>Decoder Only</td><td>7B</td><td>Apache-2.0</td></tr><tr><td>NimedayWang/PolyCoder-2.7B</td><td>Decoder Only</td><td>2.7B</td><td>Unknown</td></tr><tr><td>NousResearch/Hermes-4-14B</td><td>Decoder Only</td><td>425k</td><td>Apache-2.0</td></tr><tr><td>NousResearch/Hermes-4-14B-FP8</td><td>Decoder Only</td><td>15B</td><td>Apache-2.0</td></tr><tr><td>NousResearch/Nous-Hermes-13b</td><td>Decoder Only</td><td>13B</td><td>gpl</td></tr><tr><td>NousResearch/Nous-Hermes-2-SOLAR-10.7B</td><td>Decoder Only</td><td>11B</td><td>Apache-2.0</td></tr><tr><td>NousResearch/Nous-Hermes-2-Yi-34B</td><td>Decoder Only</td><td>34B</td><td>Apache-2.0</td></tr><tr><td>OddTheGreat/Circuitry_24B_V.2</td><td>Decoder Only</td><td>24B</td><td>Unknown</td></tr><tr><td>OpenAssistant/oasst-sft-4-pythia-12b-epoch-3.5</td><td>Decoder Only</td><td>12B</td><td>Apache-2.0</td></tr><tr><td>OpenBuddy/openbuddy-codellama2-34b-v11.1-bf16</td><td>Decoder Only</td><td>34B</td><td>Unknown</td></tr><tr><td>PharMolix/BioMedGPT-LM-7B</td><td>Decoder Only</td><td>7B</td><td>Apache-2.0</td></tr><tr><td>Plaban81/Moe-4x7b-math-reason-code</td><td>Decoder Only</td><td>24B</td><td>Apache-2.0</td></tr><tr><td>PocketDoc/Dans-PersonalityEngine-V1.3.0-24b</td><td>Decoder Only</td><td>24B</td><td>Apache-2.0</td></tr><tr><td>PygmalionAI/pygmalion-2.7b</td><td>Decoder Only</td><td>2.7B</td><td>creativeml-openrail-m</td></tr><tr><td>QuixiAI/WizardLM-13B-Uncensored</td><td>Decoder Only</td><td>13B</td><td>Other</td></tr><tr><td>Qwen/QwQ-32B</td><td>Decoder Only</td><td>33B</td><td>Apache-2.0</td></tr><tr><td>Qwen/Qwen1.5-0.5B-Chat</td><td>Decoder Only</td><td>0.6B</td><td>Other</td></tr><tr><td>Qwen/Qwen1.5-14B-Chat</td><td>Decoder Only</td><td>14B</td><td>Other</td></tr><tr><td>Qwen/Qwen1.5-32B-Chat</td><td>Decoder Only</td><td>33B</td><td>Other</td></tr><tr><td>Qwen/Qwen1.5-4B-Chat</td><td>Decoder Only</td><td>4B</td><td>Other</td></tr><tr><td>Qwen/Qwen1.5-7B-Chat</td><td>Decoder Only</td><td>8B</td><td>Other</td></tr><tr><td>Qwen/Qwen2-0.5B-Instruct</td><td>Decoder Only</td><td>0.5B</td><td>Apache-2.0</td></tr><tr><td>Qwen/Qwen2-7B-Instruct</td><td>Decoder Only</td><td>8B</td><td>Apache-2.0</td></tr><tr><td>Qwen/Qwen2.5-0.5B-Instruct</td><td>Decoder Only</td><td>0.5B</td><td>Apache-2.0</td></tr><tr><td>Qwen/Qwen2.5-1.5B</td><td>Decoder Only</td><td>2B</td><td>Apache-2.0</td></tr><tr><td>Qwen/Qwen2.5-1.5B-Instruct</td><td>Decoder Only</td><td>2B</td><td>Apache-2.0</td></tr><tr><td>Qwen/Qwen2.5-3B-Instruct</td><td>Decoder Only</td><td>3B</td><td>Other</td></tr><tr><td>Qwen/Qwen2.5-7B</td><td>Decoder Only</td><td>8B</td><td>Apache-2.0</td></tr><tr><td>Qwen/Qwen2.5-7B-Instruct</td><td>Decoder Only</td><td>8B</td><td>Apache-2.0</td></tr><tr><td>Qwen/Qwen2.5-Coder-7B</td><td>Decoder Only</td><td>8B</td><td>Apache-2.0</td></tr><tr><td>Qwen/Qwen2.5-Coder-7B-Instruct</td><td>Decoder Only</td><td>8B</td><td>Apache-2.0</td></tr><tr><td>Qwen/Qwen2.5-Math-1.5B-Instruct</td><td>Decoder Only</td><td>2B</td><td>Apache-2.0</td></tr><tr><td>Qwen/Qwen2.5-Math-7B-Instruct</td><td>Decoder Only</td><td>8B</td><td>Apache-2.0</td></tr><tr><td>Qwen/Qwen3-0.6B</td><td>Decoder Only</td><td>0.8B</td><td>Apache-2.0</td></tr><tr><td>Qwen/Qwen3-1.7B</td><td>Decoder Only</td><td>2B</td><td>Apache-2.0</td></tr><tr><td>Qwen/Qwen3-14B</td><td>Decoder Only</td><td>15B</td><td>Apache-2.0</td></tr><tr><td>Qwen/Qwen3-30B-A3B-Instruct-2507-FP8</td><td>Decoder Only</td><td>31B</td><td>Apache-2.0</td></tr><tr><td>Qwen/Qwen3-4B</td><td>Decoder Only</td><td>4B</td><td>Apache-2.0</td></tr><tr><td>Qwen/Qwen3-4B-Instruct-2507</td><td>Decoder Only</td><td>4B</td><td>Apache-2.0</td></tr><tr><td>Qwen/Qwen3-4B-Thinking-2507</td><td>Decoder Only</td><td>4B</td><td>Apache-2.0</td></tr><tr><td>Qwen/Qwen3-4B-Thinking-2507-FP8</td><td>Decoder Only</td><td>4B</td><td>Apache-2.0</td></tr><tr><td>Qwen/Qwen3-8B</td><td>Decoder Only</td><td>8B</td><td>Apache-2.0</td></tr><tr><td>S4nfs/Neeto-1.0-8b</td><td>Decoder Only</td><td>8B</td><td>CC-BY-NC-4.0</td></tr><tr><td>SUSTech/SUS-Chat-34B</td><td>Decoder Only</td><td>34B</td><td>Apache-2.0</td></tr><tr><td>SciPhi/SciPhi-Mistral-7B-32k</td><td>Decoder Only</td><td>7B</td><td>MIT</td></tr><tr><td>SciPhi/SciPhi-Self-RAG-Mistral-7B-32k</td><td>Decoder Only</td><td>7B</td><td>MIT</td></tr><tr><td>Tesslate/UIGEN-X-4B-0729</td><td>Decoder Only</td><td>4B</td><td>Apache-2.0</td></tr><tr><td>Tesslate/WEBGEN-4B-Preview</td><td>Decoder Only</td><td>4B</td><td>Apache-2.0</td></tr><tr><td>ThatSkyFox/DialoGPT-medium-whatsapp</td><td>Encoder Only</td><td>Unknown</td><td>Unknown</td></tr><tr><td>TheBloke/CodeLlama-70B-Instruct-AWQ</td><td>Decoder Only</td><td>69B</td><td>Llama-2</td></tr><tr><td>TheBloke/koala-13B-HF</td><td>Decoder Only</td><td>13B</td><td>Other</td></tr><tr><td>TheBloke/tulu-30B-fp16</td><td>Decoder Only</td><td>30B</td><td>Other</td></tr><tr><td>TheMindExpansionNetwork/SYNERGETIC...</td><td>Decoder Only</td><td>14B</td><td>Unknown</td></tr><tr><td>TheOneWhoWill/Bootstrap-LLM</td><td>Decoder Only</td><td>0.1B</td><td>Apache-2.0</td></tr><tr><td>Tianlin668/MentalBART</td><td>Encoder Decoder</td><td>Unknown</td><td>MIT</td></tr><tr><td>TigerResearch/tigerbot-13b-base</td><td>Decoder Only</td><td>13B</td><td>Apache-2.0</td></tr><tr><td>TinyLlama/TinyLlama-1.1B-Chat-v0.5</td><td>Decoder Only</td><td>1B</td><td>Apache-2.0</td></tr><tr><td>TinyLlama/TinyLlama-1.1B-Chat-v1.0</td><td>Decoder Only</td><td>1B</td><td>Apache-2.0</td></tr><tr><td>TinyLlama/TinyLlama-1.1B-intermediate-step-...</td><td>Decoder Only</td><td>1B</td><td>Apache-2.0</td></tr><tr><td>TinyLlama/TinyLlama-v1.1</td><td>Decoder Only</td><td>1B</td><td>Apache-2.0</td></tr><tr><td>TinyLlama/TinyLlama-v1.1_math_code</td><td>Decoder Only</td><td>1B</td><td>Apache-2.0</td></tr><tr><td>Vikhrmodels/Vikhr-Nemo-12B-Instruct-R-21-09-24</td><td>Decoder Only</td><td>12B</td><td>Apache-2.0</td></tr><tr><td>Vision-CAIR/vicuna</td><td>Decoder Only</td><td>Unknown</td><td>Unknown</td></tr><tr><td>Vortex5/Lunar-Nexus-12B</td><td>Decoder Only</td><td>12B</td><td>Unknown</td></tr><tr><td>Vortex5/Moonlit-Shadow-12B</td><td>Decoder Only</td><td>12B</td><td>Unknown</td></tr><tr><td>WhiteRabbitNeo/WhiteRabbitNeo-13B-v1</td><td>Decoder Only</td><td>13B</td><td>Llama-2</td></tr><tr><td>WizardLM/WizardLM-70B-V1.0</td><td>Decoder Only</td><td>70B</td><td>Llama-2</td></tr><tr><td>abocide/Qwen2.5-7B-Instruct-R1-forfinance</td><td>Decoder Only</td><td>8B</td><td>Apache-2.0</td></tr><tr><td>adamo1139/Apertus-8B-Instruct-2509-ungated</td><td>Decoder Only</td><td>8B</td><td>Apache-2.0</td></tr><tr><td>agentica-org/DeepCoder-14B-Preview</td><td>Decoder Only</td><td>15B</td><td>MIT</td></tr><tr><td>allenai/OLMoE-1B-7B-0924</td><td>Decoder Only</td><td>7B</td><td>Apache-2.0</td></tr><tr><td>allenai/tulu-2-dpo-70b</td><td>Decoder Only</td><td>69B</td><td>Other</td></tr><tr><td>aquif-ai/aquif-3.5-8B-Think</td><td>Decoder Only</td><td>8B</td><td>Apache-2.0</td></tr><tr><td>askfjhaskjgh/UbermenschetienASI</td><td>Decoder Only</td><td>8B</td><td>Other</td></tr><tr><td>augmxnt/shisa-base-7b-v1</td><td>Decoder Only</td><td>8B</td><td>Apache-2.0</td></tr><tr><td>bardsai/jaskier-7b-dpo-v5.6</td><td>Decoder Only</td><td>7B</td><td>CC-BY-4.0</td></tr><tr><td>berkeley-nest/Starling-LM-7B-alpha</td><td>Decoder Only</td><td>7B</td><td>Apache-2.0</td></tr><tr><td>beruniy/Llama-3.2-3B-Instruct-Uz</td><td>Decoder Only</td><td>3B</td><td>llama3.2</td></tr><tr><td>beyoru/Luna</td><td>Decoder Only</td><td>4B</td><td>MIT</td></tr><tr><td>bigcode/octocoder</td><td>Decoder Only</td><td>16B</td><td>OpenRAIL-M</td></tr><tr><td>bigcode/starcoder2-3b</td><td>Decoder Only</td><td>3B</td><td>OpenRAIL-M</td></tr><tr><td>bigscience/bloom-560m</td><td>Decoder Only</td><td>0.6B</td><td>BigScience RAIL 1.0</td></tr><tr><td>bigscience/bloom-7b1</td><td>Decoder Only</td><td>7B</td><td>BigScience RAIL 1.0</td></tr><tr><td>bigscience/bloomz-1b1</td><td>Decoder Only</td><td>1B</td><td>BigScience RAIL 1.0</td></tr><tr><td>bigscience/bloomz-1b7</td><td>Decoder Only</td><td>2B</td><td>BigScience RAIL 1.0</td></tr><tr><td>bigscience/bloomz-560m</td><td>Decoder Only</td><td>0.6B</td><td>BigScience RAIL 1.0</td></tr><tr><td>bigscience/bloomz-7b1</td><td>Decoder Only</td><td>7B</td><td>BigScience RAIL 1.0</td></tr><tr><td>bxod/Llama-3.2-1B-Instruct-uz</td><td>Decoder Only</td><td>1B</td><td>llama3.2</td></tr><tr><td>chatitcloud/UZI1</td><td>Decoder Only</td><td>0.3B</td><td>Apache-2.0</td></tr><tr><td>cisco-ai/mini-bart-g2p</td><td>Encoder Decoder</td><td>Unknown</td><td>Apache-2.0</td></tr><tr><td>cloudyu/Mixtral_11Bx2_MoE_19B</td><td>Decoder Only</td><td>19B</td><td>CC-BY-NC-4.0</td></tr><tr><td>codefuse-ai/CodeFuse-DeepSeek-33B</td><td>Decoder Only</td><td>33B</td><td>Other</td></tr><tr><td>codellama/CodeLlama-13b-Instruct-hf</td><td>Decoder Only</td><td>13B</td><td>Llama-2</td></tr><tr><td>codellama/CodeLlama-34b-Instruct-hf</td><td>Decoder Only</td><td>34B</td><td>Llama-2</td></tr><tr><td>codellama/CodeLlama-7b-hf</td><td>Decoder Only</td><td>7B</td><td>Llama-2</td></tr><tr><td>codeparrot/codeparrot-small-code-to-text</td><td>Encoder Only</td><td>Unknown</td><td>Apache-2.0</td></tr><tr><td>codeparrot/codeparrot-small-multi</td><td>Encoder Only</td><td>Unknown</td><td>Apache-2.0</td></tr><tr><td>continuedev/instinct</td><td>Decoder Only</td><td>8B</td><td>Apache-2.0</td></tr><tr><td>darkc0de/XortronCriminalComputingConfig</td><td>Decoder Only</td><td>24B</td><td>Apache-2.0</td></tr><tr><td>databricks/dolly-v1-6b</td><td>Decoder Only</td><td>6B</td><td>CC-BY-NC-4.0</td></tr><tr><td>databricks/dolly-v2-12b</td><td>Decoder Only</td><td>12B</td><td>MIT</td></tr><tr><td>databricks/dolly-v2-3b</td><td>Decoder Only</td><td>3B</td><td>MIT</td></tr><tr><td>databricks/dolly-v2-7b</td><td>Decoder Only</td><td>7B</td><td>MIT</td></tr><tr><td>deepseek-ai/DeepSeek-Coder-V2-Lite-Instruct</td><td>Decoder Only</td><td>16B</td><td>Other</td></tr><tr><td>deepseek-ai/DeepSeek-R1-0528-Qwen3-8B</td><td>Decoder Only</td><td>8B</td><td>MIT</td></tr><tr><td>deepseek-ai/DeepSeek-R1-Distill-Llama-8B</td><td>Decoder Only</td><td>8B</td><td>MIT</td></tr><tr><td>deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B</td><td>Decoder Only</td><td>2B</td><td>MIT</td></tr><tr><td>deepseek-ai/DeepSeek-R1-Distill-Qwen-7B</td><td>Decoder Only</td><td>8B</td><td>MIT</td></tr><tr><td>deepseek-ai/DeepSeek-V2-Lite</td><td>Decoder Only</td><td>16B</td><td>Other</td></tr><tr><td>deepseek-ai/deepseek-coder-1.3b-base</td><td>Decoder Only</td><td>1B</td><td>Other</td></tr><tr><td>deepseek-ai/deepseek-coder-6.7b-instruct</td><td>Decoder Only</td><td>7B</td><td>Other</td></tr><tr><td>deepseek-ai/deepseek-llm-67b-chat</td><td>Decoder Only</td><td>67B</td><td>Other</td></tr><tr><td>deepseek-ai/deepseek-llm-7b-base</td><td>Decoder Only</td><td>7B</td><td>Other</td></tr><tr><td>deepseek-ai/deepseek-llm-7b-chat</td><td>Decoder Only</td><td>7B</td><td>Other</td></tr><tr><td>deepseek-ai/deepseek-math-7b-instruct</td><td>Decoder Only</td><td>7B</td><td>Other</td></tr><tr><td>dicta-il/dictalm2.0</td><td>Decoder Only</td><td>7B</td><td>Apache-2.0</td></tr><tr><td>dphn/Dolphin-Mistral-24B-Venice-Edition</td><td>Decoder Only</td><td>24B</td><td>Apache-2.0</td></tr><tr><td>eci-io/climategpt-7b</td><td>Decoder Only</td><td>7B</td><td>Other</td></tr><tr><td>elyza/ELYZA-japanese-Llama-2-7b</td><td>Decoder Only</td><td>7B</td><td>Llama-2</td></tr><tr><td>elyza/ELYZA-japanese-Llama-2-7b-instruct</td><td>Decoder Only</td><td>7B</td><td>Llama-2</td></tr><tr><td>elyza/Llama-3-ELYZA-JP-8B</td><td>Decoder Only</td><td>8B</td><td>llama3</td></tr><tr><td>eren23/ogno-monarch-jaskier-merge-7b-OH-PREF-...</td><td>Decoder Only</td><td>7B</td><td>CC-BY-NC-4.0</td></tr><tr><td>facebook/galactica-1.3b</td><td>Decoder Only</td><td>1B</td><td>CC-BY-NC-4.0</td></tr><tr><td>fblgit/UNA-SimpleSmaug-34b-v1beta</td><td>Decoder Only</td><td>34B</td><td>Apache-2.0</td></tr><tr><td>fluently/FluentlyQwen3-1.7B</td><td>Decoder Only</td><td>2B</td><td>Apache-2.0</td></tr><tr><td>futurehouse/ether0</td><td>Decoder Only</td><td>24B</td><td>Apache-2.0</td></tr><tr><td>golaxy/gowizardlm</td><td>Decoder Only</td><td>Unknown</td><td>Apache-2.0</td></tr><tr><td>google-t5/t5-large</td><td>Encoder Decoder</td><td>0.7B</td><td>Apache-2.0</td></tr><tr><td>google-t5/t5-small</td><td>Encoder Decoder</td><td>60.5M</td><td>Apache-2.0</td></tr><tr><td>google/flan-t5-base</td><td>Encoder Decoder</td><td>0.2B</td><td>Apache-2.0</td></tr><tr><td>google/flan-t5-large</td><td>Encoder Decoder</td><td>0.8B</td><td>Apache-2.0</td></tr><tr><td>google/gemma-2b-it</td><td>Unknown</td><td>3B</td><td>Gemma</td></tr><tr><td>google/gemma-3-12b-it</td><td>Unknown</td><td>12B</td><td>Gemma</td></tr><tr><td>google/gemma-3-1b-it</td><td>Unknown</td><td>1B</td><td>Gemma</td></tr><tr><td>google/gemma-3-4b-it</td><td>Unknown</td><td>4B</td><td>Gemma</td></tr><tr><td>google/gemma-7b-it</td><td>Unknown</td><td>9B</td><td>Gemma</td></tr><tr><td>gradientai/Llama-3-8B-Instruct-262k</td><td>Decoder Only</td><td>8B</td><td>llama3</td></tr><tr><td>heegyu/kogpt-j-base</td><td>Decoder Only</td><td>Unknown</td><td>MIT</td></tr><tr><td>huggyllama/llama-7b</td><td>Decoder Only</td><td>7B</td><td>Other</td></tr><tr><td>huihui-ai/Huihui-Jan-v1-4B-abliterated</td><td>Decoder Only</td><td>4B</td><td>Apache-2.0</td></tr><tr><td>ibivibiv/alpaca-dragon-72b-v1</td><td>Decoder Only</td><td>72B</td><td>Other</td></tr><tr><td>inflatebot/MN-12B-Mag-Mell-R1</td><td>Decoder Only</td><td>12B</td><td>Unknown</td></tr><tr><td>janhq/Jan-v1-4B</td><td>Decoder Only</td><td>4B</td><td>Apache-2.0</td></tr><tr><td>janhq/Jan-v1-edge</td><td>Decoder Only</td><td>2B</td><td>Apache-2.0</td></tr><tr><td>jiawei-ucas/Qwen-2.5-7B-ConsistentChat</td><td>Decoder Only</td><td>8B</td><td>MIT</td></tr><tr><td>jxm/gpt-oss-20b-base</td><td>Unknown</td><td>20B</td><td>Unknown</td></tr><tr><td>kevin009/llamaRAGdrama</td><td>Decoder Only</td><td>7B</td><td>Apache-2.0</td></tr><tr><td>knifeayumu/Cydonia-v4.1-MS3.2-Magnum-...</td><td>Decoder Only</td><td>24B</td><td>Apache-2.0</td></tr><tr><td>kyujinpy/Sakura-SOLRCA-Math-Instruct-DPO-v1</td><td>Decoder Only</td><td>11B</td><td>CC-BY-NC-SA-4.0</td></tr><tr><td>lgaalves/gpt1</td><td>Decoder Only</td><td>0.1B</td><td>MIT</td></tr><tr><td>liyuesen/druggpt</td><td>Encoder Only</td><td>Unknown</td><td>GPL-3.0</td></tr><tr><td>lmsys/vicuna-13b-v1.5</td><td>Decoder Only</td><td>13B</td><td>Llama-2</td></tr><tr><td>lmsys/vicuna-33b-v1.3</td><td>Decoder Only</td><td>33B</td><td>Unknown</td></tr><tr><td>lmsys/vicuna-7b-v1.1</td><td>Decoder Only</td><td>7B</td><td>Unknown</td></tr><tr><td>lmsys/vicuna-7b-v1.5</td><td>Decoder Only</td><td>7B</td><td>Llama-2</td></tr><tr><td>lmsys/vicuna-7b-v1.5-16k</td><td>Decoder Only</td><td>7B</td><td>Llama-2</td></tr><tr><td>m-a-p/ChatMusician</td><td>Decoder Only</td><td>7B</td><td>MIT</td></tr><tr><td>meta-llama/CodeLlama-13b-Instruct-hf</td><td>Unknown</td><td>13B</td><td>Llama-2</td></tr><tr><td>meta-llama/CodeLlama-7b-Instruct-hf</td><td>Unknown</td><td>7B</td><td>Llama-2</td></tr><tr><td>meta-llama/Llama-2-13b-chat-hf</td><td>Unknown</td><td>13B</td><td>Llama-2</td></tr><tr><td>meta-llama/Llama-2-70b-chat-hf</td><td>Unknown</td><td>69B</td><td>Llama-2</td></tr><tr><td>meta-llama/Llama-2-7b-chat-hf</td><td>Unknown</td><td>7B</td><td>Llama-2</td></tr><tr><td>meta-llama/Llama-2-7b-hf</td><td>Unknown</td><td>7B</td><td>Llama-2</td></tr><tr><td>meta-llama/Llama-3.1-8B-Instruct</td><td>Unknown</td><td>8B</td><td>llama3.1</td></tr><tr><td>meta-llama/Llama-3.2-1B-Instruct</td><td>Unknown</td><td>1B</td><td>llama3.2</td></tr><tr><td>meta-llama/Llama-3.2-3B-Instruct</td><td>Unknown</td><td>3B</td><td>llama3.2</td></tr><tr><td>meta-llama/LlamaGuard-7b</td><td>Unknown</td><td>7B</td><td>Llama-2</td></tr><tr><td>meta-llama/Meta-Llama-3-70B</td><td>Unknown</td><td>71B</td><td>llama3</td></tr><tr><td>meta-llama/Meta-Llama-3-70B-Instruct</td><td>Unknown</td><td>71B</td><td>llama3</td></tr><tr><td>meta-llama/Meta-Llama-3-8B</td><td>Unknown</td><td>8B</td><td>llama3</td></tr><tr><td>meta-llama/Meta-Llama-3-8B-Instruct</td><td>Unknown</td><td>8B</td><td>llama3</td></tr><tr><td>meta-llama/Meta-Llama-Guard-2-8B</td><td>Unknown</td><td>8B</td><td>llama3</td></tr><tr><td>meta-math/MetaMath-Llemma-7B</td><td>Decoder Only</td><td>7B</td><td>Apache-2.0</td></tr><tr><td>meta-math/MetaMath-Mistral-7B</td><td>Decoder Only</td><td>7B</td><td>Apache-2.0</td></tr><tr><td>microsoft/DialoGPT-medium</td><td>Encoder Only</td><td>Unknown</td><td>MIT</td></tr><tr><td>microsoft/MediPhi-Instruct</td><td>Decoder Only</td><td>4B</td><td>MIT</td></tr><tr><td>microsoft/Orca-2-13b</td><td>Decoder Only</td><td>13B</td><td>Other</td></tr><tr><td>microsoft/Orca-2-7b</td><td>Decoder Only</td><td>7B</td><td>Other</td></tr><tr><td>microsoft/Phi-3-mini-128k-instruct</td><td>Decoder Only</td><td>4B</td><td>MIT</td></tr><tr><td>microsoft/Phi-3-mini-4k-instruct</td><td>Decoder Only</td><td>4B</td><td>MIT</td></tr><tr><td>microsoft/Phi-3.5-mini-instruct</td><td>Decoder Only</td><td>4B</td><td>MIT</td></tr><tr><td>microsoft/Phi-4-mini-instruct</td><td>Decoder Only</td><td>4B</td><td>MIT</td></tr><tr><td>microsoft/Phi-4-mini-reasoning</td><td>Decoder Only</td><td>4B</td><td>MIT</td></tr><tr><td>microsoft/bitnet-b1.58-2B-4T</td><td>Decoder Only</td><td>0.8B</td><td>MIT</td></tr><tr><td>microsoft/phi-1</td><td>Decoder Only</td><td>1B</td><td>MIT</td></tr><tr><td>microsoft/phi-1_5</td><td>Decoder Only</td><td>1B</td><td>MIT</td></tr><tr><td>microsoft/phi-2</td><td>Decoder Only</td><td>3B</td><td>MIT</td></tr><tr><td>microsoft/phi-4</td><td>Decoder Only</td><td>15B</td><td>MIT</td></tr><tr><td>miromind-ai/MiroThinker-14B-DPO-v0.2</td><td>Decoder Only</td><td>14B</td><td>Apache-2.0</td></tr><tr><td>mistralai/Ministral-8B-Instruct-2410</td><td>Unknown</td><td>8B</td><td>Other</td></tr><tr><td>mistralai/Mistral-7B-Instruct-v0.1</td><td>Unknown</td><td>7B</td><td>Apache-2.0</td></tr><tr><td>mistralai/Mistral-7B-Instruct-v0.3</td><td>Unknown</td><td>7B</td><td>Apache-2.0</td></tr><tr><td>mistralai/Mixtral-8x7B-Instruct-v0.1</td><td>Unknown</td><td>47B</td><td>Apache-2.0</td></tr><tr><td>mlabonne/AlphaMonarch-7B</td><td>Decoder Only</td><td>7B</td><td>CC-BY-NC-4.0</td></tr><tr><td>mlx-community/Apertus-8B-Instruct-2509-bf16</td><td>Decoder Only</td><td>8B</td><td>Apache-2.0</td></tr><tr><td>mookiezi/Discord-Micae-8B-Preview</td><td>Decoder Only</td><td>8B</td><td>llama3</td></tr><tr><td>mookiezi/Discord-Micae-Hermes-3-3B</td><td>Decoder Only</td><td>3B</td><td>llama3</td></tr><tr><td>mosaicml/mpt-30b-chat</td><td>Decoder Only</td><td>30B</td><td>CC-BY-NC-SA-4.0</td></tr><tr><td>mosaicml/mpt-30b-instruct</td><td>Decoder Only</td><td>30B</td><td>Apache-2.0</td></tr><tr><td>mosaicml/mpt-7b-storywriter</td><td>Decoder Only</td><td>7B</td><td>Apache-2.0</td></tr><tr><td>nakodanei/Blue-Orchid-2x7b</td><td>Decoder Only</td><td>13B</td><td>Apache-2.0</td></tr><tr><td>nomic-ai/gpt4all-13b-snoozy</td><td>Decoder Only</td><td>13B</td><td>gpl</td></tr><tr><td>nvidia/OpenReasoning-Nemotron-1.5B</td><td>Decoder Only</td><td>2B</td><td>CC-BY-4.0</td></tr><tr><td>openai-community/openai-gpt</td><td>Decoder Only</td><td>0.1B</td><td>MIT</td></tr><tr><td>openai/gpt-oss-20b</td><td>Decoder Only</td><td>22B</td><td>Apache-2.0</td></tr><tr><td>openbmb/UltraCM-13b</td><td>Decoder Only</td><td>13B</td><td>MIT</td></tr><tr><td>openchat/openchat-3.5-0106</td><td>Decoder Only</td><td>7B</td><td>Apache-2.0</td></tr><tr><td>openchat/openchat_3.5</td><td>Decoder Only</td><td>7B</td><td>Apache-2.0</td></tr><tr><td>openlm-research/open_llama_13b</td><td>Decoder Only</td><td>13B</td><td>Apache-2.0</td></tr><tr><td>openlm-research/open_llama_7b</td><td>Decoder Only</td><td>7B</td><td>Apache-2.0</td></tr><tr><td>prithivMLmods/rStar-Coder-Qwen3-0.6B</td><td>Decoder Only</td><td>0.6B</td><td>Apache-2.0</td></tr><tr><td>project-baize/baize-v2-13b</td><td>Decoder Only</td><td>13B</td><td>CC-BY-NC-4.0</td></tr><tr><td>quantumaikr/KoreanLM</td><td>Decoder Only</td><td>7B</td><td>Unknown</td></tr><tr><td>rishiraj/CatPPT-base</td><td>Decoder Only</td><td>7B</td><td>Apache-2.0</td></tr><tr><td>roneneldan/TinyStories-1M</td><td>Decoder Only</td><td>1M</td><td>Unknown</td></tr><tr><td>sail/Sailor-7B</td><td>Decoder Only</td><td>8B</td><td>Apache-2.0</td></tr><tr><td>sarvamai/sarvam-1</td><td>Decoder Only</td><td>3B</td><td>Unknown</td></tr><tr><td>scb10x/typhoon-7b</td><td>Decoder Only</td><td>7B</td><td>Apache-2.0</td></tr><tr><td>segolilylabs/Lily-Cybersecurity-7B-v0.2</td><td>Decoder Only</td><td>7B</td><td>Apache-2.0</td></tr><tr><td>sequelbox/gpt-oss-20b-DES-Reasoning</td><td>Decoder Only</td><td>21B</td><td>Apache-2.0</td></tr><tr><td>stabilityai/stablelm-tuned-alpha-7b</td><td>Decoder Only</td><td>7B</td><td>CC-BY-NC-SA-4.0</td></tr><tr><td>stanford-crfm/BioMedLM</td><td>Encoder Only</td><td>Unknown</td><td>BigScience RAIL 1.0</td></tr><tr><td>tencent/Hunyuan-1.8B-Instruct</td><td>Decoder Only</td><td>2B</td><td>Unknown</td></tr><tr><td>tencent/Hunyuan-7B-Instruct</td><td>Decoder Only</td><td>8B</td><td>Unknown</td></tr><tr><td>theprint/TiTan-Qwen2.5-0.5B</td><td>Decoder Only</td><td>0.5B</td><td>Apache-2.0</td></tr><tr><td>thesephist/contra-bottleneck-t5-large-wikipedia</td><td>Encoder Decoder</td><td>Unknown</td><td>MIT</td></tr><tr><td>tiuae/Falcon3-10B-Instruct</td><td>Decoder Only</td><td>10B</td><td>Other</td></tr><tr><td>tiuae/Falcon3-1B-Instruct</td><td>Decoder Only</td><td>2B</td><td>Other</td></tr><tr><td>tiuae/Falcon3-3B-Instruct</td><td>Decoder Only</td><td>3B</td><td>Other</td></tr><tr><td>tiuae/Falcon3-7B-Instruct</td><td>Decoder Only</td><td>7B</td><td>Other</td></tr><tr><td>tiuae/falcon-11B</td><td>Decoder Only</td><td>11B</td><td>Unknown</td></tr><tr><td>tiuae/falcon-40b-instruct</td><td>Decoder Only</td><td>40B</td><td>Apache-2.0</td></tr><tr><td>tiuae/falcon-7b-instruct</td><td>Decoder Only</td><td>7B</td><td>Apache-2.0</td></tr><tr><td>tomg-group-umd/DynaGuard-1.7B</td><td>Decoder Only</td><td>2B</td><td>Apache-2.0</td></tr><tr><td>tomg-group-umd/DynaGuard-4B</td><td>Decoder Only</td><td>4B</td><td>Apache-2.0</td></tr><tr><td>tomg-group-umd/DynaGuard-8B</td><td>Decoder Only</td><td>8B</td><td>Apache-2.0</td></tr><tr><td>unsloth/gpt-oss-20b-BF16</td><td>Decoder Only</td><td>21B</td><td>Apache-2.0</td></tr><tr><td>upstage/SOLAR-10.7B-Instruct-v1.0</td><td>Decoder Only</td><td>11B</td><td>CC-BY-NC-4.0</td></tr><tr><td>upstage/SOLAR-10.7B-v1.0</td><td>Decoder Only</td><td>11B</td><td>Apache-2.0</td></tr><tr><td>vilm/vinallama-7b-chat</td><td>Decoder Only</td><td>7B</td><td>Llama-2</td></tr><tr><td>wave-on-discord/silly-v0.2</td><td>Decoder Only</td><td>12B</td><td>Apache-2.0</td></tr><tr><td>yam-peleg/Experiment26-7B</td><td>Decoder Only</td><td>7B</td><td>Apache-2.0</td></tr><tr><td>zai-org/GLM-4-32B-0414</td><td>Decoder Only</td><td>33B</td><td>MIT</td></tr><tr><td>zai-org/glm-4-9b-chat-hf</td><td>Decoder Only</td><td>9B</td><td>Other</td></tr><tr><td>zhengr/MixTAO-7Bx2-MoE-v8.1</td><td>Decoder Only</td><td>13B</td><td>Apache-2.0</td></tr></table>",
+        "bbox": [
+            192,
+            133,
+            807,
+            912
+        ],
+        "page_idx": 24
+    },
+    {
+        "type": "header",
+        "text": "Published as a conference paper at ICLR 2026",
+        "bbox": [
+            171,
+            32,
+            480,
+            47
+        ],
+        "page_idx": 24
+    },
+    {
+        "type": "page_number",
+        "text": "25",
+        "bbox": [
+            488,
+            948,
+            509,
+            960
+        ],
+        "page_idx": 24
+    },
+    {
+        "type": "table",
+        "img_path": "",
+        "table_caption": [
+            ""
+        ],
+        "table_footnote": [],
+        "bbox": [
+            191,
+            128,
+            807,
+            936
+        ],
+        "page_idx": 25
+    },
+    {
+        "type": "header",
+        "text": "Published as a conference paper at ICLR 2026",
+        "bbox": [
+            171,
+            32,
+            480,
+            47
+        ],
+        "page_idx": 25
+    },
+    {
+        "type": "page_number",
+        "text": "26",
+        "bbox": [
+            488,
+            948,
+            509,
+            960
+        ],
+        "page_idx": 25
+    },
+    {
+        "type": "table",
+        "img_path": "",
+        "table_caption": [
+            ""
+        ],
+        "table_footnote": [],
+        "bbox": [
+            191,
+            128,
+            807,
+            936
+        ],
+        "page_idx": 26
+    },
+    {
+        "type": "header",
+        "text": "Published as a conference paper at ICLR 2026",
+        "bbox": [
+            171,
+            32,
+            480,
+            47
+        ],
+        "page_idx": 26
+    },
+    {
+        "type": "page_number",
+        "text": "27",
+        "bbox": [
+            488,
+            946,
+            509,
+            959
+        ],
+        "page_idx": 26
+    },
+    {
+        "type": "table",
+        "img_path": "",
+        "table_caption": [
+            ""
+        ],
+        "table_footnote": [],
+        "bbox": [
+            191,
+            138,
+            807,
+            909
+        ],
+        "page_idx": 27
+    },
+    {
+        "type": "header",
+        "text": "Published as a conference paper at ICLR 2026",
+        "bbox": [
+            171,
+            32,
+            480,
+            47
+        ],
+        "page_idx": 27
+    },
+    {
+        "type": "page_number",
+        "text": "28",
+        "bbox": [
+            488,
+            948,
+            509,
+            960
+        ],
+        "page_idx": 27
+    }
+]

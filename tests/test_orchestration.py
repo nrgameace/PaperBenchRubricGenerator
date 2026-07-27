@@ -550,9 +550,14 @@ def test_resolve_invalid_weights_agentic_auto_queues_all_for_regen():
     assert result["a"] == 1 and result["b"] == 2
 
 
+def _fake_base_rubric():
+    leaf = {"id": "child-1", "sub_tasks": [], "requirements": "do the thing", "task_category": "Code Development"}
+    return {"id": "root", "sub_tasks": [leaf], "requirements": "r"}
+
+
 def test_run_base_phase_agentic_skips_review(tmp_path):
     state = {"rubric": {}, "queue": [], "hints": {}}
-    fake_rubric = {"id": "root", "sub_tasks": [], "requirements": "r"}
+    fake_rubric = _fake_base_rubric()
 
     with patch("rubric_gen.run_base_llm", return_value={"root": {"requirements": "r"}, "children": []}), \
          patch("rubric_gen.apply_base", return_value=(fake_rubric, [], {}, {})), \
@@ -568,7 +573,7 @@ def test_run_base_phase_agentic_skips_review(tmp_path):
 
 def test_run_base_phase_stores_section_map_in_state(tmp_path):
     state = {"rubric": {}, "queue": [], "hints": {}}
-    fake_rubric = {"id": "root", "sub_tasks": [], "requirements": "r"}
+    fake_rubric = _fake_base_rubric()
     fake_section_map = {"env-setup": {"pages": [1, 3], "tables": 0, "figures": 1}}
 
     with patch("rubric_gen.run_base_llm", return_value={"root": {"requirements": "r"}, "children": []}), \
@@ -581,6 +586,40 @@ def test_run_base_phase_stores_section_map_in_state(tmp_path):
         rubric_gen.run_base_phase(None, [], None, [], state, "model", tmp_path, human_review=False)
 
     assert state["section_map"] == fake_section_map
+
+
+def test_run_base_phase_retries_on_empty_top_level_children(tmp_path):
+    """A base pass with zero top-level children must not be accepted silently (it would blow up
+    with a ZeroDivisionError deep in the weight phase's embedding rescale); it should retry."""
+    state = {"rubric": {}, "queue": [], "hints": {}}
+    empty_rubric = {"id": "root", "sub_tasks": [], "requirements": "r"}
+    good_rubric = _fake_base_rubric()
+
+    with patch("rubric_gen.run_base_llm", return_value={"root": {"requirements": "r"}, "children": []}), \
+         patch("rubric_gen.apply_base", side_effect=[(empty_rubric, [], {}, {}), (good_rubric, [], {}, {})]), \
+         patch("rubric_gen.review_pass"), \
+         patch("rubric_gen.pretty_print_nodes"), \
+         patch("rubric_gen.commit"), \
+         patch("rubric_gen.reconcile_queue", return_value=[]), \
+         patch("rubric_gen.blocks_to_text", return_value=""):
+        rubric_gen.run_base_phase(None, [], None, [], state, "model", tmp_path, human_review=False)
+
+    assert state["rubric"] == good_rubric
+
+
+def test_run_base_phase_raises_after_max_retries_on_persistent_empty_children(tmp_path):
+    state = {"rubric": {}, "queue": [], "hints": {}}
+    empty_rubric = {"id": "root", "sub_tasks": [], "requirements": "r"}
+
+    with patch("rubric_gen.run_base_llm", return_value={"root": {"requirements": "r"}, "children": []}), \
+         patch("rubric_gen.apply_base", return_value=(empty_rubric, [], {}, {})), \
+         patch("rubric_gen.review_pass"), \
+         patch("rubric_gen.pretty_print_nodes"), \
+         patch("rubric_gen.commit"), \
+         patch("rubric_gen.reconcile_queue", return_value=[]), \
+         patch("rubric_gen.blocks_to_text", return_value=""), \
+         pytest.raises(rubric_gen.MaxRetriesExceeded):
+        rubric_gen.run_base_phase(None, [], None, [], state, "model", tmp_path, human_review=False)
 
 
 def test_run_expansion_phase_agentic_skips_review(tmp_path):

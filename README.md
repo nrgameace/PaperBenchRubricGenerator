@@ -29,7 +29,7 @@ resumable. There are three phases:
    count per top-level child — consumed later by the weight pass's embedding-based rescale;
    this rides the same cached base-pass call, no extra PDF read.
 
-2. **Expansion passes** — `claude-sonnet-4-6`, breadth-first. For each top-level node, the
+2. **Expansion passes** — `claude-sonnet-5`, breadth-first. For each top-level node, the
    tool fully expands its entire subtree (all depths) before pausing for review — **one review
    per top-level section**, not one per node. The MinerU content is sliced to the matching
    section using `difflib` fuzzy heading match; falls back to the full content list when no
@@ -59,7 +59,7 @@ resumable. There are three phases:
    extra LLM call, and applies to both the base pass and every expansion pass since both share
    `normalize_child`.
 
-3. **Split-check pass** — `claude-sonnet-4-6`, one call per top-level branch, runs after
+3. **Split-check pass** — `claude-sonnet-5`, one call per top-level branch, runs after
    expansion is fully complete and before weighting. `pb_enumeration.py`'s regex heuristic
    only catches *syntactic* bundling (comma lists, `et al.`, Table/Figure refs). This pass
    catches *semantic* bundling with no consistent trigger phrase — e.g. "small, medium, and
@@ -78,7 +78,7 @@ resumable. There are three phases:
    `errors.txt`, and if a replacement child still trips the enumeration threshold that's logged
    too, as a model-under-split warning. Disable with `--no-split-check`.
 
-4. **Weight pass** — one LLM sub-phase (`claude-sonnet-4-6`) followed by a deterministic,
+4. **Weight pass** — one LLM sub-phase (`claude-sonnet-5`) followed by a deterministic,
    embedding-based rescale (no LLM call):
    - **Local passes** — one LLM call per top-level branch. Each call is focused on a single
      subtree so the model can reason about relative importance within that branch without
@@ -458,7 +458,7 @@ multi-model pipeline built on the raw Anthropic SDK:
 pauses between phases, eliminating repeated full-context charges.
 
 **Model tiering.** `claude-opus-4-8` is used only for the base pass where deep paper
-comprehension is needed. All expansion calls and the weight pass use `claude-sonnet-4-6`
+comprehension is needed. All expansion calls and the weight pass use `claude-sonnet-5`
 (~5× cheaper per token), which is adequate for mechanical child generation and weight
 assignment.
 

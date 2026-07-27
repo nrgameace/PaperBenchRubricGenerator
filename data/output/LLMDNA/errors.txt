@@ -1,0 +1,14 @@
+run-relation-prediction-chat-template-ablation: Branch 'stability-stress-tests' hit the 40-node cap; forced to leaf.
+verify-figure4-undocumented-relationships: split-check split into 2 children (branch 'relationship-detection').
+verify-dna-routing-matches-trained-baseline: split-check removed as duplicate of 'result-table2-dna-routing'.
+result-table2-dna-routing: split-check split into 1 children (branch 'model-routing').
+result-table3-phylolm-baseline: split-check split into 2 children (branch 'stability-stress-tests').
+result-table3-dna-standard-benchmark: split-check split into 2 children (branch 'stability-stress-tests').
+result-table3-dna-random-inputs: split-check split into 2 children (branch 'stability-stress-tests').
+result-table4-qwen3-with-template: split-check split into 2 children (branch 'stability-stress-tests').
+result-table4-qwen3-without-template: split-check split into 2 children (branch 'stability-stress-tests').
+result-table4-mpnet-with-template: split-check split into 2 children (branch 'stability-stress-tests').
+result-table4-mpnet-without-template: split-check split into 2 children (branch 'stability-stress-tests').
+result-table4-bge-with-template: split-check split into 2 children (branch 'stability-stress-tests').
+result-table4-bge-without-template: split-check split into 2 children (branch 'stability-stress-tests').
+verify-figure7-family-colocation-per-model: split-check split into 3 children (branch 'phylogenetic-tree').

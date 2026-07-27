@@ -7,7 +7,9 @@ PRICING = {
         "cache_write": 10.00 / 1_000_000,
         "cache_read":   0.50 / 1_000_000,
     },
-    "claude-sonnet-4-6": {
+    # Standard (post-introductory) rate; Anthropic offers $2/$10 intro pricing
+    # through 2026-08-31, but the tracker uses the durable post-intro rate.
+    "claude-sonnet-5": {
         "input":        3.00 / 1_000_000,
         "output":      15.00 / 1_000_000,
         "cache_write":  6.00 / 1_000_000,

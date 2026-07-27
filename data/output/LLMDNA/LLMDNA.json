@@ -1,0 +1,3369 @@
+{
+  "id": "root",
+  "requirements": "The core contributions of 'LLM DNA: Tracing Model Evolution via Functional Representations' have been reproduced: the training-free RepTrace DNA extraction pipeline (Algorithm 1), DNA extraction across the 305-model pool, LLM relationship detection against the Hugging Face model tree, training-free model routing, the stability stress tests over heterogeneous prompts, random-word prompts and chat templates, the fine-tuning-intensity study, the Neighbor-Joining phylogenetic trees, and the appendix ablations over the bottleneck encoder, the embedding dimension p, the DNA dimension L, model scale, and the same-tokenizer regime, with results that align with the values and observations reported in the paper.",
+  "weight": 1,
+  "sub_tasks": [
+    {
+      "id": "setup-and-acquisition",
+      "requirements": "The models, datasets, sentence-embedding encoders, generation settings, and compute environment required by the paper's experimental setting (Section 5.1, Appendix B, Appendix F) have been acquired and configured.",
+      "weight": 3,
+      "sub_tasks": [
+        {
+          "id": "acquire-llm-pool",
+          "requirements": "The evaluation pool of LLMs described in Section 5.1 and enumerated in Table 8 (Appendix F) has been assembled and made runnable.",
+          "weight": 4,
+          "sub_tasks": [
+            {
+              "id": "acquire-305-llms",
+              "requirements": "All 305 LLMs enumerated in Table 8 (Appendix F) have been downloaded from Hugging Face or otherwise made accessible for inference, so that a response can be generated from each one.",
+              "weight": 8,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Dataset and Model Acquisition"
+            },
+            {
+              "id": "llm-pool-org-coverage",
+              "requirements": "The assembled model pool spans the 153 distinct releasing organizations reported in Section 5.1.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Dataset and Model Acquisition"
+            },
+            {
+              "id": "llm-pool-decoder-only",
+              "requirements": "The assembled model pool includes decoder-only text-generation models (e.g., the GPT, Llama, and Qwen families), matching the 'Decoder Only' architecture entries in Table 8.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Dataset and Model Acquisition"
+            },
+            {
+              "id": "llm-pool-encoder-decoder",
+              "requirements": "The assembled model pool includes encoder-decoder text-generation models (e.g., google-t5/t5-small, google-t5/t5-large, google/flan-t5-base, google/flan-t5-large), matching the 'Encoder Decoder' architecture entries in Table 8.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Dataset and Model Acquisition"
+            },
+            {
+              "id": "llm-pool-scale-coverage",
+              "requirements": "The assembled model pool covers the parameter range stated in Section 5.1, spanning models from roughly 100M parameters up to 70B parameters.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Dataset and Model Acquisition"
+            },
+            {
+              "id": "llm-pool-base-models",
+              "requirements": "The assembled model pool includes base (completion) models, per Section 5.1.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Dataset and Model Acquisition"
+            },
+            {
+              "id": "llm-pool-instruction-tuned-models",
+              "requirements": "The assembled model pool includes instruction-tuned models, per Section 5.1.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Dataset and Model Acquisition"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "acquire-datasets",
+          "requirements": "The six prompt-source benchmarks used for DNA extraction, plus the auxiliary datasets used for routing and fine-tuning experiments, have been acquired and prepared.",
+          "weight": 4,
+          "sub_tasks": [
+            {
+              "id": "dataset-squad",
+              "requirements": "The SQuAD dataset (Rajpurkar et al., 2016) has been acquired and made loadable for prompt sampling, per Section 5.1.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Dataset and Model Acquisition"
+            },
+            {
+              "id": "dataset-commonsenseqa",
+              "requirements": "The CommonsenseQA dataset (Talmor et al., 2018) has been acquired and made loadable for prompt sampling, per Section 5.1.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Dataset and Model Acquisition"
+            },
+            {
+              "id": "dataset-hellaswag",
+              "requirements": "The HellaSwag dataset (Zellers et al., 2019) has been acquired and made loadable for prompt sampling, per Section 5.1.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Dataset and Model Acquisition"
+            },
+            {
+              "id": "dataset-winogrande",
+              "requirements": "The Winogrande dataset (Sakaguchi et al., 2020) has been acquired and made loadable for prompt sampling, per Section 5.1.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Dataset and Model Acquisition"
+            },
+            {
+              "id": "dataset-arc-challenge",
+              "requirements": "The ARC-Challenge dataset (Clark et al., 2018) has been acquired and made loadable for prompt sampling, per Section 5.1.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Dataset and Model Acquisition"
+            },
+            {
+              "id": "dataset-mmlu",
+              "requirements": "The MMLU dataset (Hendrycks et al., 2021) has been acquired and made loadable for prompt sampling, per Section 5.1.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Dataset and Model Acquisition"
+            },
+            {
+              "id": "dataset-text-fields",
+              "requirements": "For each of the six benchmarks, prompts are read from that dataset's designated text field (e.g., 'question' for SQuAD/CommonsenseQA, 'sentence' for Winogrande, 'ctx' for HellaSwag) rather than from a concatenation of all fields, as specified in Section 5.1.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Data Processing & Preparation"
+            },
+            {
+              "id": "dataset-mixture-loader",
+              "requirements": "A single data-loading utility combines the six benchmarks into one prompt mixture that the DNA extraction pipeline consumes, implementing Section 5.1's statement that 'DNA extraction employs a mixture of all six datasets'.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Data Processing & Preparation"
+            },
+            {
+              "id": "dataset-100-samples-each",
+              "requirements": "Exactly 100 prompts are randomly sampled from each of the six benchmarks, so the default extraction prompt set contains 600 prompts in total, per Section 5.1.",
+              "weight": 5,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Data Processing & Preparation"
+            },
+            {
+              "id": "dataset-embedllm",
+              "requirements": "The EmbedLLM dataset (Zhuang et al., 2025) has been acquired for the model-routing evaluation of Section 5.3.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Dataset and Model Acquisition"
+            },
+            {
+              "id": "dataset-embedllm-excluded-from-extraction",
+              "requirements": "The EmbedLLM dataset is excluded from the DNA extraction prompt mixture, per Section 5.1 ('though not involved in DNA extraction').",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Data Processing & Preparation"
+            },
+            {
+              "id": "dataset-openmathinstruct2",
+              "requirements": "The NVIDIA OpenMathInstruct-2 dataset (Toshniwal et al., 2024) has been acquired for the fine-tuning-intensity experiment of Section 5.7.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Dataset and Model Acquisition"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "acquire-encoders",
+          "requirements": "The sentence-embedding encoders that act as the semantic bottleneck of RepTrace have been acquired and configured per Section 5.1 and Appendix B.1.",
+          "weight": 3,
+          "sub_tasks": [
+            {
+              "id": "encoder-qwen3",
+              "requirements": "Qwen/Qwen3-Embedding-8B has been acquired and configured as the default bottleneck sentence-embedding model for DNA extraction, per Section 5.1 and Appendix B.1.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Dataset and Model Acquisition"
+            },
+            {
+              "id": "encoder-mpnet",
+              "requirements": "sentence-transformers/all-mpnet-base-v2 (0.1B parameters) has been acquired and configured as an alternative bottleneck sentence-embedding model, per Section 5.1.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Dataset and Model Acquisition"
+            },
+            {
+              "id": "encoder-bge",
+              "requirements": "BAAI/bge-large-en-v1.5 (0.3B parameters) has been acquired and configured as an alternative bottleneck sentence-embedding model, per Section 5.1.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Dataset and Model Acquisition"
+            },
+            {
+              "id": "encoder-max-input-1024",
+              "requirements": "The sentence-embedding model is invoked with a maximum input length of 1024 tokens, per Appendix B.1.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "encoder-cls-pooling",
+              "requirements": "The sentence-embedding model uses CLS pooling to produce each fixed-size response embedding, per Appendix B.1.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "encoder-shared-with-routing",
+              "requirements": "The same sentence-embedding model used for DNA extraction is also used to encode the routing-experiment questions, preserving the semantic consistency required by Appendix B.1.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Experimental Setup"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "generation-configuration",
+          "requirements": "The text-generation configuration used to elicit each LLM's responses matches Appendix B.1.",
+          "weight": 3,
+          "sub_tasks": [
+            {
+              "id": "gen-max-length-1024",
+              "requirements": "Response generation uses max_length = 1024, per Appendix B.1.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "gen-temperature-07",
+              "requirements": "Response generation uses temperature = 0.7, per Appendix B.1.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "gen-top-p-09",
+              "requirements": "Response generation uses top_p = 0.9, per Appendix B.1.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "gen-hf-defaults",
+              "requirements": "All generation parameters not explicitly specified by the paper are left at their HuggingFace default values, per Appendix B.1 ('All other parameters follow HuggingFace defaults').",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "precision-small-models",
+              "requirements": "Models with fewer than 7B parameters are run in BF16/FP16 precision without quantization, per Appendix B.1.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "precision-large-models",
+              "requirements": "Models larger than the 7B threshold are automatically quantized to 8-bit for memory efficiency, per Appendix B.1.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Experimental Setup"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "response-extraction-protocol",
+          "requirements": "The protocol that turns a raw model generation into the response string fed to the embedding model matches Appendix B.1 and Appendix F.",
+          "weight": 3,
+          "sub_tasks": [
+            {
+              "id": "chat-template-default-on",
+              "requirements": "For instruction-tuned models, the model-provided chat template is applied to the prompt by default, per Appendix B.1.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "chat-template-response-only",
+              "requirements": "When a chat template is applied, only the assistant's response is extracted from the templated generation and used for DNA extraction, per Appendix B.1.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "reasoning-traces-retained",
+              "requirements": "Any model-generated reasoning traces contained in an instruction-tuned model's response (e.g., Qwen3's thinking output) are retained as part of the response rather than stripped, per Appendix F.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "completion-models-use-completion",
+              "requirements": "For completion (base) models, the completed text itself is treated as the response used for DNA extraction, per Appendix F.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "five-seed-protocol",
+          "requirements": "All applicable experiments are configured to run over five random seeds, with the mean and standard deviation of every reported metric recorded, per Appendix B.1.",
+          "weight": 4,
+          "sub_tasks": [],
+          "task_category": "Code Development",
+          "finegrained_task_category": "Experimental Setup"
+        },
+        {
+          "id": "compute-environment",
+          "requirements": "The compute and storage environment matches the specification in Appendix B.2.",
+          "weight": 1,
+          "sub_tasks": [
+            {
+              "id": "env-single-gpu-per-model",
+              "requirements": "DNA extraction for each individual model is executed on a single GPU rather than being sharded across multiple GPUs, per Appendix B.2.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Environment & Infrastructure Setup"
+            },
+            {
+              "id": "env-a100-h100",
+              "requirements": "Models with up to 30B parameters are executed on an NVIDIA A100 or H100 GPU with 80GB of memory, per Appendix B.2.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Environment & Infrastructure Setup"
+            },
+            {
+              "id": "env-h200",
+              "requirements": "Models between 30B and 70B parameters are executed on an NVIDIA H200 GPU with 140GB of memory, per Appendix B.2.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Environment & Infrastructure Setup"
+            },
+            {
+              "id": "env-storage-20tb",
+              "requirements": "Storage capacity on the order of 20TB has been provisioned to hold the weights of all 305 models, consistent with the footprint reported in Appendix B.2.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Environment & Infrastructure Setup"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        }
+      ],
+      "task_category": null,
+      "finegrained_task_category": null
+    },
+    {
+      "id": "reptrace-pipeline",
+      "requirements": "The RepTrace DNA extraction pipeline of Algorithm 1 (Section 4.3, illustrated in Figure 1) has been implemented as a training-free, end-to-end procedure and executed over the model pool.",
+      "weight": 10,
+      "sub_tasks": [
+        {
+          "id": "reptrace-algorithm-steps",
+          "requirements": "Each step of Algorithm 1 has been implemented.",
+          "weight": 5,
+          "sub_tasks": [
+            {
+              "id": "reptrace-sample-input-set",
+              "requirements": "Code exists to draw the sample input set S_t = {x_1, ..., x_t} uniformly from the real-world dataset mixture, supplying the prompt set that Algorithm 1 takes as input.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Data Processing & Preparation"
+            },
+            {
+              "id": "reptrace-sample-size-600",
+              "requirements": "The default sample size is t = 600 prompts, obtained as 100 prompts from each of the six benchmarks, consistent with Section 5.1.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "reptrace-generate-response",
+              "requirements": "Code exists to feed each sampled prompt x_i to an LLM f and collect the textual response y_i = f(x_i), implementing line 4 of Algorithm 1.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "reptrace-embed-response",
+              "requirements": "Code exists to encode each textual response y_i into a fixed-size semantic embedding e_i = phi(y_i) in R^p using the sentence-embedding model phi, implementing line 5 of Algorithm 1 and the semantic-aware representation of Section 4.1.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "reptrace-concatenate",
+              "requirements": "Code exists to concatenate the t response embeddings end-to-end into a single functional representation E_f = [e_1, e_2, ..., e_t] in R^(p*t), implementing line 6 of Algorithm 1.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "reptrace-gaussian-matrix-shape",
+              "requirements": "Code exists to initialize a random Gaussian projection matrix A of shape L x (p*t), implementing the shape requirement of line 1 of Algorithm 1 and Figure 1.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "reptrace-gaussian-matrix-distribution",
+              "requirements": "The entries of the projection matrix A are drawn i.i.d. as A_jk ~ N(0, 1/sqrt(L)), exactly as specified in line 1 of Algorithm 1.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "reptrace-matrix-shared-across-models",
+              "requirements": "The projection matrix A is pre-computed once outside the per-model loop and reused unchanged for every LLM in a given extraction run, so that all DNA vectors live in a common space, as required by the placement of line 1 before the foreach loop in Algorithm 1.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "reptrace-project",
+              "requirements": "Code exists to compute the DNA vector tau_f = A * E_f in R^L, implementing line 7 of Algorithm 1.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "reptrace-default-L-128",
+              "requirements": "The DNA dimensionality defaults to L = 128, the value used for all main experiments per Appendix B.1 and justified in Appendix C.5.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Experimental Setup"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "reptrace-design-properties",
+          "requirements": "The implemented pipeline exhibits the design properties claimed for it in Sections 4.1 and 4.3.",
+          "weight": 3,
+          "sub_tasks": [
+            {
+              "id": "reptrace-training-free",
+              "requirements": "No step of the DNA extraction pipeline performs gradient-based training or fine-tuning of any model or projection, satisfying the paper's 'training-free' claim in Section 4.3.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "reptrace-no-internal-access",
+              "requirements": "DNA extraction consumes only each LLM's generated text and requires no access to its internal architecture, weights, logits, or tokenizer, satisfying the LLM-agnostic benefit claimed in Section 4.1.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "reptrace-api-only-support",
+              "requirements": "The extraction interface accepts a query-only (API-served) model as a valid input, so a closed-source LLM can have its DNA computed without local weights, satisfying the second benefit claimed in Section 4.1.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "reptrace-incremental-extension",
+              "requirements": "A newly added LLM's DNA can be computed without recomputing or altering the DNA vectors of previously processed LLMs, satisfying the third benefit claimed in Section 4.1 and overcoming EmbedLLM's fixed-model-set limitation.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "reptrace-pairwise-distance",
+          "requirements": "Code exists to measure the functional distance between two LLMs as the Euclidean (L2) distance between their DNA vectors, serving as the computable estimate of the stochastic functional distance of Definition 4.1.",
+          "weight": 3,
+          "sub_tasks": [],
+          "task_category": "Code Development",
+          "finegrained_task_category": "Method Implementation"
+        },
+        {
+          "id": "reptrace-extract-all-305",
+          "requirements": "The RepTrace pipeline has been executed end-to-end over the full 305-model pool with the default configuration, producing one 128-dimensional DNA vector per model.",
+          "weight": 6,
+          "sub_tasks": [],
+          "task_category": "Code Execution",
+          "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+        }
+      ],
+      "task_category": null,
+      "finegrained_task_category": null
+    },
+    {
+      "id": "relationship-detection",
+      "requirements": "The LLM relationship-detection experiments of Section 5.2 have been reproduced, covering the eight-model validation against Zhu et al. (2025) (Figure 2), the 305-model classification study (Table 1), and the t-SNE map of all DNAs (Figure 4).",
+      "weight": 8,
+      "sub_tasks": [
+        {
+          "id": "figure2-experiment",
+          "requirements": "The Figure 2 validation experiment against Zhu et al. (2025) has been reproduced.",
+          "weight": 2,
+          "sub_tasks": [
+            {
+              "id": "fig2-extract-eight-models",
+              "requirements": "DNA vectors have been extracted for the eight models plotted in Figure 2 — meta-llama/Llama-2-7b-hf, Orca-2-7b, CodeLlama-7b-hf, llemma_7b, vicuna-7b-v1.1, vicuna-7b-v1.5, open_llama_7b, and Amber — which are the models evaluated in Table 1 of Zhu et al. (2025).",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Dataset and Model Acquisition"
+            },
+            {
+              "id": "fig2-relative-differences",
+              "requirements": "Code exists to compute, for each of the eight models, the difference between its DNA vector and the DNA vector of Llama-2-7B-hf, matching the quantity plotted in Figure 2 ('t-SNE of DNA differences relative to LLaMA-2-7B-hf').",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "fig2-tsne-projection",
+              "requirements": "Code exists to project the eight DNA-difference vectors into two dimensions with t-SNE, producing the Component 1 / Component 2 coordinates plotted in Figure 2.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Logging, Analysis & Presentation"
+            },
+            {
+              "id": "fig2-svm-fit",
+              "requirements": "Code exists to fit a support vector machine with an RBF kernel to the projected points, as described in the Figure 2 caption.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "fig2-svm-boundary-drawn",
+              "requirements": "Code exists to draw the fitted SVM's decision boundary over the projected points, producing the dashed boundary and shaded regions shown in Figure 2.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Logging, Analysis & Presentation"
+            },
+            {
+              "id": "fig2-correlated-independent-labels",
+              "requirements": "Each of the eight models is labelled 'Correlated' or 'Independent' relative to Llama-2-7B-hf according to public documentation, giving four models per class as stated in Section 5.2.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Data Processing & Preparation"
+            },
+            {
+              "id": "fig2-plot-rendered",
+              "requirements": "The Figure 2 scatter plot has been rendered with every one of the eight models individually annotated by name and its marker coloured by its Correlated/Independent class.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Logging, Analysis & Presentation"
+            },
+            {
+              "id": "fig2-executed",
+              "requirements": "The Figure 2 pipeline has been executed end-to-end on the eight extracted DNA vectors to produce the final plot.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "fig2-separation-result",
+              "requirements": "The reproduced Figure 2 shows the 'Correlated' and 'Independent' models falling on opposite sides of the SVM-RBF decision boundary, i.e. the two classes are clearly separated in DNA-difference space, supporting Section 5.2's claim that DNA structure is consistent with Zhu et al. (2025) and the corresponding Hugging Face documentation.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "relation-dataset-construction",
+          "requirements": "The 305-model relationship-detection dataset described in Section 5.2 has been constructed.",
+          "weight": 3,
+          "sub_tasks": [
+            {
+              "id": "hf-model-tree-query",
+              "requirements": "Code exists to query the official Hugging Face 'Model Tree' metadata for each of the 305 LLMs and to extract the documented parent/derivative links used as ground truth for correlated pairs, per Section 5.2.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Data Processing & Preparation"
+            },
+            {
+              "id": "relation-83-correlated-pairs",
+              "requirements": "Exactly 83 correlated model pairs are obtained from the Hugging Face Model Tree over the 305-model pool, matching the count reported in Section 5.2.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Data Processing & Preparation"
+            },
+            {
+              "id": "relation-83-random-pairs",
+              "requirements": "An additional 83 model pairs are sampled at random from the 305-model pool and labelled independent, per Section 5.2 ('We additionally sample 83 random pairs and treat them as independent').",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Data Processing & Preparation"
+            },
+            {
+              "id": "relation-166-pair-dataset",
+              "requirements": "The 83 correlated pairs and the 83 randomly sampled independent pairs are combined into a single balanced 166-pair labelled dataset.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Data Processing & Preparation"
+            },
+            {
+              "id": "relation-8-2-split",
+              "requirements": "The 166-pair dataset is split into training and test sets in an 8:2 ratio, per Section 5.2.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Data Processing & Preparation"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "relation-methods",
+          "requirements": "All methods compared in Table 1 have been implemented.",
+          "weight": 3,
+          "sub_tasks": [
+            {
+              "id": "baseline-random",
+              "requirements": "The Random baseline has been implemented, guessing 'correlated' or 'independent' uniformly at random for each pair, per Section 5.2.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "baseline-greedy",
+              "requirements": "The Greedy baseline has been implemented, predicting that every within-organization pair is correlated and every cross-organization pair is independent, per Section 5.2.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "baseline-phylolm-nei",
+              "requirements": "The PhyloLM baseline (Yax et al., 2025) has been implemented, computing Nei's genetic distance over output token distributions between models that share a tokenizer, per Section 5.2 and the Related Work description in Section 2.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "baseline-phylolm-cross-tokenizer",
+              "requirements": "The PhyloLM baseline handles models with differing tokenizers by approximating the distance from the first four characters of concatenated tokens, as described in Section 2.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "baseline-phylolm-signature",
+              "requirements": "For PhyloLM, each model's signature vector is formed from its genetic distances to the other LLMs in the training set, and this signature is the input to the downstream classifier, per Section 5.2.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "classifier-svm-rbf",
+              "requirements": "An SVM with an RBF kernel is used as the downstream pair classifier for both PhyloLM and DNA, per Section 5.2.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "relation-eval-execution",
+              "requirements": "All six Table 1 methods have been evaluated on the held-out test split across five random seeds, with the mean and standard deviation of Accuracy, Precision, Recall, F1, and AUC recorded.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "table1-results",
+          "requirements": "The reproduced relationship-detection numbers match those reported in Table 1.",
+          "weight": 6,
+          "sub_tasks": [
+            {
+              "id": "t1-random",
+              "requirements": "The reproduced Table 1 row for the Random baseline matches the reported values.",
+              "weight": 1,
+              "sub_tasks": [
+                {
+                  "id": "t1-random-acc",
+                  "requirements": "The reproduced Table 1 row for the Random baseline reports Accuracy = 0.493 ± 0.036 on the held-out relationship-detection test set (mean ± standard deviation over five random seeds), matching the reported value within a reasonable tolerance.",
+                  "weight": 1,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                },
+                {
+                  "id": "t1-random-prec",
+                  "requirements": "The reproduced Table 1 row for the Random baseline reports Precision = 0.515 ± 0.034 on the held-out relationship-detection test set (mean ± standard deviation over five random seeds), matching the reported value within a reasonable tolerance.",
+                  "weight": 1,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                },
+                {
+                  "id": "t1-random-rec",
+                  "requirements": "The reproduced Table 1 row for the Random baseline reports Recall = 0.516 ± 0.042 on the held-out relationship-detection test set (mean ± standard deviation over five random seeds), matching the reported value within a reasonable tolerance.",
+                  "weight": 1,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                },
+                {
+                  "id": "t1-random-f1",
+                  "requirements": "The reproduced Table 1 row for the Random baseline reports F1 = 0.516 ± 0.036 on the held-out relationship-detection test set (mean ± standard deviation over five random seeds), matching the reported value within a reasonable tolerance.",
+                  "weight": 1,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                },
+                {
+                  "id": "t1-random-auc",
+                  "requirements": "The reproduced Table 1 row for the Random baseline reports AUC = 0.492 ± 0.036 on the held-out relationship-detection test set (mean ± standard deviation over five random seeds), matching the reported value within a reasonable tolerance.",
+                  "weight": 1,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                }
+              ],
+              "task_category": null,
+              "finegrained_task_category": null
+            },
+            {
+              "id": "t1-greedy",
+              "requirements": "The reproduced Table 1 row for the Greedy baseline matches the reported values.",
+              "weight": 1,
+              "sub_tasks": [
+                {
+                  "id": "t1-greedy-acc",
+                  "requirements": "The reproduced Table 1 row for the Greedy baseline reports Accuracy = 0.593 ± 0.018 on the held-out relationship-detection test set (mean ± standard deviation over five random seeds), matching the reported value within a reasonable tolerance.",
+                  "weight": 1,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                },
+                {
+                  "id": "t1-greedy-prec",
+                  "requirements": "The reproduced Table 1 row for the Greedy baseline reports Precision = 0.759 ± 0.081 on the held-out relationship-detection test set (mean ± standard deviation over five random seeds), matching the reported value within a reasonable tolerance.",
+                  "weight": 1,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                },
+                {
+                  "id": "t1-greedy-rec",
+                  "requirements": "The reproduced Table 1 row for the Greedy baseline reports Recall = 0.329 ± 0.000 on the held-out relationship-detection test set (mean ± standard deviation over five random seeds), matching the reported value within a reasonable tolerance.",
+                  "weight": 1,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                },
+                {
+                  "id": "t1-greedy-f1",
+                  "requirements": "The reproduced Table 1 row for the Greedy baseline reports F1 = 0.458 ± 0.014 on the held-out relationship-detection test set (mean ± standard deviation over five random seeds), matching the reported value within a reasonable tolerance.",
+                  "weight": 1,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                },
+                {
+                  "id": "t1-greedy-auc",
+                  "requirements": "The reproduced Table 1 row for the Greedy baseline reports AUC = 0.606 ± 0.023 on the held-out relationship-detection test set (mean ± standard deviation over five random seeds), matching the reported value within a reasonable tolerance.",
+                  "weight": 1,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                }
+              ],
+              "task_category": null,
+              "finegrained_task_category": null
+            },
+            {
+              "id": "t1-phylolm",
+              "requirements": "The reproduced Table 1 row for PhyloLM + SVM matches the reported values.",
+              "weight": 2,
+              "sub_tasks": [
+                {
+                  "id": "t1-phylolm-acc",
+                  "requirements": "The reproduced Table 1 row for PhyloLM + SVM reports Accuracy = 0.742 ± 0.058 on the held-out relationship-detection test set (mean ± standard deviation over five random seeds), matching the reported value within a reasonable tolerance.",
+                  "weight": 1,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                },
+                {
+                  "id": "t1-phylolm-prec",
+                  "requirements": "The reproduced Table 1 row for PhyloLM + SVM reports Precision = 0.741 ± 0.073 on the held-out relationship-detection test set (mean ± standard deviation over five random seeds), matching the reported value within a reasonable tolerance.",
+                  "weight": 1,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                },
+                {
+                  "id": "t1-phylolm-rec",
+                  "requirements": "The reproduced Table 1 row for PhyloLM + SVM reports Recall = 0.812 ± 0.123 on the held-out relationship-detection test set (mean ± standard deviation over five random seeds), matching the reported value within a reasonable tolerance.",
+                  "weight": 1,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                },
+                {
+                  "id": "t1-phylolm-f1",
+                  "requirements": "The reproduced Table 1 row for PhyloLM + SVM reports F1 = 0.766 ± 0.057 on the held-out relationship-detection test set (mean ± standard deviation over five random seeds), matching the reported value within a reasonable tolerance.",
+                  "weight": 1,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                },
+                {
+                  "id": "t1-phylolm-auc",
+                  "requirements": "The reproduced Table 1 row for PhyloLM + SVM reports AUC = 0.788 ± 0.060 on the held-out relationship-detection test set (mean ± standard deviation over five random seeds), matching the reported value within a reasonable tolerance.",
+                  "weight": 1,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                }
+              ],
+              "task_category": null,
+              "finegrained_task_category": null
+            },
+            {
+              "id": "t1-dna-qwen3",
+              "requirements": "The reproduced Table 1 row for DNA (Qwen3) + SVM matches the reported values.",
+              "weight": 3,
+              "sub_tasks": [
+                {
+                  "id": "t1-dna-qwen3-acc",
+                  "requirements": "The reproduced Table 1 row for DNA (Qwen3) + SVM reports Accuracy = 0.919 ± 0.048 on the held-out relationship-detection test set (mean ± standard deviation over five random seeds), matching the reported value within a reasonable tolerance.",
+                  "weight": 2,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                },
+                {
+                  "id": "t1-dna-qwen3-prec",
+                  "requirements": "The reproduced Table 1 row for DNA (Qwen3) + SVM reports Precision = 0.898 ± 0.049 on the held-out relationship-detection test set (mean ± standard deviation over five random seeds), matching the reported value within a reasonable tolerance.",
+                  "weight": 1,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                },
+                {
+                  "id": "t1-dna-qwen3-rec",
+                  "requirements": "The reproduced Table 1 row for DNA (Qwen3) + SVM reports Recall = 0.957 ± 0.072 on the held-out relationship-detection test set (mean ± standard deviation over five random seeds), matching the reported value within a reasonable tolerance.",
+                  "weight": 1,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                },
+                {
+                  "id": "t1-dna-qwen3-f1",
+                  "requirements": "The reproduced Table 1 row for DNA (Qwen3) + SVM reports F1 = 0.925 ± 0.047 on the held-out relationship-detection test set (mean ± standard deviation over five random seeds), matching the reported value within a reasonable tolerance.",
+                  "weight": 1,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                },
+                {
+                  "id": "t1-dna-qwen3-auc",
+                  "requirements": "The reproduced Table 1 row for DNA (Qwen3) + SVM reports AUC = 0.979 ± 0.027 on the held-out relationship-detection test set (mean ± standard deviation over five random seeds), matching the reported value within a reasonable tolerance.",
+                  "weight": 2,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                }
+              ],
+              "task_category": null,
+              "finegrained_task_category": null
+            },
+            {
+              "id": "t1-dna-bge",
+              "requirements": "The reproduced Table 1 row for DNA (BGE) + SVM matches the reported values.",
+              "weight": 3,
+              "sub_tasks": [
+                {
+                  "id": "t1-dna-bge-acc",
+                  "requirements": "The reproduced Table 1 row for DNA (BGE) + SVM reports Accuracy = 0.934 ± 0.053 on the held-out relationship-detection test set (mean ± standard deviation over five random seeds), matching the reported value within a reasonable tolerance.",
+                  "weight": 2,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                },
+                {
+                  "id": "t1-dna-bge-prec",
+                  "requirements": "The reproduced Table 1 row for DNA (BGE) + SVM reports Precision = 0.905 ± 0.068 on the held-out relationship-detection test set (mean ± standard deviation over five random seeds), matching the reported value within a reasonable tolerance.",
+                  "weight": 1,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                },
+                {
+                  "id": "t1-dna-bge-rec",
+                  "requirements": "The reproduced Table 1 row for DNA (BGE) + SVM reports Recall = 0.982 ± 0.059 on the held-out relationship-detection test set (mean ± standard deviation over five random seeds), matching the reported value within a reasonable tolerance.",
+                  "weight": 1,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                },
+                {
+                  "id": "t1-dna-bge-f1",
+                  "requirements": "The reproduced Table 1 row for DNA (BGE) + SVM reports F1 = 0.940 ± 0.050 on the held-out relationship-detection test set (mean ± standard deviation over five random seeds), matching the reported value within a reasonable tolerance.",
+                  "weight": 1,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                },
+                {
+                  "id": "t1-dna-bge-auc",
+                  "requirements": "The reproduced Table 1 row for DNA (BGE) + SVM reports AUC = 0.992 ± 0.023 on the held-out relationship-detection test set (mean ± standard deviation over five random seeds), matching the reported value within a reasonable tolerance.",
+                  "weight": 2,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                }
+              ],
+              "task_category": null,
+              "finegrained_task_category": null
+            },
+            {
+              "id": "t1-dna-mpnet",
+              "requirements": "The reproduced Table 1 row for DNA (MPNet) + SVM matches the reported values.",
+              "weight": 3,
+              "sub_tasks": [
+                {
+                  "id": "t1-dna-mpnet-acc",
+                  "requirements": "The reproduced Table 1 row for DNA (MPNet) + SVM reports Accuracy = 0.932 ± 0.048 on the held-out relationship-detection test set (mean ± standard deviation over five random seeds), matching the reported value within a reasonable tolerance.",
+                  "weight": 2,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                },
+                {
+                  "id": "t1-dna-mpnet-prec",
+                  "requirements": "The reproduced Table 1 row for DNA (MPNet) + SVM reports Precision = 0.914 ± 0.065 on the held-out relationship-detection test set (mean ± standard deviation over five random seeds), matching the reported value within a reasonable tolerance.",
+                  "weight": 1,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                },
+                {
+                  "id": "t1-dna-mpnet-rec",
+                  "requirements": "The reproduced Table 1 row for DNA (MPNet) + SVM reports Recall = 0.966 ± 0.069 on the held-out relationship-detection test set (mean ± standard deviation over five random seeds), matching the reported value within a reasonable tolerance.",
+                  "weight": 1,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                },
+                {
+                  "id": "t1-dna-mpnet-f1",
+                  "requirements": "The reproduced Table 1 row for DNA (MPNet) + SVM reports F1 = 0.937 ± 0.047 on the held-out relationship-detection test set (mean ± standard deviation over five random seeds), matching the reported value within a reasonable tolerance.",
+                  "weight": 1,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                },
+                {
+                  "id": "t1-dna-mpnet-auc",
+                  "requirements": "The reproduced Table 1 row for DNA (MPNet) + SVM reports AUC = 0.990 ± 0.020 on the held-out relationship-detection test set (mean ± standard deviation over five random seeds), matching the reported value within a reasonable tolerance.",
+                  "weight": 2,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                }
+              ],
+              "task_category": null,
+              "finegrained_task_category": null
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "table1-claims",
+          "requirements": "The three observations Section 5.2 draws from Table 1 hold in the reproduction.",
+          "weight": 4,
+          "sub_tasks": [
+            {
+              "id": "claim-dna-beats-baselines",
+              "requirements": "Every DNA variant outperforms the Random, Greedy, and PhyloLM + SVM baselines on the relationship-detection task, supporting Section 5.2's first observation that DNA significantly outperforms the baselines.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "claim-best-auc-0992",
+              "requirements": "The best-performing DNA variant reaches an AUC of approximately 0.992, the headline figure quoted in Section 5.2.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "claim-recall-exceeds-precision",
+              "requirements": "For each of the three DNA variants, the reproduced Recall exceeds the reproduced Precision, supporting Section 5.2's second observation that unlabelled relationships exist in the official model tree.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "claim-encoder-robustness",
+              "requirements": "The BGE (0.3B) and MPNet (0.1B) DNA variants achieve relationship-detection performance comparable to or better than the Qwen3-Embedding-8B variant despite their much smaller parameter counts, supporting Section 5.2's third observation that DNA quality is robust to the choice of sentence-embedding model.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "figure4-tsne-map",
+          "requirements": "The Figure 4 t-SNE map of all 305 DNA vectors has been reproduced and its three stated observations hold.",
+          "weight": 4,
+          "sub_tasks": [
+            {
+              "id": "fig4-tsne-code",
+              "requirements": "Code exists to compute a 2-D t-SNE projection of the DNA vectors of all 305 models, producing the coordinates plotted in Figure 4.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Logging, Analysis & Presentation"
+            },
+            {
+              "id": "fig4-org-coloring",
+              "requirements": "Points in the Figure 4 plot are coloured by releasing organization, with organizations contributing fewer than five LLMs collapsed into a single 'Others' category, per the Figure 4 caption.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Logging, Analysis & Presentation"
+            },
+            {
+              "id": "fig4-dbscan-regions",
+              "requirements": "Background regions in the Figure 4 plot are obtained by running localized DBSCAN seeded wherever an organization forms a group of more than three models, per the Figure 4 caption.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Logging, Analysis & Presentation"
+            },
+            {
+              "id": "fig4-executed",
+              "requirements": "The Figure 4 visualization pipeline has been executed on the 305 extracted DNA vectors to produce the final plot.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "fig4-family-clustering",
+              "requirements": "In the reproduced Figure 4, models from the same organization and model family cluster tightly (e.g., the Qwen3 and Llama families each form a compact group), matching Section 5.2's first observation about the visualization.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "fig4-deepseek-near-qwen3",
+              "requirements": "In the reproduced Figure 4, the DeepSeek-distilled Qwen models are located near the Qwen3 cluster, matching Section 5.2's second observation and confirming the inheritance property.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "fig4-vicuna-in-llama-base",
+              "requirements": "In the reproduced Figure 4, lmsys/vicuna-7b-v1.1 falls inside the Llama-base cluster, supporting Section 5.2's inference about its undocumented base version.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "fig4-orca2-in-llama-chat",
+              "requirements": "In the reproduced Figure 4, microsoft/orca-2-13b falls inside the Llama-chat cluster, supporting Section 5.2's inference about its undocumented base version.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        }
+      ],
+      "task_category": null,
+      "finegrained_task_category": null
+    },
+    {
+      "id": "model-routing",
+      "requirements": "The training-free model-routing experiment of Section 5.3, which drops frozen DNA vectors into the EmbedLLM matrix-factorization framework, has been reproduced (Table 2).",
+      "weight": 5,
+      "sub_tasks": [
+        {
+          "id": "routing-implementation",
+          "requirements": "The routing framework and its variants have been implemented.",
+          "weight": 4,
+          "sub_tasks": [
+            {
+              "id": "routing-mf-framework",
+              "requirements": "The EmbedLLM matrix-factorization routing framework (Zhuang et al., 2025) has been implemented or adapted, predicting whether a given model answers a given question correctly from the interaction between a model representation and a question representation.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "routing-frozen-dna-substitution",
+              "requirements": "Within that framework, the LLM embedding layer and its subsequent linear layer are together replaced by frozen pre-computed DNA vectors that receive no gradient updates during routing training, exactly as described in Section 5.3.",
+              "weight": 5,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "routing-question-embeddings",
+              "requirements": "Routing questions are encoded with Qwen/Qwen3-Embedding-8B and compared directly against the DNA vectors to make routing decisions, per Section 5.3 and Appendix B.1.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "routing-protocol-matches-embedllm",
+              "requirements": "The routing experiment reuses EmbedLLM's own dataset, data split, baselines, and evaluation metric rather than defining new ones, per Section 5.3.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "routing-11-models-omitted",
+              "requirements": "The 11 models reported by Zhuang et al. (2025) that no longer exist or fail to run are omitted from the routing model pool, per Section 5.3.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "routing-numbers-not-identical-to-embedllm",
+              "requirements": "The reproduction records that, because of those omitted models, its routing numbers are not expected to align exactly with the numbers published by Zhuang et al. (2025), per Section 5.3.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Logging, Analysis & Presentation"
+            },
+            {
+              "id": "routing-baseline-random",
+              "requirements": "The Random routing baseline has been implemented, selecting a model uniformly at random for each query.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "routing-baseline-single-best",
+              "requirements": "The Single Best routing baseline has been implemented, always routing every query to the one model with the highest overall accuracy.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "routing-baseline-embedllm",
+              "requirements": "The original EmbedLLM baseline has been implemented, using EmbedLLM's own trainable (non-frozen) model embeddings inside the matrix-factorization framework.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "routing-accuracy-metric",
+              "requirements": "Routing accuracy is computed as the fraction of queries routed to an LLM that answers them correctly, the definition attributed to Zhuang et al. (2025) in Section 5.3.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "routing-executed",
+              "requirements": "The routing evaluation has been executed on the EmbedLLM test split for all four methods, producing the numbers underlying Table 2.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "table2-results",
+          "requirements": "The reproduced routing accuracies match those reported in Table 2.",
+          "weight": 4,
+          "sub_tasks": [
+            {
+              "id": "t2-random",
+              "requirements": "The reproduced Table 2 entry for the Random routing baseline is 0.402 ± 0.016, matching the reported value within a reasonable tolerance.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "t2-single-best",
+              "requirements": "The reproduced Table 2 entry for the Single Best routing baseline is 0.607 ± 0.000, matching the reported value within a reasonable tolerance.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "t2-embedllm",
+              "requirements": "The reproduced Table 2 entry for EmbedLLM (Matrix Factorisation) is 0.665 ± 0.003, matching the reported value within a reasonable tolerance.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "t2-dna",
+              "requirements": "The reproduced Table 2 entry for the DNA-based router is 0.672 ± 0.008, matching the reported value within a reasonable tolerance.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "routing-claim-dna-beats-embedllm",
+          "requirements": "The reproduced routing accuracy of the frozen-DNA router exceeds that of the trained EmbedLLM embeddings, supporting Section 5.3's claim that a training-free, task-agnostic representation matches or beats a representation explicitly trained on this routing dataset.",
+          "weight": 4,
+          "sub_tasks": [],
+          "task_category": "Result Analysis",
+          "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+        }
+      ],
+      "task_category": null,
+      "finegrained_task_category": null
+    },
+    {
+      "id": "stability-heterogeneous-data",
+      "requirements": "The Section 5.4 Mantel-test experiment, which checks whether DNA structure depends on the prompt distribution used to extract it, has been reproduced (Figure 3).",
+      "weight": 3,
+      "sub_tasks": [
+        {
+          "id": "mantel-setup",
+          "requirements": "The two disjoint prompt sets and the DNA vectors derived from them have been produced.",
+          "weight": 4,
+          "sub_tasks": [
+            {
+              "id": "squad-cqa-set",
+              "requirements": "A prompt set named squad_cqa has been constructed as the union of 100 samples from SQuAD and 100 samples from CommonsenseQA, per Section 5.4.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Data Processing & Preparation"
+            },
+            {
+              "id": "hs-wg-set",
+              "requirements": "A prompt set named hs_wg has been constructed as the union of 100 samples from HellaSwag and 100 samples from Winogrande, per Section 5.4.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Data Processing & Preparation"
+            },
+            {
+              "id": "mantel-sets-disjoint",
+              "requirements": "The squad_cqa and hs_wg prompt sets are disjoint, drawing on four different source benchmarks with no shared prompts, as required by Section 5.4's description of 'two disjoint datasets'.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Data Processing & Preparation"
+            },
+            {
+              "id": "mantel-dual-extraction",
+              "requirements": "DNA vectors have been extracted for the same set of models twice, once using the squad_cqa prompts and once using the hs_wg prompts, yielding two independent DNA representations per model.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "mantel-analysis",
+          "requirements": "The Mantel-test analysis and its visualization have been implemented and executed.",
+          "weight": 3,
+          "sub_tasks": [
+            {
+              "id": "mantel-pairwise-distances",
+              "requirements": "Code exists to compute pairwise Euclidean distances between randomly selected pairs of models separately within the squad_cqa DNA set and within the hs_wg DNA set, per Section 5.4.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "mantel-correlation-code",
+              "requirements": "Code exists to compute the Pearson correlation and its p-value between the two vectors of pairwise model distances, implementing the Mantel test described in Section 5.4.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "fig3-scatter",
+              "requirements": "Code exists to render the Figure 3 scatter plot in which each point is one model pair, positioned by its squad_cqa distance on the horizontal axis and its hs_wg distance on the vertical axis.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Logging, Analysis & Presentation"
+            },
+            {
+              "id": "fig3-fit-line",
+              "requirements": "The Figure 3 plot overlays a fitted regression line through the scatter of paired distances.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Logging, Analysis & Presentation"
+            },
+            {
+              "id": "fig3-annotation-box",
+              "requirements": "The Figure 3 plot carries an annotation box reporting the Pearson correlation and its p-value.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Logging, Analysis & Presentation"
+            },
+            {
+              "id": "mantel-executed",
+              "requirements": "The full Mantel-test pipeline has been executed end-to-end to produce the results underlying Figure 3.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "mantel-results",
+          "requirements": "The reproduced Mantel-test statistics match those reported in Figure 3 and support the stability claim of Section 5.4.",
+          "weight": 4,
+          "sub_tasks": [
+            {
+              "id": "fig3-pearson-r",
+              "requirements": "The reproduced Pearson correlation between the squad_cqa and hs_wg pairwise distance structures is approximately 0.7797, the value annotated in Figure 3, matching the reported value within a reasonable tolerance.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "fig3-p-value",
+              "requirements": "The reproduced p-value for that correlation is below 0.0001, matching the significance level annotated in Figure 3.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "mantel-stability-claim",
+              "requirements": "The reproduced correlation is strong enough (Pearson r > 0.75 at p < 0.001) to support Section 5.4's conclusion that DNA structure does not depend on the sampled data from which it is extracted.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        }
+      ],
+      "task_category": null,
+      "finegrained_task_category": null
+    },
+    {
+      "id": "stability-random-inputs",
+      "requirements": "The Section 5.5 experiment showing that DNA remains discriminative when extracted from synthetic random-word prompts has been reproduced (Table 3).",
+      "weight": 3,
+      "sub_tasks": [
+        {
+          "id": "random-prompt-generation",
+          "requirements": "The synthetic random-word prompt set has been generated as described in Section 5.5.",
+          "weight": 3,
+          "sub_tasks": [
+            {
+              "id": "random-wonderwords-source",
+              "requirements": "Prompt words are sampled with wonderwords.RandomWord, the generator named in Section 5.5.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Data Processing & Preparation"
+            },
+            {
+              "id": "random-prompt-length-100",
+              "requirements": "Each synthetic prompt consists of 100 randomly sampled words concatenated together with no semantic structure, per Section 5.5 and the example slice quoted there.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Data Processing & Preparation"
+            },
+            {
+              "id": "random-prompt-count-600",
+              "requirements": "The synthetic prompt set contains 600 prompts, generated as six groups of 100 so as to mirror the 6 x 100 structure of the main six-benchmark protocol, per Section 5.5.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Data Processing & Preparation"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "random-dna-extraction",
+          "requirements": "DNA vectors have been extracted from the random-word prompts using the unchanged RepTrace protocol.",
+          "weight": 3,
+          "sub_tasks": [
+            {
+              "id": "random-run-llms",
+              "requirements": "Every LLM in the evaluation pool has been run on the 600 synthetic random-word prompts to obtain textual outputs, using the same generation settings as the main protocol.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "random-embed-qwen3",
+              "requirements": "The outputs generated from random-word prompts have been embedded with Qwen3-8B-Embedding, the same default encoder used in the main protocol, per Section 5.5.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "random-project-dna",
+              "requirements": "The random-input embeddings have been concatenated and projected through the same Gaussian random projection as the main pipeline, producing the DNA (Rand) representation evaluated in Table 3.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "random-relation-protocol",
+          "requirements": "The relationship-prediction protocol applied to the random-input DNAs is identical to the one used for Table 1, so the Table 3 comparison is like-for-like.",
+          "weight": 2,
+          "sub_tasks": [
+            {
+              "id": "random-reuse-pairs",
+              "requirements": "The same 166-pair correlated/independent dataset constructed for Table 1 is reused unmodified for the random-input evaluation.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Data Processing & Preparation"
+            },
+            {
+              "id": "random-reuse-split",
+              "requirements": "The same 8:2 train/test split used for Table 1 is applied to the random-input DNA vectors.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Data Processing & Preparation"
+            },
+            {
+              "id": "random-reuse-svm",
+              "requirements": "The same SVM-with-RBF-kernel classifier configuration used for the DNA rows of Table 1 is used for the DNA (Rand) row of Table 3.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "random-five-seeds-executed",
+              "requirements": "The DNA (Rand) + SVM evaluation has been executed across five random seeds, recording the mean and standard deviation of every metric.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "table3-results",
+          "requirements": "The reproduced Table 3 numbers match those reported in the paper.",
+          "weight": 4,
+          "sub_tasks": [
+            {
+              "id": "t3-dna-rand",
+              "requirements": "The reproduced Table 3 row for DNA (Rand) + SVM matches the reported values.",
+              "weight": 4,
+              "sub_tasks": [
+                {
+                  "id": "t3-dna-rand-acc",
+                  "requirements": "The reproduced Table 3 row for DNA (Rand) + SVM reports Accuracy = 0.949 ± 0.048 on the held-out relationship-detection test set (mean ± standard deviation over five random seeds), matching the reported value within a reasonable tolerance.",
+                  "weight": 2,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                },
+                {
+                  "id": "t3-dna-rand-prec",
+                  "requirements": "The reproduced Table 3 row for DNA (Rand) + SVM reports Precision = 0.931 ± 0.053 on the held-out relationship-detection test set (mean ± standard deviation over five random seeds), matching the reported value within a reasonable tolerance.",
+                  "weight": 1,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                },
+                {
+                  "id": "t3-dna-rand-rec",
+                  "requirements": "The reproduced Table 3 row for DNA (Rand) + SVM reports Recall = 0.977 ± 0.062 on the held-out relationship-detection test set (mean ± standard deviation over five random seeds), matching the reported value within a reasonable tolerance.",
+                  "weight": 1,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                },
+                {
+                  "id": "t3-dna-rand-f1",
+                  "requirements": "The reproduced Table 3 row for DNA (Rand) + SVM reports F1 = 0.952 ± 0.048 on the held-out relationship-detection test set (mean ± standard deviation over five random seeds), matching the reported value within a reasonable tolerance.",
+                  "weight": 1,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                },
+                {
+                  "id": "t3-dna-rand-auc",
+                  "requirements": "The reproduced Table 3 row for DNA (Rand) + SVM reports AUC = 0.987 ± 0.038 on the held-out relationship-detection test set (mean ± standard deviation over five random seeds), matching the reported value within a reasonable tolerance.",
+                  "weight": 2,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                }
+              ],
+              "task_category": null,
+              "finegrained_task_category": null
+            },
+            {
+              "id": "t3-phylolm-reference",
+              "requirements": "The PhyloLM + SVM row of Table 3 is reported as an unchanged carry-over of the corresponding Table 1 row rather than as a separately re-run experiment, matching the paper's use of it as a reference baseline.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "t3-dna-reference",
+              "requirements": "The DNA + SVM row of Table 3 is reported as an unchanged carry-over of the Table 1 DNA (Qwen3) row rather than as a separately re-run experiment, matching the paper's use of it as the standard-protocol reference.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "random-claims",
+          "requirements": "The conclusions Section 5.5 draws from Table 3 hold in the reproduction.",
+          "weight": 3,
+          "sub_tasks": [
+            {
+              "id": "claim-random-slightly-outperforms",
+              "requirements": "The reproduced DNA (Rand) + SVM accuracy slightly exceeds the DNA + SVM accuracy obtained from the standard six-benchmark protocol, matching Section 5.5's observation that the random-data setting even slightly outperforms the standard benchmark.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "claim-insensitive-to-dataset-bias",
+              "requirements": "The reproduced results support Section 5.5's conclusion that DNA extraction is largely insensitive to input-dataset bias because relationship analyses target relative distances among LLMs rather than absolute task accuracy.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        }
+      ],
+      "task_category": null,
+      "finegrained_task_category": null
+    },
+    {
+      "id": "chat-template-ablation",
+      "requirements": "The Section 5.6 ablation comparing DNA extracted with and without chat templates for instruction-tuned models has been reproduced (Table 4).",
+      "weight": 2,
+      "sub_tasks": [
+        {
+          "id": "template-protocols",
+          "requirements": "Both extraction protocols compared in Section 5.6 have been implemented.",
+          "weight": 4,
+          "sub_tasks": [
+            {
+              "id": "template-identify-chat-models",
+              "requirements": "The instruction-tuned (chat) subset of the model pool has been identified so that the two protocols can be applied selectively, as Section 5.6 requires.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Data Processing & Preparation"
+            },
+            {
+              "id": "template-protocol-with",
+              "requirements": "The 'with template' protocol has been implemented, applying each instruction-tuned model's own chat template and computing DNA from the extracted assistant response only.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "template-protocol-without",
+              "requirements": "The 'without template' protocol has been implemented, bypassing the chat template entirely and feeding the raw prompt to the instruction-tuned model in completion style.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "template-base-models-unchanged",
+              "requirements": "For non-chat base/completion models the extraction pipeline is identical under both conditions, per Section 5.6.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "template-six-dna-sets",
+              "requirements": "DNA vectors have been extracted under both template conditions with each of the three encoders (Qwen3, MPNet, BGE), producing the six DNA sets needed to populate Table 4.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "template-rerun-relation-task",
+              "requirements": "The Table 1 relationship-prediction protocol (166-pair dataset, 8:2 split, SVM-RBF, five seeds) has been re-run unchanged for each of the six DNA sets.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "table4-results",
+          "requirements": "The reproduced Table 4 numbers match those reported in the paper.",
+          "weight": 5,
+          "sub_tasks": [
+            {
+              "id": "t4-qwen3-wo",
+              "requirements": "The reproduced Table 4 row for the Qwen3 encoder without chat templates matches the reported values.",
+              "weight": 3,
+              "sub_tasks": [
+                {
+                  "id": "t4-qwen3-wo-acc",
+                  "requirements": "The reproduced Table 4 row for the Qwen3 encoder without chat templates reports Accuracy = 0.930 ± 0.045 on the held-out relationship-detection test set (mean ± standard deviation over five random seeds), matching the reported value within a reasonable tolerance.",
+                  "weight": 2,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                },
+                {
+                  "id": "t4-qwen3-wo-prec",
+                  "requirements": "The reproduced Table 4 row for the Qwen3 encoder without chat templates reports Precision = 0.916 ± 0.067 on the held-out relationship-detection test set (mean ± standard deviation over five random seeds), matching the reported value within a reasonable tolerance.",
+                  "weight": 1,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                },
+                {
+                  "id": "t4-qwen3-wo-rec",
+                  "requirements": "The reproduced Table 4 row for the Qwen3 encoder without chat templates reports Recall = 0.961 ± 0.071 on the held-out relationship-detection test set (mean ± standard deviation over five random seeds), matching the reported value within a reasonable tolerance.",
+                  "weight": 1,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                },
+                {
+                  "id": "t4-qwen3-wo-f1",
+                  "requirements": "The reproduced Table 4 row for the Qwen3 encoder without chat templates reports F1 = 0.935 ± 0.044 on the held-out relationship-detection test set (mean ± standard deviation over five random seeds), matching the reported value within a reasonable tolerance.",
+                  "weight": 1,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                },
+                {
+                  "id": "t4-qwen3-wo-auc",
+                  "requirements": "The reproduced Table 4 row for the Qwen3 encoder without chat templates reports AUC = 0.994 ± 0.021 on the held-out relationship-detection test set (mean ± standard deviation over five random seeds), matching the reported value within a reasonable tolerance.",
+                  "weight": 2,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                }
+              ],
+              "task_category": null,
+              "finegrained_task_category": null
+            },
+            {
+              "id": "t4-mpnet-wo",
+              "requirements": "The reproduced Table 4 row for the MPNet encoder without chat templates matches the reported values.",
+              "weight": 3,
+              "sub_tasks": [
+                {
+                  "id": "t4-mpnet-wo-acc",
+                  "requirements": "The reproduced Table 4 row for the MPNet encoder without chat templates reports Accuracy = 0.958 ± 0.047 on the held-out relationship-detection test set (mean ± standard deviation over five random seeds), matching the reported value within a reasonable tolerance.",
+                  "weight": 2,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                },
+                {
+                  "id": "t4-mpnet-wo-prec",
+                  "requirements": "The reproduced Table 4 row for the MPNet encoder without chat templates reports Precision = 0.943 ± 0.060 on the held-out relationship-detection test set (mean ± standard deviation over five random seeds), matching the reported value within a reasonable tolerance.",
+                  "weight": 1,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                },
+                {
+                  "id": "t4-mpnet-wo-rec",
+                  "requirements": "The reproduced Table 4 row for the MPNet encoder without chat templates reports Recall = 0.982 ± 0.059 on the held-out relationship-detection test set (mean ± standard deviation over five random seeds), matching the reported value within a reasonable tolerance.",
+                  "weight": 1,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                },
+                {
+                  "id": "t4-mpnet-wo-f1",
+                  "requirements": "The reproduced Table 4 row for the MPNet encoder without chat templates reports F1 = 0.960 ± 0.047 on the held-out relationship-detection test set (mean ± standard deviation over five random seeds), matching the reported value within a reasonable tolerance.",
+                  "weight": 1,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                },
+                {
+                  "id": "t4-mpnet-wo-auc",
+                  "requirements": "The reproduced Table 4 row for the MPNet encoder without chat templates reports AUC = 0.994 ± 0.016 on the held-out relationship-detection test set (mean ± standard deviation over five random seeds), matching the reported value within a reasonable tolerance.",
+                  "weight": 2,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                }
+              ],
+              "task_category": null,
+              "finegrained_task_category": null
+            },
+            {
+              "id": "t4-bge-wo",
+              "requirements": "The reproduced Table 4 row for the BGE encoder without chat templates matches the reported values.",
+              "weight": 3,
+              "sub_tasks": [
+                {
+                  "id": "t4-bge-wo-acc",
+                  "requirements": "The reproduced Table 4 row for the BGE encoder without chat templates reports Accuracy = 0.945 ± 0.054 on the held-out relationship-detection test set (mean ± standard deviation over five random seeds), matching the reported value within a reasonable tolerance.",
+                  "weight": 2,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                },
+                {
+                  "id": "t4-bge-wo-prec",
+                  "requirements": "The reproduced Table 4 row for the BGE encoder without chat templates reports Precision = 0.929 ± 0.073 on the held-out relationship-detection test set (mean ± standard deviation over five random seeds), matching the reported value within a reasonable tolerance.",
+                  "weight": 1,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                },
+                {
+                  "id": "t4-bge-wo-rec",
+                  "requirements": "The reproduced Table 4 row for the BGE encoder without chat templates reports Recall = 0.974 ± 0.066 on the held-out relationship-detection test set (mean ± standard deviation over five random seeds), matching the reported value within a reasonable tolerance.",
+                  "weight": 1,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                },
+                {
+                  "id": "t4-bge-wo-f1",
+                  "requirements": "The reproduced Table 4 row for the BGE encoder without chat templates reports F1 = 0.948 ± 0.052 on the held-out relationship-detection test set (mean ± standard deviation over five random seeds), matching the reported value within a reasonable tolerance.",
+                  "weight": 1,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                },
+                {
+                  "id": "t4-bge-wo-auc",
+                  "requirements": "The reproduced Table 4 row for the BGE encoder without chat templates reports AUC = 0.992 ± 0.023 on the held-out relationship-detection test set (mean ± standard deviation over five random seeds), matching the reported value within a reasonable tolerance.",
+                  "weight": 2,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                }
+              ],
+              "task_category": null,
+              "finegrained_task_category": null
+            },
+            {
+              "id": "t4-with-template-rows-reference",
+              "requirements": "The three 'w/ template' rows of Table 4 are reported as unchanged carry-overs of the corresponding DNA rows of Table 1 rather than as separately re-run experiments, matching the paper's presentation.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "template-claims",
+          "requirements": "The per-encoder improvement claimed in Section 5.6 holds in the reproduction.",
+          "weight": 3,
+          "sub_tasks": [
+            {
+              "id": "t4-claim-qwen3-improves",
+              "requirements": "Removing the chat template improves the Qwen3-encoder accuracy from 0.919 to 0.930, an increase of roughly 1.1 percentage points, matching Section 5.6.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "t4-claim-mpnet-improves",
+              "requirements": "Removing the chat template improves the MPNet-encoder accuracy from 0.932 to 0.958, an increase of roughly 2.6 percentage points, matching Section 5.6.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "t4-claim-bge-improves",
+              "requirements": "Removing the chat template improves the BGE-encoder accuracy from 0.934 to 0.945, an increase of roughly 1.1 percentage points, matching Section 5.6.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "t4-claim-consistent-1-3pct",
+              "requirements": "The accuracy improvement from removing chat templates is consistent in sign across all three encoders and lies within the 1-3% band claimed in Section 5.6.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        }
+      ],
+      "task_category": null,
+      "finegrained_task_category": null
+    },
+    {
+      "id": "finetuning-effect",
+      "requirements": "The Section 5.7 study quantifying how full-parameter fine-tuning shifts DNA values has been reproduced (Figure 5).",
+      "weight": 3,
+      "sub_tasks": [
+        {
+          "id": "finetune-training",
+          "requirements": "The four fine-tuned Llama3-8B-Instruct checkpoints described in Section 5.7 have been produced.",
+          "weight": 4,
+          "sub_tasks": [
+            {
+              "id": "ft-full-parameter",
+              "requirements": "Fine-tuning updates all parameters of Llama3-8B-Instruct rather than using a parameter-efficient method, per Section 5.7's 'fully fine-tune all parameters'.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "ft-n10",
+              "requirements": "A checkpoint has been produced by fine-tuning Llama3-8B-Instruct on a 10-sample subset of OpenMathInstruct-2.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "ft-n100",
+              "requirements": "A checkpoint has been produced by fine-tuning Llama3-8B-Instruct on a 100-sample subset of OpenMathInstruct-2.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "ft-n1000",
+              "requirements": "A checkpoint has been produced by fine-tuning Llama3-8B-Instruct on a 1,000-sample subset of OpenMathInstruct-2.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "ft-n10000",
+              "requirements": "A checkpoint has been produced by fine-tuning Llama3-8B-Instruct on a 10,000-sample subset of OpenMathInstruct-2.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "ft-postdates-llama3",
+              "requirements": "The setup records that OpenMathInstruct-2 was released after Llama3 and therefore cannot appear in Llama3's pretraining corpus, per Section 5.7.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "ft-absent-from-extraction-set",
+              "requirements": "The setup records that OpenMathInstruct-2 is absent from the six-benchmark DNA extraction prompt set, so the measured DNA shift is driven by genuinely external data, per Section 5.7.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Experimental Setup"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "finetune-measurement",
+          "requirements": "DNA shifts have been measured and visualized as in Figure 5.",
+          "weight": 3,
+          "sub_tasks": [
+            {
+              "id": "ft-extract-five-dnas",
+              "requirements": "DNA vectors have been extracted with the unchanged default RepTrace configuration for the original Llama3-8B-Instruct model and for each of the four fine-tuned checkpoints.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "ft-l2-computation",
+              "requirements": "Code exists to compute the Euclidean (L2) distance between each fine-tuned model's DNA vector and the original model's DNA vector.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "ft-heatmap-figure",
+              "requirements": "Code exists to render the Figure 5 heatmap, with one row per model, DNA dimension on the horizontal axis, per-dimension DNA value encoded as colour, and each row annotated with its L2 distance to the original model.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Logging, Analysis & Presentation"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "finetune-results",
+          "requirements": "The reproduced DNA shifts match the values annotated in Figure 5 and support Section 5.7's conclusions.",
+          "weight": 4,
+          "sub_tasks": [
+            {
+              "id": "ft-l2-n10",
+              "requirements": "The reproduced L2 distance between the DNA of the n=10 fine-tuned model and the original Llama3-8B-Instruct DNA is approximately 0.6926, the value annotated in Figure 5, matching the reported value within a reasonable tolerance.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "ft-l2-n100",
+              "requirements": "The reproduced L2 distance for the n=100 fine-tuned model is approximately 0.7860, the value annotated in Figure 5, matching the reported value within a reasonable tolerance.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "ft-l2-n1000",
+              "requirements": "The reproduced L2 distance for the n=1000 fine-tuned model is approximately 0.7001, the value annotated in Figure 5, matching the reported value within a reasonable tolerance.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "ft-l2-n10000",
+              "requirements": "The reproduced L2 distance for the n=10000 fine-tuned model is approximately 0.8024, the value annotated in Figure 5, matching the reported value within a reasonable tolerance.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "ft-claim-sharp-then-gradual",
+              "requirements": "The reproduced distances show the shift rising sharply as soon as fine-tuning begins (roughly 0.69 after only 10 samples) and then growing far more slowly with additional data (reaching roughly 0.80 at 10,000 samples), matching the nonlinear trend described in Section 5.7.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "ft-claim-global-structure-stable",
+              "requirements": "In the reproduced Figure 5 heatmap, most DNA subsequences keep their dark/light pattern across all four fine-tuned variants, supporting Section 5.7's conclusion that fine-tuning alters local traits while leaving the global, inherited DNA structure largely intact.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        }
+      ],
+      "task_category": null,
+      "finegrained_task_category": null
+    },
+    {
+      "id": "phylogenetic-tree",
+      "requirements": "The phylogenetic trees of Section 5.8 (Figure 6) and Appendix C.1 (Figure 7) have been reconstructed from DNA L2 distances with Neighbor-Joining and midpoint rooting, and their stated observations hold.",
+      "weight": 6,
+      "sub_tasks": [
+        {
+          "id": "phylo-construction",
+          "requirements": "The tree-construction procedure has been implemented as described.",
+          "weight": 5,
+          "sub_tasks": [
+            {
+              "id": "phylo-distance-matrix",
+              "requirements": "A pairwise Euclidean (L2) distance matrix over DNA vectors has been computed to serve as the input to the tree-building algorithm, per Section 5.8 and Appendix C.1.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "phylo-nj-algorithm",
+              "requirements": "The Neighbor-Joining algorithm (Saitou & Nei, 1987) has been implemented or invoked from a standard library to build a tree from that distance matrix, minimizing the total sum of edge lengths.",
+              "weight": 5,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "phylo-midpoint-rooting",
+              "requirements": "The tree is rooted with the default midpoint strategy, placing the root at the midpoint of the longest path in the tree, per Section 5.8 and Appendix C.1.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "phylo-llm-as-species",
+              "requirements": "Each LLM is treated as a single species/leaf in the tree construction, per Appendix C.1.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "phylo-no-release-dates",
+              "requirements": "The tree is constructed purely from DNA distances, with no release dates, timestamps, or documented lineage metadata used as input, as Section 5.8 emphasises.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "phylo-branch-ordering",
+              "requirements": "Branches in the Figure 6 rendering are ordered by their leaf counts, per Section 5.8.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Logging, Analysis & Presentation"
+            },
+            {
+              "id": "phylo-fig6-family-tree",
+              "requirements": "Code exists to render Figure 6, a family-level tree whose leaves are model groups (flan-t5, pythia, llemma, Llama2-chat, Llama3-Instruct, gemma-it, gemma3-it, Qwen1.5, Qwen2.5, Qwen3) laid out against an evolutionary-distance axis.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Logging, Analysis & Presentation"
+            },
+            {
+              "id": "phylo-fig6-branch-length-labels",
+              "requirements": "Each internal branch in the Figure 6 rendering is annotated with its numeric branch length, as shown in the published figure.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Logging, Analysis & Presentation"
+            },
+            {
+              "id": "phylo-fig6-org-coloring",
+              "requirements": "Leaves in the Figure 6 rendering are coloured by releasing organization (EleutherAI, Qwen, Google, meta-llama) with a corresponding legend.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Logging, Analysis & Presentation"
+            },
+            {
+              "id": "phylo-fig7-per-model-tree",
+              "requirements": "Code exists to render Figure 7, the expanded tree with one leaf per individual model over the representative subset drawn from EleutherAI, Qwen, Google, and meta-llama, built with the same Neighbor-Joining and midpoint-rooting procedure as Figure 6.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Logging, Analysis & Presentation"
+            },
+            {
+              "id": "phylo-executed",
+              "requirements": "The full tree-construction pipeline has been executed on the extracted DNA vectors to produce both the family-level tree of Figure 6 and the per-model tree of Figure 7.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "phylo-figure6-observations",
+          "requirements": "The four observations Section 5.8 draws from Figure 6 hold in the reconstructed tree.",
+          "weight": 5,
+          "sub_tasks": [
+            {
+              "id": "phylo-obs-architecture-shift",
+              "requirements": "The reconstructed tree separates early encoder-decoder models (e.g., Flan-T5) from the later decoder-only models (e.g., Llama, Qwen), recovering the architectural shift described as observation (i) in Section 5.8.",
+              "weight": 5,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "phylo-obs-temporal-progression",
+              "requirements": "Root-to-leaf paths in the reconstructed tree order model groups consistently with their release years from 2023 to 2025, recovering the temporal progression described as observation (ii) in Section 5.8 even though release dates were never given to the algorithm.",
+              "weight": 5,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "phylo-obs-llama2-to-llama3",
+              "requirements": "The reconstructed tree places Llama2-chat and Llama3-Instruct on the same lineage in that order, recovering the within-family lineage evolution described as observation (iii) in Section 5.8.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "phylo-obs-evolution-speed",
+              "requirements": "The reconstructed tree assigns longer branches between successive Qwen and Gemma generations than between successive Llama generations, supporting Section 5.8's claim that Qwen and Gemma evolve faster than the Llama series.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "phylo-figure7-observations",
+          "requirements": "The observations Appendix C.1 draws from the expanded per-model tree hold in the reconstruction.",
+          "weight": 3,
+          "sub_tasks": [
+            {
+              "id": "phylo-fig7-flan-colocated",
+              "requirements": "In the reconstructed Figure 7, the Google Flan models (flan-t5-base, flan-t5-large) are colocated on the same subtree, supporting Appendix C.1's observation 1 about series-level similarity.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "phylo-fig7-qwen3-colocated",
+              "requirements": "In the reconstructed Figure 7, the Qwen3 models are colocated on the same subtree, supporting Appendix C.1's observation 1 about series-level similarity.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "phylo-fig7-llama3-colocated",
+              "requirements": "In the reconstructed Figure 7, the Llama 3 models are colocated on the same subtree, supporting Appendix C.1's observation 1 about series-level similarity.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "phylo-fig7-gemma-progression",
+              "requirements": "In the reconstructed Figure 7, root-to-leaf paths progress from Gemma to Gemma 3, matching part (i) of Appendix C.1's observation 2.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "phylo-fig7-encoder-decoder-basal",
+              "requirements": "In the reconstructed Figure 7, the encoder-decoder Flan-T5 models occupy a basal position relative to the decoder-only models, matching part (ii) of Appendix C.1's observation 2.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        }
+      ],
+      "task_category": null,
+      "finegrained_task_category": null
+    },
+    {
+      "id": "false-positive-analysis",
+      "requirements": "The Appendix C.2 analysis of relationship pairs that the DNA classifier predicts as correlated but that the Hugging Face model tree labels independent has been reproduced (Table 5).",
+      "weight": 2,
+      "sub_tasks": [
+        {
+          "id": "fp-procedure",
+          "requirements": "The error-analysis procedure of Appendix C.2 has been implemented.",
+          "weight": 4,
+          "sub_tasks": [
+            {
+              "id": "fp-collect-misclassified",
+              "requirements": "Code exists to collect the model pairs that the DNA classifier predicts as correlated while the Hugging Face model tree labels them independent, i.e. the false positives analysed in Appendix C.2.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "fp-manual-verification",
+              "requirements": "The collected false-positive pairs have been examined against public documentation (model cards, release notes, family membership) to determine whether each is in fact a genuine relationship missing from the model tree, per Appendix C.2.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "fp-table5-rendered",
+              "requirements": "A table of notable false-positive pairs has been produced in the format of Table 5, listing each pair as Model 1 and Model 2.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Logging, Analysis & Presentation"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "fp-table5-pairs",
+          "requirements": "The reproduced false-positive analysis surfaces the specific model pairs listed in Table 5.",
+          "weight": 3,
+          "sub_tasks": [
+            {
+              "id": "t5-qwen25-7bi-qwen3-17b",
+              "requirements": "The reproduced set of DNA false positives includes the pair Qwen/Qwen2.5-7B-Instruct and Qwen/Qwen3-1.7B, listed in Table 5 as an undocumented relationship identified by LLM DNA.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "t5-qwen25-7bi-qwen3-14b",
+              "requirements": "The reproduced set of DNA false positives includes the pair Qwen/Qwen2.5-7B-Instruct and Qwen/Qwen3-14B, listed in Table 5 as an undocumented relationship identified by LLM DNA.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "t5-qwen25-7bi-qwen3-8b",
+              "requirements": "The reproduced set of DNA false positives includes the pair Qwen/Qwen2.5-7B-Instruct and Qwen/Qwen3-8B, listed in Table 5 as an undocumented relationship identified by LLM DNA.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "t5-qwen25coder-qwen3think",
+              "requirements": "The reproduced set of DNA false positives includes the pair Qwen/Qwen2.5-Coder-7B-Instruct and Qwen/Qwen3-4B-Thinking-2507-FP8, listed in Table 5 as an undocumented relationship identified by LLM DNA.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "t5-qwen3-4b-qwen25coder",
+              "requirements": "The reproduced set of DNA false positives includes the pair Qwen/Qwen3-4B and Qwen/Qwen2.5-Coder-7B, listed in Table 5 as an undocumented relationship identified by LLM DNA.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "t5-qwen3-4b-qwen3-8b",
+              "requirements": "The reproduced set of DNA false positives includes the pair Qwen/Qwen3-4B and Qwen/Qwen3-8B, listed in Table 5 as an undocumented relationship identified by LLM DNA.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "t5-qwen3think-qwen25-05bi",
+              "requirements": "The reproduced set of DNA false positives includes the pair Qwen/Qwen3-4B-Thinking-2507-FP8 and Qwen/Qwen2.5-0.5B-Instruct, listed in Table 5 as an undocumented relationship identified by LLM DNA.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "t5-qwen3think-qwen25-7b",
+              "requirements": "The reproduced set of DNA false positives includes the pair Qwen/Qwen3-4B-Thinking-2507-FP8 and Qwen/Qwen2.5-7B, listed in Table 5 as an undocumented relationship identified by LLM DNA.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "t5-qwen3-8b-qwen3think",
+              "requirements": "The reproduced set of DNA false positives includes the pair Qwen/Qwen3-8B and Qwen/Qwen3-4B-Thinking-2507-FP8, listed in Table 5 as an undocumented relationship identified by LLM DNA.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "t5-rstar-qwen25coder",
+              "requirements": "The reproduced set of DNA false positives includes the pair prithivMLmods/rStar-Coder-Qwen3-0.6B and Qwen/Qwen2.5-Coder-7B, listed in Table 5 as an undocumented relationship identified by LLM DNA.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "t5-rstar-jan",
+              "requirements": "The reproduced set of DNA false positives includes the pair prithivMLmods/rStar-Coder-Qwen3-0.6B and janhq/Jan-v1-4B, listed in Table 5 as an undocumented relationship identified by LLM DNA.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "t5-rstar-llama3",
+              "requirements": "The reproduced set of DNA false positives includes the pair prithivMLmods/rStar-Coder-Qwen3-0.6B and meta-llama/Meta-Llama-3-8B-Instruct, listed in Table 5 as an undocumented relationship identified by LLM DNA.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "t5-rstar-gptoss",
+              "requirements": "The reproduced set of DNA false positives includes the pair prithivMLmods/rStar-Coder-Qwen3-0.6B and openai/gpt-oss-20b, listed in Table 5 as an undocumented relationship identified by LLM DNA.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "t5-falcon-qwen25coder",
+              "requirements": "The reproduced set of DNA false positives includes the pair tiiuae/falcon-7b-instruct and Qwen/Qwen2.5-Coder-7B, listed in Table 5 as an undocumented relationship identified by LLM DNA.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "t5-dynaguard-qwen3-14b",
+              "requirements": "The reproduced set of DNA false positives includes the pair tomg-group-umd/DynaGuard-8B and Qwen/Qwen3-14B, listed in Table 5 as an undocumented relationship identified by LLM DNA.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "fp-claims",
+          "requirements": "The conclusions Appendix C.2 draws from this analysis hold in the reproduction.",
+          "weight": 3,
+          "sub_tasks": [
+            {
+              "id": "fp-claim-incomplete-labeling",
+              "requirements": "A substantial portion of the reproduced false positives are pairs that are absent from the Hugging Face model tree yet verifiably related from public documentation, or that belong to the same model family, supporting Appendix C.2's conclusion that the errors stem from incomplete model-tree labelling rather than from the DNA method.",
+              "weight": 5,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "fp-claim-enriches-model-tree",
+              "requirements": "The reproduction demonstrates that these DNA-identified pairs can be used to propose additions to the Hugging Face model tree, supporting Appendix C.2's claim that LLM DNA offers a principled way to enrich it.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        }
+      ],
+      "task_category": null,
+      "finegrained_task_category": null
+    },
+    {
+      "id": "encoder-ablation",
+      "requirements": "The Appendix C.3 ablation measuring how much the choice of bottleneck sentence-embedding model changes overall DNA structure has been reproduced (Figure 8).",
+      "weight": 2,
+      "sub_tasks": [
+        {
+          "id": "c3-procedure",
+          "requirements": "The cross-encoder Mantel-test procedure of Appendix C.3 has been implemented and executed.",
+          "weight": 4,
+          "sub_tasks": [
+            {
+              "id": "c3-three-dna-sets",
+              "requirements": "DNA vectors have been computed for the same model set three times, once with Qwen3-Embedding-8B, once with all-mpnet-base-v2, and once with bge-large-en-v1.5.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "c3-sample-10000-pairs",
+              "requirements": "Exactly 10,000 random model pairs are sampled and their DNA distances computed, per Appendix C.3.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "c3-spearman-correlation",
+              "requirements": "Code exists to compute the Spearman correlation and its p-value between the distance vectors produced by two different encoders, implementing the pairwise Mantel test of Appendix C.3.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "c3-figure8-panels",
+              "requirements": "Code exists to render Figure 8 as three scatter panels, one per encoder pair, each plotting one encoder's pairwise Euclidean DNA distances against the other's.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Logging, Analysis & Presentation"
+            },
+            {
+              "id": "c3-figure8-annotations",
+              "requirements": "Each Figure 8 panel carries an annotation reporting the correlation coefficient and p-value for that encoder pair.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Logging, Analysis & Presentation"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "c3-results",
+          "requirements": "The reproduced cross-encoder correlations match those annotated in Figure 8.",
+          "weight": 4,
+          "sub_tasks": [
+            {
+              "id": "c3-r-mpnet-bge",
+              "requirements": "The reproduced correlation between the all-mpnet-base-v2 and bge-large-en-v1.5 distance structures is approximately 0.7685, the value annotated in the first panel of Figure 8, matching the reported value within a reasonable tolerance.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "c3-r-mpnet-qwen3",
+              "requirements": "The reproduced correlation between the all-mpnet-base-v2 and Qwen3-Embedding-8B distance structures is approximately 0.7804, the value annotated in the second panel of Figure 8, matching the reported value within a reasonable tolerance.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "c3-r-qwen3-bge",
+              "requirements": "The reproduced correlation between the Qwen3-Embedding-8B and bge-large-en-v1.5 distance structures is approximately 0.7928, the value annotated in the third panel of Figure 8, matching the reported value within a reasonable tolerance.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "c3-p-values",
+              "requirements": "All three reproduced encoder-pair correlations are statistically significant at p < 0.0001, as annotated in Figure 8.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "c3-claims",
+          "requirements": "The conclusions Appendix C.3 draws from Figure 8 hold in the reproduction.",
+          "weight": 3,
+          "sub_tasks": [
+            {
+              "id": "c3-claim-marginal-impact",
+              "requirements": "All three encoder pairs show strong agreement (r > 0.75), supporting Appendix C.3's conclusion that the choice of bottleneck embedding model has only marginal impact on overall DNA structure.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "c3-claim-small-encoder-sufficient",
+              "requirements": "The reproduction confirms that the 0.1B all-mpnet-base-v2 encoder yields DNA whose distance structure agrees closely with that produced by the 8B Qwen3 encoder, supporting Appendix C.3's claim that even a small embedding model yields comparable DNA.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        }
+      ],
+      "task_category": null,
+      "finegrained_task_category": null
+    },
+    {
+      "id": "embedding-dimension-ablation",
+      "requirements": "The Appendix C.4 ablation over the pre-aggregation embedding dimension p has been reproduced (Figure 9).",
+      "weight": 2,
+      "sub_tasks": [
+        {
+          "id": "c4-vary-p",
+          "requirements": "DNA vectors have been extracted with the Qwen3-8B-Embedding output dimension p set to each of 4, 64, 128, 1024, and 4096, the five settings swept in Appendix C.4.",
+          "weight": 5,
+          "sub_tasks": [],
+          "task_category": "Code Development",
+          "finegrained_task_category": "Experimental Setup"
+        },
+        {
+          "id": "c4-reuse-relation-task",
+          "requirements": "Each p setting is evaluated on the same relationship-prediction task used for Table 1, with the dataset, split, and classifier held fixed so that p is the only variable, per Appendix C.4.",
+          "weight": 3,
+          "sub_tasks": [],
+          "task_category": "Code Development",
+          "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+        },
+        {
+          "id": "c4-five-seeds-executed",
+          "requirements": "Each p setting has been evaluated across five random seeds, recording the mean and standard deviation of Accuracy, Precision, Recall, F1, and AUC-ROC.",
+          "weight": 3,
+          "sub_tasks": [],
+          "task_category": "Code Execution",
+          "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+        },
+        {
+          "id": "c4-figure9-rendered",
+          "requirements": "Code exists to render Figure 9 as five panels — Accuracy, Precision, Recall, F1 Score, and AUC-ROC — plotted against the sentence-embedding model output dimension, with error bars denoting the standard deviation across seeds.",
+          "weight": 3,
+          "sub_tasks": [],
+          "task_category": "Code Development",
+          "finegrained_task_category": "Logging, Analysis & Presentation"
+        },
+        {
+          "id": "c4-claim-p-marginal",
+          "requirements": "Across all five panels of the reproduced Figure 9, relationship-prediction performance remains largely unchanged as p varies, supporting Appendix C.4's conclusion that p has only marginal impact.",
+          "weight": 5,
+          "sub_tasks": [],
+          "task_category": "Result Analysis",
+          "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+        },
+        {
+          "id": "c4-claim-aggregation-drives-quality",
+          "requirements": "The reproduced results support Appendix C.4's interpretation that DNA quality is driven by the subsequent aggregation (concatenation and random projection) rather than by the embedding model's output dimension.",
+          "weight": 3,
+          "sub_tasks": [],
+          "task_category": "Result Analysis",
+          "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+        }
+      ],
+      "task_category": null,
+      "finegrained_task_category": null
+    },
+    {
+      "id": "dna-dimension-ablation",
+      "requirements": "The Appendix C.5 ablation over the DNA dimension L has been reproduced (Figure 10).",
+      "weight": 2,
+      "sub_tasks": [
+        {
+          "id": "c5-vary-L",
+          "requirements": "DNA vectors have been extracted with the DNA dimension L set to each of 4, 32, 128, 1024, and 4096, the five settings swept in Appendix C.5.",
+          "weight": 5,
+          "sub_tasks": [],
+          "task_category": "Code Development",
+          "finegrained_task_category": "Experimental Setup"
+        },
+        {
+          "id": "c5-reuse-relation-task",
+          "requirements": "Each L setting is evaluated on the same relationship-prediction task used for Table 1, with the dataset, split, and classifier held fixed so that L is the only variable, per Appendix C.5.",
+          "weight": 3,
+          "sub_tasks": [],
+          "task_category": "Code Development",
+          "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+        },
+        {
+          "id": "c5-five-seeds-executed",
+          "requirements": "Each L setting has been evaluated across five random seeds, recording the mean and standard deviation of Accuracy, Precision, Recall, F1, and AUC-ROC.",
+          "weight": 3,
+          "sub_tasks": [],
+          "task_category": "Code Execution",
+          "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+        },
+        {
+          "id": "c5-figure10-rendered",
+          "requirements": "Code exists to render Figure 10 as five panels — Accuracy, Precision, Recall, F1 Score, and AUC-ROC — plotted against the DNA dimension, with error bars denoting the standard deviation across seeds.",
+          "weight": 3,
+          "sub_tasks": [],
+          "task_category": "Code Development",
+          "finegrained_task_category": "Logging, Analysis & Presentation"
+        },
+        {
+          "id": "c5-claim-improves-with-L",
+          "requirements": "In the reproduced Figure 10, relationship-prediction quality improves as the DNA dimension L increases, matching Appendix C.5.",
+          "weight": 4,
+          "sub_tasks": [],
+          "task_category": "Result Analysis",
+          "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+        },
+        {
+          "id": "c5-claim-converges-at-128",
+          "requirements": "In the reproduced Figure 10, the performance curves flatten from roughly L = 128 onward, matching Appendix C.5's statement that DNA quality converges around L = 128.",
+          "weight": 4,
+          "sub_tasks": [],
+          "task_category": "Result Analysis",
+          "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+        },
+        {
+          "id": "c5-claim-L4-underperforms",
+          "requirements": "In the reproduced Figure 10, the L = 4 setting performs clearly worse than every larger setting across the reported metrics, matching Appendix C.5's explanation that very low dimensions discard structural information from the original high-dimensional space.",
+          "weight": 4,
+          "sub_tasks": [],
+          "task_category": "Result Analysis",
+          "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+        },
+        {
+          "id": "c5-claim-justifies-default",
+          "requirements": "The reproduced sweep supports Appendix C.5's quality-versus-efficiency argument for adopting L = 128 as the default at the paper's evaluation scale of roughly 300 LLMs.",
+          "weight": 2,
+          "sub_tasks": [],
+          "task_category": "Result Analysis",
+          "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+        }
+      ],
+      "task_category": null,
+      "finegrained_task_category": null
+    },
+    {
+      "id": "parameter-size-bias-analysis",
+      "requirements": "The Appendix C.6 post-hoc analysis testing whether DNA relationship-detection quality is biased by model scale has been reproduced (Table 6).",
+      "weight": 2,
+      "sub_tasks": [
+        {
+          "id": "c6-procedure",
+          "requirements": "The post-hoc size-bias analysis of Appendix C.6 has been implemented.",
+          "weight": 4,
+          "sub_tasks": [
+            {
+              "id": "c6-classifier-blind-to-size",
+              "requirements": "The DNA classifier makes its relationship predictions from functional embeddings alone, with no access to metadata such as parameter counts, as Appendix C.6 requires.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "c6-analysis-is-post-hoc",
+              "requirements": "The size analysis is performed after the classifier's predictions have been fixed, entirely separate from the DNA classification pipeline, per Appendix C.6.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "c6-cumulative-parameter-size",
+              "requirements": "For every test pair, a cumulative parameter size is computed as the sum of the parameter counts of the two models, per Appendix C.6.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "c6-point-biserial",
+              "requirements": "Code exists to compute the Point-Biserial correlation between a pair's cumulative parameter size and the binary correctness of the classifier's prediction for that pair.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "c6-logistic-regression",
+              "requirements": "An independent logistic regression is fit predicting prediction correctness (1 for correct, 0 for incorrect) from a test pair's cumulative parameter size, per Appendix C.6.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "c6-size-coefficient-pvalue",
+              "requirements": "The p-value of the parameter-size coefficient is extracted from that logistic regression and reported alongside the correlation, per Appendix C.6.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "c6-table6-results",
+          "requirements": "The reproduced size-bias statistics match those reported in Table 6.",
+          "weight": 4,
+          "sub_tasks": [
+            {
+              "id": "t6-phylolm",
+              "requirements": "The reproduced Table 6 size-bias statistics for PhyloLM match the reported values.",
+              "weight": 1,
+              "sub_tasks": [
+                {
+                  "id": "t6-phylolm-corr",
+                  "requirements": "The reproduced Point-Biserial correlation between cumulative parameter size and prediction correctness for PhyloLM, reported in the Corr. column of Table 6, is -0.097 ± 0.195, matching the reported value within a reasonable tolerance.",
+                  "weight": 2,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                },
+                {
+                  "id": "t6-phylolm-pval",
+                  "requirements": "The reproduced p-value of the parameter-size coefficient for PhyloLM, reported in the p-value (Size) column of Table 6, is approximately 0.5202, matching the reported value within a reasonable tolerance.",
+                  "weight": 2,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                }
+              ],
+              "task_category": null,
+              "finegrained_task_category": null
+            },
+            {
+              "id": "t6-dna-qwen3",
+              "requirements": "The reproduced Table 6 size-bias statistics for DNA (Qwen3) match the reported values.",
+              "weight": 2,
+              "sub_tasks": [
+                {
+                  "id": "t6-dna-qwen3-corr",
+                  "requirements": "The reproduced Point-Biserial correlation between cumulative parameter size and prediction correctness for DNA (Qwen3), reported in the Corr. column of Table 6, is 0.025 ± 0.123, matching the reported value within a reasonable tolerance.",
+                  "weight": 2,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                },
+                {
+                  "id": "t6-dna-qwen3-pval",
+                  "requirements": "The reproduced p-value of the parameter-size coefficient for DNA (Qwen3), reported in the p-value (Size) column of Table 6, is approximately 0.6349, matching the reported value within a reasonable tolerance.",
+                  "weight": 2,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                }
+              ],
+              "task_category": null,
+              "finegrained_task_category": null
+            },
+            {
+              "id": "t6-dna-bge",
+              "requirements": "The reproduced Table 6 size-bias statistics for DNA (BGE) match the reported values.",
+              "weight": 2,
+              "sub_tasks": [
+                {
+                  "id": "t6-dna-bge-corr",
+                  "requirements": "The reproduced Point-Biserial correlation between cumulative parameter size and prediction correctness for DNA (BGE), reported in the Corr. column of Table 6, is 0.013 ± 0.125, matching the reported value within a reasonable tolerance.",
+                  "weight": 2,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                },
+                {
+                  "id": "t6-dna-bge-pval",
+                  "requirements": "The reproduced p-value of the parameter-size coefficient for DNA (BGE), reported in the p-value (Size) column of Table 6, is approximately 0.6550, matching the reported value within a reasonable tolerance.",
+                  "weight": 2,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                }
+              ],
+              "task_category": null,
+              "finegrained_task_category": null
+            },
+            {
+              "id": "t6-dna-mpnet",
+              "requirements": "The reproduced Table 6 size-bias statistics for DNA (MPNet) match the reported values.",
+              "weight": 2,
+              "sub_tasks": [
+                {
+                  "id": "t6-dna-mpnet-corr",
+                  "requirements": "The reproduced Point-Biserial correlation between cumulative parameter size and prediction correctness for DNA (MPNet), reported in the Corr. column of Table 6, is 0.023 ± 0.122, matching the reported value within a reasonable tolerance.",
+                  "weight": 2,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                },
+                {
+                  "id": "t6-dna-mpnet-pval",
+                  "requirements": "The reproduced p-value of the parameter-size coefficient for DNA (MPNet), reported in the p-value (Size) column of Table 6, is approximately 0.6903, matching the reported value within a reasonable tolerance.",
+                  "weight": 2,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                }
+              ],
+              "task_category": null,
+              "finegrained_task_category": null
+            },
+            {
+              "id": "t6-accuracy-f1-auc-reference",
+              "requirements": "The Accuracy, F1, and AUC columns of Table 6 are reported as unchanged carry-overs of the corresponding Table 1 rows rather than as separately re-run experiments, matching the paper's presentation.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "c6-claims",
+          "requirements": "The two conclusions Appendix C.6 draws from Table 6 hold in the reproduction.",
+          "weight": 3,
+          "sub_tasks": [
+            {
+              "id": "c6-claim-size-independent",
+              "requirements": "Across all DNA-based methods the reproduced Point-Biserial correlations are negligible and the size-coefficient p-values sit far above the 0.05 significance threshold, supporting Appendix C.6's first conclusion that DNA quality is statistically independent of LLM size.",
+              "weight": 5,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "c6-claim-consistent-across-encoders",
+              "requirements": "The absence of size bias holds equally for the 8B Qwen3 encoder and the much smaller BGE (0.3B) and MPNet (0.1B) encoders, supporting Appendix C.6's second conclusion that robustness is consistent regardless of encoder size.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        }
+      ],
+      "task_category": null,
+      "finegrained_task_category": null
+    },
+    {
+      "id": "same-tokenizer-comparison",
+      "requirements": "The Appendix C.7 comparison against PhyloLM restricted to models that share the Qwen2Tokenizer has been reproduced (Table 7).",
+      "weight": 2,
+      "sub_tasks": [
+        {
+          "id": "c7-setup",
+          "requirements": "The same-tokenizer evaluation subset and protocol have been constructed as described in Appendix C.7.",
+          "weight": 4,
+          "sub_tasks": [
+            {
+              "id": "c7-filter-qwen2tokenizer",
+              "requirements": "The evaluation set is filtered to include only models that use Qwen2Tokenizer, the most common tokenizer in the 305-model pool, per Appendix C.7.",
+              "weight": 5,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Data Processing & Preparation"
+            },
+            {
+              "id": "c7-phylolm-same-tokenizer-variant",
+              "requirements": "PhyloLM is run in its same-tokenizer regime on this subset, using exact output token distributions rather than the first-four-character cross-tokenizer approximation, per Appendix C.7.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "c7-rerun-relation-task",
+              "requirements": "The same relationship-prediction task and evaluation protocol used for Table 1 have been re-run on the Qwen2Tokenizer subset for all six methods across five seeds.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "c7-table7-results",
+          "requirements": "The reproduced same-tokenizer numbers match those reported in Table 7.",
+          "weight": 5,
+          "sub_tasks": [
+            {
+              "id": "t7-random",
+              "requirements": "The reproduced Table 7 row for the Random baseline matches the reported values.",
+              "weight": 1,
+              "sub_tasks": [
+                {
+                  "id": "t7-random-acc",
+                  "requirements": "The reproduced Table 7 row for the Random baseline on the Qwen2Tokenizer subset reports Accuracy = 0.511 ± 0.054 on the held-out relationship-detection test set (mean ± standard deviation over five random seeds), matching the reported value within a reasonable tolerance.",
+                  "weight": 1,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                },
+                {
+                  "id": "t7-random-prec",
+                  "requirements": "The reproduced Table 7 row for the Random baseline on the Qwen2Tokenizer subset reports Precision = 0.682 ± 0.073 on the held-out relationship-detection test set (mean ± standard deviation over five random seeds), matching the reported value within a reasonable tolerance.",
+                  "weight": 1,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                },
+                {
+                  "id": "t7-random-rec",
+                  "requirements": "The reproduced Table 7 row for the Random baseline on the Qwen2Tokenizer subset reports Recall = 0.529 ± 0.054 on the held-out relationship-detection test set (mean ± standard deviation over five random seeds), matching the reported value within a reasonable tolerance.",
+                  "weight": 1,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                },
+                {
+                  "id": "t7-random-f1",
+                  "requirements": "The reproduced Table 7 row for the Random baseline on the Qwen2Tokenizer subset reports F1 = 0.593 ± 0.047 on the held-out relationship-detection test set (mean ± standard deviation over five random seeds), matching the reported value within a reasonable tolerance.",
+                  "weight": 1,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                },
+                {
+                  "id": "t7-random-auc",
+                  "requirements": "The reproduced Table 7 row for the Random baseline on the Qwen2Tokenizer subset reports AUC = 0.501 ± 0.068 on the held-out relationship-detection test set (mean ± standard deviation over five random seeds), matching the reported value within a reasonable tolerance.",
+                  "weight": 1,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                }
+              ],
+              "task_category": null,
+              "finegrained_task_category": null
+            },
+            {
+              "id": "t7-greedy",
+              "requirements": "The reproduced Table 7 row for the Greedy baseline matches the reported values.",
+              "weight": 1,
+              "sub_tasks": [
+                {
+                  "id": "t7-greedy-acc",
+                  "requirements": "The reproduced Table 7 row for the Greedy baseline on the Qwen2Tokenizer subset reports Accuracy = 0.428 ± 0.043 on the held-out relationship-detection test set (mean ± standard deviation over five random seeds), matching the reported value within a reasonable tolerance.",
+                  "weight": 1,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                },
+                {
+                  "id": "t7-greedy-prec",
+                  "requirements": "The reproduced Table 7 row for the Greedy baseline on the Qwen2Tokenizer subset reports Precision = 0.687 ± 0.101 on the held-out relationship-detection test set (mean ± standard deviation over five random seeds), matching the reported value within a reasonable tolerance.",
+                  "weight": 1,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                },
+                {
+                  "id": "t7-greedy-rec",
+                  "requirements": "The reproduced Table 7 row for the Greedy baseline on the Qwen2Tokenizer subset reports Recall = 0.294 ± 0.000 on the held-out relationship-detection test set (mean ± standard deviation over five random seeds), matching the reported value within a reasonable tolerance.",
+                  "weight": 1,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                },
+                {
+                  "id": "t7-greedy-f1",
+                  "requirements": "The reproduced Table 7 row for the Greedy baseline on the Qwen2Tokenizer subset reports F1 = 0.410 ± 0.018 on the held-out relationship-detection test set (mean ± standard deviation over five random seeds), matching the reported value within a reasonable tolerance.",
+                  "weight": 1,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                },
+                {
+                  "id": "t7-greedy-auc",
+                  "requirements": "The reproduced Table 7 row for the Greedy baseline on the Qwen2Tokenizer subset reports AUC = 0.500 ± 0.049 on the held-out relationship-detection test set (mean ± standard deviation over five random seeds), matching the reported value within a reasonable tolerance.",
+                  "weight": 1,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                }
+              ],
+              "task_category": null,
+              "finegrained_task_category": null
+            },
+            {
+              "id": "t7-phylolm",
+              "requirements": "The reproduced Table 7 row for PhyloLM + SVM matches the reported values.",
+              "weight": 2,
+              "sub_tasks": [
+                {
+                  "id": "t7-phylolm-acc",
+                  "requirements": "The reproduced Table 7 row for PhyloLM + SVM on the Qwen2Tokenizer subset reports Accuracy = 0.755 ± 0.136 on the held-out relationship-detection test set (mean ± standard deviation over five random seeds), matching the reported value within a reasonable tolerance.",
+                  "weight": 1,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                },
+                {
+                  "id": "t7-phylolm-prec",
+                  "requirements": "The reproduced Table 7 row for PhyloLM + SVM on the Qwen2Tokenizer subset reports Precision = 0.832 ± 0.080 on the held-out relationship-detection test set (mean ± standard deviation over five random seeds), matching the reported value within a reasonable tolerance.",
+                  "weight": 1,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                },
+                {
+                  "id": "t7-phylolm-rec",
+                  "requirements": "The reproduced Table 7 row for PhyloLM + SVM on the Qwen2Tokenizer subset reports Recall = 0.800 ± 0.204 on the held-out relationship-detection test set (mean ± standard deviation over five random seeds), matching the reported value within a reasonable tolerance.",
+                  "weight": 1,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                },
+                {
+                  "id": "t7-phylolm-f1",
+                  "requirements": "The reproduced Table 7 row for PhyloLM + SVM on the Qwen2Tokenizer subset reports F1 = 0.801 ± 0.149 on the held-out relationship-detection test set (mean ± standard deviation over five random seeds), matching the reported value within a reasonable tolerance.",
+                  "weight": 1,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                },
+                {
+                  "id": "t7-phylolm-auc",
+                  "requirements": "The reproduced Table 7 row for PhyloLM + SVM on the Qwen2Tokenizer subset reports AUC = 0.760 ± 0.180 on the held-out relationship-detection test set (mean ± standard deviation over five random seeds), matching the reported value within a reasonable tolerance.",
+                  "weight": 1,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                }
+              ],
+              "task_category": null,
+              "finegrained_task_category": null
+            },
+            {
+              "id": "t7-dna-qwen3",
+              "requirements": "The reproduced Table 7 row for DNA (Qwen3) + SVM matches the reported values.",
+              "weight": 3,
+              "sub_tasks": [
+                {
+                  "id": "t7-dna-qwen3-acc",
+                  "requirements": "The reproduced Table 7 row for DNA (Qwen3) + SVM on the Qwen2Tokenizer subset reports Accuracy = 0.834 ± 0.092 on the held-out relationship-detection test set (mean ± standard deviation over five random seeds), matching the reported value within a reasonable tolerance.",
+                  "weight": 2,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                },
+                {
+                  "id": "t7-dna-qwen3-prec",
+                  "requirements": "The reproduced Table 7 row for DNA (Qwen3) + SVM on the Qwen2Tokenizer subset reports Precision = 0.863 ± 0.073 on the held-out relationship-detection test set (mean ± standard deviation over five random seeds), matching the reported value within a reasonable tolerance.",
+                  "weight": 1,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                },
+                {
+                  "id": "t7-dna-qwen3-rec",
+                  "requirements": "The reproduced Table 7 row for DNA (Qwen3) + SVM on the Qwen2Tokenizer subset reports Recall = 0.907 ± 0.123 on the held-out relationship-detection test set (mean ± standard deviation over five random seeds), matching the reported value within a reasonable tolerance.",
+                  "weight": 1,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                },
+                {
+                  "id": "t7-dna-qwen3-f1",
+                  "requirements": "The reproduced Table 7 row for DNA (Qwen3) + SVM on the Qwen2Tokenizer subset reports F1 = 0.878 ± 0.072 on the held-out relationship-detection test set (mean ± standard deviation over five random seeds), matching the reported value within a reasonable tolerance.",
+                  "weight": 1,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                },
+                {
+                  "id": "t7-dna-qwen3-auc",
+                  "requirements": "The reproduced Table 7 row for DNA (Qwen3) + SVM on the Qwen2Tokenizer subset reports AUC = 0.926 ± 0.105 on the held-out relationship-detection test set (mean ± standard deviation over five random seeds), matching the reported value within a reasonable tolerance.",
+                  "weight": 2,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                }
+              ],
+              "task_category": null,
+              "finegrained_task_category": null
+            },
+            {
+              "id": "t7-dna-bge",
+              "requirements": "The reproduced Table 7 row for DNA (BGE) + SVM matches the reported values.",
+              "weight": 3,
+              "sub_tasks": [
+                {
+                  "id": "t7-dna-bge-acc",
+                  "requirements": "The reproduced Table 7 row for DNA (BGE) + SVM on the Qwen2Tokenizer subset reports Accuracy = 0.869 ± 0.078 on the held-out relationship-detection test set (mean ± standard deviation over five random seeds), matching the reported value within a reasonable tolerance.",
+                  "weight": 2,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                },
+                {
+                  "id": "t7-dna-bge-prec",
+                  "requirements": "The reproduced Table 7 row for DNA (BGE) + SVM on the Qwen2Tokenizer subset reports Precision = 0.865 ± 0.069 on the held-out relationship-detection test set (mean ± standard deviation over five random seeds), matching the reported value within a reasonable tolerance.",
+                  "weight": 1,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                },
+                {
+                  "id": "t7-dna-bge-rec",
+                  "requirements": "The reproduced Table 7 row for DNA (BGE) + SVM on the Qwen2Tokenizer subset reports Recall = 0.966 ± 0.094 on the held-out relationship-detection test set (mean ± standard deviation over five random seeds), matching the reported value within a reasonable tolerance.",
+                  "weight": 1,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                },
+                {
+                  "id": "t7-dna-bge-f1",
+                  "requirements": "The reproduced Table 7 row for DNA (BGE) + SVM on the Qwen2Tokenizer subset reports F1 = 0.909 ± 0.059 on the held-out relationship-detection test set (mean ± standard deviation over five random seeds), matching the reported value within a reasonable tolerance.",
+                  "weight": 1,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                },
+                {
+                  "id": "t7-dna-bge-auc",
+                  "requirements": "The reproduced Table 7 row for DNA (BGE) + SVM on the Qwen2Tokenizer subset reports AUC = 0.944 ± 0.087 on the held-out relationship-detection test set (mean ± standard deviation over five random seeds), matching the reported value within a reasonable tolerance.",
+                  "weight": 2,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                }
+              ],
+              "task_category": null,
+              "finegrained_task_category": null
+            },
+            {
+              "id": "t7-dna-mpnet",
+              "requirements": "The reproduced Table 7 row for DNA (MPNet) + SVM matches the reported values.",
+              "weight": 3,
+              "sub_tasks": [
+                {
+                  "id": "t7-dna-mpnet-acc",
+                  "requirements": "The reproduced Table 7 row for DNA (MPNet) + SVM on the Qwen2Tokenizer subset reports Accuracy = 0.866 ± 0.088 on the held-out relationship-detection test set (mean ± standard deviation over five random seeds), matching the reported value within a reasonable tolerance.",
+                  "weight": 2,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                },
+                {
+                  "id": "t7-dna-mpnet-prec",
+                  "requirements": "The reproduced Table 7 row for DNA (MPNet) + SVM on the Qwen2Tokenizer subset reports Precision = 0.879 ± 0.099 on the held-out relationship-detection test set (mean ± standard deviation over five random seeds), matching the reported value within a reasonable tolerance.",
+                  "weight": 1,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                },
+                {
+                  "id": "t7-dna-mpnet-rec",
+                  "requirements": "The reproduced Table 7 row for DNA (MPNet) + SVM on the Qwen2Tokenizer subset reports Recall = 0.948 ± 0.098 on the held-out relationship-detection test set (mean ± standard deviation over five random seeds), matching the reported value within a reasonable tolerance.",
+                  "weight": 1,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                },
+                {
+                  "id": "t7-dna-mpnet-f1",
+                  "requirements": "The reproduced Table 7 row for DNA (MPNet) + SVM on the Qwen2Tokenizer subset reports F1 = 0.906 ± 0.065 on the held-out relationship-detection test set (mean ± standard deviation over five random seeds), matching the reported value within a reasonable tolerance.",
+                  "weight": 1,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                },
+                {
+                  "id": "t7-dna-mpnet-auc",
+                  "requirements": "The reproduced Table 7 row for DNA (MPNet) + SVM on the Qwen2Tokenizer subset reports AUC = 0.960 ± 0.079 on the held-out relationship-detection test set (mean ± standard deviation over five random seeds), matching the reported value within a reasonable tolerance.",
+                  "weight": 2,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                }
+              ],
+              "task_category": null,
+              "finegrained_task_category": null
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "c7-claims",
+          "requirements": "The findings Appendix C.7 reports from comparing Table 7 against Table 1 hold in the reproduction.",
+          "weight": 4,
+          "sub_tasks": [
+            {
+              "id": "c7-claim-harder-setting",
+              "requirements": "Every method except PhyloLM shows a clear performance drop when moving from the full pool (Table 1) to the Qwen2Tokenizer subset (Table 7), confirming Appendix C.7's point that the same-tokenizer setting is genuinely harder because such models are functionally closer.",
+              "weight": 4,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "c7-claim-mpnet-drop",
+              "requirements": "The DNA (MPNet) accuracy falls from roughly 0.93 on the full pool to roughly 0.86 on the Qwen2Tokenizer subset, the specific drop cited in Appendix C.7.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "c7-claim-greedy-drop",
+              "requirements": "The Greedy baseline accuracy falls from 0.593 on the full pool (Table 1) to 0.428 on the Qwen2Tokenizer subset (Table 7), the drop cited in Appendix C.7.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "c7-claim-phylolm-accuracy-improves",
+              "requirements": "PhyloLM's accuracy slightly improves from 0.742 on the full pool to 0.755 on the Qwen2Tokenizer subset, matching Appendix C.7.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "c7-claim-phylolm-precision-gain",
+              "requirements": "PhyloLM's precision rises from roughly 0.74 on the full pool to roughly 0.83 on the Qwen2Tokenizer subset, the notable precision gain cited in Appendix C.7.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "c7-claim-dna-still-wins",
+              "requirements": "Despite the reduced gap, every DNA variant still outperforms PhyloLM on the Qwen2Tokenizer subset, supporting Appendix C.7's conclusion that PhyloLM's first-token view is insufficient to capture the sentence-level, long-range behaviour that DNA reflects.",
+              "weight": 5,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        }
+      ],
+      "task_category": null,
+      "finegrained_task_category": null
+    }
+  ],
+  "task_category": null,
+  "finegrained_task_category": null
+}

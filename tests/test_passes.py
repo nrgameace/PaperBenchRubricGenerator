@@ -9,6 +9,23 @@ import pb_passes
 from pb_schema import find_node, validate_final, validate_partial
 
 
+def test_pdf_to_block_returns_base64_document_block(tmp_path):
+    pdf_path = tmp_path / "small.pdf"
+    pdf_path.write_bytes(b"%PDF-1.4 fake pdf content")
+    block = pb_passes.pdf_to_block(pdf_path)
+    assert block["type"] == "document"
+    assert block["source"]["type"] == "base64"
+    assert block["cache_control"] == {"type": "ephemeral", "ttl": "1h"}
+
+
+def test_pdf_to_block_rejects_pdf_over_request_size_limit(tmp_path, monkeypatch):
+    monkeypatch.setattr(pb_passes, "MAX_ENCODED_PDF_BYTES", 100)
+    pdf_path = tmp_path / "big.pdf"
+    pdf_path.write_bytes(b"x" * 1000)
+    with pytest.raises(ValueError, match="exceeds Anthropic's 32 MB request-size limit"):
+        pb_passes.pdf_to_block(pdf_path)
+
+
 def test_parse_json_plain():
     assert pb_passes.parse_json_response('{"a": 1}') == {"a": 1}
 
@@ -622,7 +639,7 @@ def test_run_expansion_llm_appends_feedback_when_provided():
         _target_rubric(),
         "target",
         "expansion hint",
-        "claude-sonnet-4-6",
+        "claude-sonnet-5",
         feedback="check table 3",
     )
     instruction = client.messages.calls[0]["messages"][0]["content"][0]["text"]
@@ -639,7 +656,7 @@ def test_run_expansion_llm_no_feedback_block_when_empty():
         _target_rubric(),
         "target",
         "expansion hint",
-        "claude-sonnet-4-6",
+        "claude-sonnet-5",
         feedback="",
     )
     instruction = client.messages.calls[0]["messages"][0]["content"][0]["text"]
@@ -664,7 +681,7 @@ def test_run_expansion_llm_injects_enumeration_guardrail_for_dense_target():
         _dense_target_rubric(),
         "target",
         "expansion hint",
-        "claude-sonnet-4-6",
+        "claude-sonnet-5",
     )
     instruction = client.messages.calls[0]["messages"][0]["content"][0]["text"]
     assert "ENUMERATION GUARDRAIL" in instruction
@@ -680,7 +697,7 @@ def test_run_expansion_llm_omits_enumeration_guardrail_for_single_item_target():
         _target_rubric(),
         "target",
         "expansion hint",
-        "claude-sonnet-4-6",
+        "claude-sonnet-5",
     )
     instruction = client.messages.calls[0]["messages"][0]["content"][0]["text"]
     assert "ENUMERATION GUARDRAIL" not in instruction
@@ -695,7 +712,7 @@ def test_run_expansion_llm_enumeration_guardrail_appears_before_feedback_block()
         _dense_target_rubric(),
         "target",
         "expansion hint",
-        "claude-sonnet-4-6",
+        "claude-sonnet-5",
         feedback="check table 3",
     )
     instruction = client.messages.calls[0]["messages"][0]["content"][0]["text"]
@@ -754,25 +771,25 @@ def test_invoke_llm_wraps_errors():
 def test_invoke_llm_raises_clear_error_when_response_truncated_at_max_tokens():
     client = _FakeClient('{"a": 1', stop_reason="max_tokens")
     with pytest.raises(RuntimeError, match="truncated at max_tokens=8000"):
-        pb_passes.invoke_llm(client, [], [{"role": "user", "content": []}], "claude-sonnet-4-6")
+        pb_passes.invoke_llm(client, [], [{"role": "user", "content": []}], "claude-sonnet-5")
 
 
 def test_invoke_llm_does_not_raise_when_stop_reason_is_end_turn():
     client = _FakeClient('{"a": 1}', stop_reason="end_turn")
-    result = pb_passes.invoke_llm(client, [], [{"role": "user", "content": []}], "claude-sonnet-4-6")
+    result = pb_passes.invoke_llm(client, [], [{"role": "user", "content": []}], "claude-sonnet-5")
     assert result == '{"a": 1}'
 
 
 def test_invoke_llm_skips_leading_thinking_block():
     client = _FakeClient([_FakeBlock("", type="thinking"), _FakeBlock('{"a": 1}')])
-    result = pb_passes.invoke_llm(client, [], [{"role": "user", "content": []}], "claude-sonnet-4-6")
+    result = pb_passes.invoke_llm(client, [], [{"role": "user", "content": []}], "claude-sonnet-5")
     assert result == '{"a": 1}'
 
 
 def test_invoke_llm_raises_clear_error_when_no_text_block():
     client = _FakeClient([_FakeBlock("", type="thinking")])
     with pytest.raises(RuntimeError, match="contained no text block"):
-        pb_passes.invoke_llm(client, [], [{"role": "user", "content": []}], "claude-sonnet-4-6")
+        pb_passes.invoke_llm(client, [], [{"role": "user", "content": []}], "claude-sonnet-5")
 
 
 # ── run_split_check_llm tests ─────────────────────────────────────────────────

@@ -19,6 +19,12 @@ MAX_EXPANSION_DEPTH = 7
 _DEPTH_FALLBACK_CATEGORY = "Code Development"
 MAX_BRANCH_NODES = 40
 
+# Anthropic's Messages API caps total request size at 32 MB. Base64 inflates raw bytes by
+# ~4/3, and the base pass's system prompt + few-shot example + MinerU text ride in the same
+# request as the PDF, so leave headroom below the hard limit rather than cutting it exactly
+# at 32 MB (an API 413 only surfaces after the full upload, wasting the round trip).
+MAX_ENCODED_PDF_BYTES = 31_000_000
+
 SYSTEM_PREAMBLE = f"""You are an expert ML research engineer building a PaperBench grading \
 rubric for ONE specific paper, supplied as a PDF in the user message.
 
@@ -143,9 +149,21 @@ def build_system_blocks(few_shot_json: str) -> list:
 
 
 def pdf_to_block(pdf_path) -> dict:
-    """Read a PDF and return a cached base64 document content block."""
+    """Read a PDF and return a cached base64 document content block.
+
+    Raises ValueError before any API call if the encoded PDF alone would already push the
+    request past Anthropic's 32 MB request-size limit, rather than letting the API reject
+    the fully-uploaded request with an opaque 413.
+    """
     data = Path(pdf_path).read_bytes()
     encoded = base64.b64encode(data).decode("utf-8")
+    if len(encoded) > MAX_ENCODED_PDF_BYTES:
+        raise ValueError(
+            f"{pdf_path} is {len(data) / 1_000_000:.1f} MB raw ({len(encoded) / 1_000_000:.1f} MB "
+            "base64-encoded), which exceeds Anthropic's 32 MB request-size limit by itself. "
+            "Compress the PDF (e.g. `gs -dPDFSETTINGS=/ebook -sDEVICE=pdfwrite "
+            f"-o compressed.pdf {pdf_path}`) or downsample its embedded images, then retry."
+        )
     return {
         "type": "document",
         "source": {"type": "base64", "media_type": "application/pdf", "data": encoded},

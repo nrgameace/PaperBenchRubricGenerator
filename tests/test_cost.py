@@ -4,7 +4,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from pb_cost import CostTracker
+from pb_cost import PRICING, CostTracker
+from rubric_gen import OPUS, SONNET
 
 
 def _usage(input=0, output=0, cache_write=0, cache_read=0):
@@ -27,8 +28,8 @@ def test_record_accumulates_across_calls():
 
 def test_record_tracks_cache_tokens():
     tracker = CostTracker()
-    tracker.record("claude-sonnet-4-6", _usage(cache_write=500, cache_read=1000))
-    totals = tracker.totals_for("claude-sonnet-4-6")
+    tracker.record("claude-sonnet-5", _usage(cache_write=500, cache_read=1000))
+    totals = tracker.totals_for("claude-sonnet-5")
     assert totals["cache_write"] == 500
     assert totals["cache_read"] == 1000
 
@@ -36,9 +37,9 @@ def test_record_tracks_cache_tokens():
 def test_record_multiple_models():
     tracker = CostTracker()
     tracker.record("claude-opus-4-8", _usage(input=100))
-    tracker.record("claude-sonnet-4-6", _usage(input=200))
+    tracker.record("claude-sonnet-5", _usage(input=200))
     assert tracker.totals_for("claude-opus-4-8")["input"] == 100
-    assert tracker.totals_for("claude-sonnet-4-6")["input"] == 200
+    assert tracker.totals_for("claude-sonnet-5")["input"] == 200
 
 
 def test_total_cost_calculation():
@@ -73,3 +74,10 @@ def test_print_report_unknown_model_does_not_crash():
     tracker = CostTracker()
     tracker.record("claude-unknown-model", _usage(input=100))
     tracker.print_report()
+
+
+def test_pricing_covers_models_actually_used_by_the_pipeline():
+    for model in (OPUS, SONNET):
+        assert model in PRICING, f"{model} has no pricing entry; cost report will be silently wrong"
+        rates = PRICING[model]
+        assert all(rates[t] > 0 for t in ("input", "output", "cache_write", "cache_read"))

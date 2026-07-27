@@ -1,0 +1,19 @@
+[
+  {
+    "leaf_ids": [
+      "dds-not-run-qddm-domains",
+      "dds-not-run-in-qddm-domains",
+      "dds-excluded-from-qddm-domains-analysis"
+    ],
+    "branch_ids": [
+      "baseline-algorithms",
+      "env-and-infra-setup",
+      "main-results-experiments"
+    ],
+    "requirements": {
+      "dds-not-run-qddm-domains": "DDS is not run in the QDDM domains (TA (MNIST), TA (F-MNIST), LSI (Hiker)) due to the KDE's runtime, which grows linearly with measure space dimensionality, per Table 6 and Section 7.1.",
+      "dds-not-run-in-qddm-domains": "DDS is not run in any of the three QDDM domains (TA MNIST, TA F-MNIST, LSI Hiker) because the KDE's runtime grows linearly with measure space dimensionality, making it computationally intractable in the high-dimensional QDDM measure spaces, per Section 7.1's statement 'We could not run DDS in the QDDM domains due to the KDE's runtime, which grows linearly with measure space dimensionality' and Table 6's corresponding blank ('\u2014') entries for DDS in TA (MNIST), TA (F-MNIST), and LSI (Hiker).",
+      "dds-excluded-from-qddm-domains-analysis": "DDS could not be run in the three QDDM domains (TA MNIST, TA F-MNIST, LSI Hiker) due to the KDE's runtime growing linearly with measure space dimensionality, consistent with Section 7.1's statement ('We could not run DDS in the QDDM domains due to the KDE's runtime, which grows linearly with measure space dimensionality'), and this is reflected as blank ('\u2014') entries for DDS in the corresponding columns of Table 1."
+    }
+  }
+]

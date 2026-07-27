@@ -1,0 +1,71 @@
+hyperparameters-table6-cma-mae: Branch 'env-and-infra-setup' hit the 40-node cap; forced to leaf.
+hyperparameters-table6-dds: Branch 'env-and-infra-setup' hit the 40-node cap; forced to leaf.
+dms-hparam-num-emitters: Branch 'env-and-infra-setup' hit the 40-node cap; forced to leaf.
+dms-hparam-emitter-batch-size: Branch 'env-and-infra-setup' hit the 40-node cap; forced to leaf.
+dms-hparam-restart-rule: Branch 'env-and-infra-setup' hit the 40-node cap; forced to leaf.
+cma-mae-cma-es-emitter-mechanics: Branch 'baseline-algorithms' hit the 40-node cap; forced to leaf.
+cma-mae-histogram-discount-representation: Branch 'baseline-algorithms' hit the 40-node cap; forced to leaf.
+dds-kde-buffer-of-discovered-solutions: Branch 'baseline-algorithms' hit the 40-node cap; forced to leaf.
+dds-emitter-count-and-batch-size-config: Branch 'baseline-algorithms' hit the 40-node cap; forced to leaf.
+qd-score-coverage-metric-implementation: Branch 'main-results-experiments' hit the 40-node cap; forced to leaf.
+statistical-testing-pipeline: Branch 'main-results-experiments' hit the 40-node cap; forced to leaf.
+restart-rule-ablation-table7-generation: Branch 'ablation-studies' hit the 40-node cap; forced to leaf.
+eval-budget-cma-mae-formula: split-check removed as duplicate of 'eval-budget-dms-formula'.
+eval-budget-dds-formula: split-check removed as duplicate of 'eval-budget-dms-formula'.
+eval-budget-map-elites-line-formula: split-check removed as duplicate of 'eval-budget-map-elites-formula'.
+archive-config-2d-benchmarks: split-check removed as duplicate of 'archive-config-10d-benchmarks'.
+cvt-archive-manifold-hypothesis-motivation: split-check removed as duplicate of 'cvt-centroids-from-dataset-general'.
+eval-budget-matches-2d-10d-lp: split-check split into 2 children (branch 'env-and-infra-setup').
+eval-budget-matches-ta-domains: split-check split into 2 children (branch 'env-and-infra-setup').
+eval-budget-matches-lsi-domain: split-check split into 2 children (branch 'env-and-infra-setup').
+eval-budget-matches-arm-repertoire: split-check split into 2 children (branch 'env-and-infra-setup').
+cvt-archive-centroid-images-stored-at-native-resolution: split-check split into 2 children (branch 'env-and-infra-setup').
+cvt-archive-cell-assignment-distance-function: split-check split into 2 children (branch 'env-and-infra-setup').
+dms-hparam-restart-rule: split-check split into 3 children (branch 'env-and-infra-setup').
+hyperparameters-table6-cma-mae: split-check split into 5 children (branch 'env-and-infra-setup').
+hyperparameters-table6-dds: split-check split into 6 children (branch 'env-and-infra-setup').
+hyperparameters-table6-map-elites-variants: split-check split into 3 children (branch 'env-and-infra-setup').
+map-elites-cell-assignment-on-insertion: split-check removed as duplicate of 'map-elites-elite-replacement-condition-detail'.
+map-elites-elite-replacement-rule: split-check removed as duplicate of 'map-elites-elite-replacement-condition-detail'.
+map-elites-isotropic-gaussian-mutation: split-check removed as duplicate of 'map-elites-isotropic-gaussian-mutation-op'.
+map-elites-line-archive-inheritance: split-check removed as duplicate of 'map-elites-grid-archive-cell-structure'.
+cma-mae-cma-es-emitter-sampling-and-ranking: split-check removed as duplicate of 'cma-mae-cma-es-emitter-mechanics'.
+cma-mae-histogram-discount-function: split-check removed as duplicate of 'cma-mae-histogram-discount-representation'.
+cma-mae-threshold-update-rule: split-check removed as duplicate of 'cma-mae-threshold-update-formula'.
+cma-mae-elite-replacement-and-emitter-restart: split-check removed as duplicate of 'cma-mae-per-domain-alpha-and-restart-config'.
+dds-kde-density-model: split-check removed as duplicate of 'dds-kde-mechanism-implementation'.
+dds-density-based-ranking: split-check removed as duplicate of 'dds-density-ranking-replaces-improvement'.
+dds-restart-and-selection-rules: split-check removed as duplicate of 'dds-restart-rule-no-improvement'.
+baseline-common-map-elites-archive-solution-storage: split-check removed as duplicate of 'map-elites-elite-replacement-condition-detail'.
+map-elites-grid-archive-cell-structure: split-check split into 2 children (branch 'baseline-algorithms').
+cma-mae-per-domain-alpha-and-restart-config: split-check split into 4 children (branch 'baseline-algorithms').
+dds-emitter-count-and-batch-size-config: split-check split into 3 children (branch 'baseline-algorithms').
+table1-qd-score-sphere-domains: split-check split into 4 children (branch 'main-results-experiments').
+table1-coverage-sphere-domains: split-check split into 4 children (branch 'main-results-experiments').
+table1-qd-score-rastrigin-flat-domains: split-check split into 4 children (branch 'main-results-experiments').
+table1-coverage-rastrigin-flat-domains: split-check split into 4 children (branch 'main-results-experiments').
+table1-qd-score-ta-mnist-fmnist: split-check split into 2 children (branch 'main-results-experiments').
+table1-coverage-ta-mnist-fmnist: split-check split into 2 children (branch 'main-results-experiments').
+table2-computation-time-benchmark-domains: split-check split into 9 children (branch 'computation-time-analysis').
+table2-computation-time-qddm-domains: split-check split into 3 children (branch 'computation-time-analysis').
+alpha-ablation-qd-score-2d-10d-sphere-values: split-check split into 2 children (branch 'ablation-studies').
+alpha-ablation-coverage-2d-10d-sphere-values: split-check split into 2 children (branch 'ablation-studies').
+alpha-ablation-qd-score-2d-10d-rastrigin-values: split-check split into 2 children (branch 'ablation-studies').
+alpha-ablation-coverage-2d-10d-rastrigin-values: split-check split into 2 children (branch 'ablation-studies').
+alpha-ablation-qd-score-flat-domains-values: split-check split into 2 children (branch 'ablation-studies').
+alpha-ablation-coverage-flat-domains-values: split-check split into 2 children (branch 'ablation-studies').
+alpha-ablation-qd-score-coverage-arm-repertoire-values: split-check split into 2 children (branch 'ablation-studies').
+empty-points-ablation-qd-score-2d-10d-sphere-values: split-check split into 2 children (branch 'ablation-studies').
+empty-points-ablation-coverage-2d-10d-sphere-values: split-check split into 2 children (branch 'ablation-studies').
+empty-points-ablation-qd-score-2d-10d-rastrigin-values: split-check split into 2 children (branch 'ablation-studies').
+empty-points-ablation-coverage-2d-10d-rastrigin-values: split-check split into 2 children (branch 'ablation-studies').
+empty-points-ablation-qd-score-flat-domains-values: split-check split into 2 children (branch 'ablation-studies').
+empty-points-ablation-coverage-flat-domains-values: split-check split into 2 children (branch 'ablation-studies').
+empty-points-ablation-qd-score-coverage-arm-repertoire-values: split-check split into 2 children (branch 'ablation-studies').
+restart-rule-ablation-qd-score-coverage-2d-lp-sphere: split-check split into 2 children (branch 'ablation-studies').
+restart-rule-ablation-qd-score-coverage-10d-lp-sphere: split-check split into 2 children (branch 'ablation-studies').
+restart-rule-ablation-qd-score-coverage-2d-lp-rastrigin: split-check split into 2 children (branch 'ablation-studies').
+restart-rule-ablation-qd-score-coverage-10d-lp-rastrigin: split-check split into 2 children (branch 'ablation-studies').
+restart-rule-ablation-qd-score-coverage-2d-lp-flat: split-check split into 2 children (branch 'ablation-studies').
+restart-rule-ablation-qd-score-coverage-10d-lp-flat: split-check split into 2 children (branch 'ablation-studies').
+restart-rule-ablation-qd-score-coverage-arm-repertoire: split-check split into 2 children (branch 'ablation-studies').

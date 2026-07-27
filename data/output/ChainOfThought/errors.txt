@@ -1,0 +1,23 @@
+cross-domain-run-training-eval-grid: Branch 'verification-performance-robustness' hit the 40-node cap; forced to leaf.
+difficulty-aupr-increases-with-difficulty: Branch 'verification-performance-robustness' hit the 40-node cap; forced to leaf.
+table12-boolean-stats: split-check child of 'dataset-statistics-table12' still enumerates >= 3 items after splitting (model under-split).
+table12-arithmetic-stats: split-check child of 'dataset-statistics-table12' still enumerates >= 3 items after splitting (model under-split).
+table12-gsm8k-stats: split-check child of 'dataset-statistics-table12' still enumerates >= 3 items after splitting (model under-split).
+dataset-statistics-table12: split-check split into 3 children (branch 'dataset-curation-annotation').
+base-model-accuracy-table13: split-check split into 3 children (branch 'dataset-curation-annotation').
+table2-cross-domain-generalization-claim: split-check removed as duplicate of 'table2-test-arithmetic-results'.
+table1-crv-results: split-check split into 4 children (branch 'verification-performance-robustness').
+table2-test-boolean-results: split-check split into 4 children (branch 'verification-performance-robustness').
+table2-test-arithmetic-results: split-check split into 4 children (branch 'verification-performance-robustness').
+table2-test-gsm8k-results: split-check split into 4 children (branch 'verification-performance-robustness').
+difficulty-crv-consistent-advantage: split-check split into 2 children (branch 'verification-performance-robustness').
+figure4-graph-density-significance-verification: split-check removed as duplicate of 'figure4-graph-density-separability'.
+figure4-total-active-features-significance-verification: split-check removed as duplicate of 'figure4-total-active-features-separability'.
+table3-node-influence-most-critical-claim: split-check removed as duplicate of 'table3-without-node-stats-result-values'.
+table3-global-stats-substantial-contribution-claim: split-check removed as duplicate of 'table3-without-global-stats-result-values'.
+table3-topological-stats-least-critical-claim: split-check removed as duplicate of 'table3-without-topological-stats-result-values'.
+table3-full-three-family-model-best-overall-claim: split-check removed as duplicate of 'table3-full-model-result-values'.
+full-crv-metrics-evaluation-arithmetic-table3-baseline: split-check split into 2 children (branch 'mechanistic-feature-analysis').
+table3-relative-feature-importance-ranking-claim: split-check split into 3 children (branch 'mechanistic-feature-analysis').
+identify-multiplication-feature-91814: split-check split into 2 children (branch 'causal-intervention').
+causal-intervention-closed-loop-claim: split-check split into 1 children (branch 'causal-intervention').

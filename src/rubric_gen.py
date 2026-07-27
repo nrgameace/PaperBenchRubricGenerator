@@ -40,10 +40,12 @@ OPUS = "claude-opus-4-8"
 SONNET = "claude-sonnet-5"
 FEW_SHOT_RUBRIC_PATH = Path(os.environ.get("FEW_SHOT_RUBRIC_PATH", HERE.parent / "examples" / "example_rubric.json"))
 MAX_WEIGHT_RESOLUTION_RETRIES = 5
+MAX_BASE_RETRIES = 3
 
 
 class MaxRetriesExceeded(Exception):
-    """Raised when weight resolution still has invalid nodes after MAX_WEIGHT_RESOLUTION_RETRIES attempts."""
+    """Raised when a bounded LLM retry loop (weight resolution, base-pass generation) is still
+    unresolved after its retry cap."""
 
 
 def parse_args():
@@ -95,8 +97,18 @@ def run_base_phase(client, system_blocks, pdf_block, content_list, state, model,
     print("\n>>> BASE NODE PASS: generating root and top-level nodes...")
     content_list_text = blocks_to_text(content_list)
     feedback = ""
+    attempt = 0
     while True:
         rubric, queue, hints, section_map = apply_base(run_base_llm(client, system_blocks, pdf_block, content_list_text, model, tracker=tracker))
+        if not rubric["sub_tasks"]:
+            attempt += 1
+            if attempt > MAX_BASE_RETRIES:
+                raise MaxRetriesExceeded(
+                    f"Base pass produced zero top-level children after {MAX_BASE_RETRIES} retries; "
+                    "the model's response is not usable as-is. Re-run with --resume once this is investigated."
+                )
+            print(f"  Base pass returned no top-level children (attempt {attempt}/{MAX_BASE_RETRIES}); retrying...")
+            continue
         pretty_print_nodes("Generated base nodes", rubric["sub_tasks"])
         if human_review:
             try:
@@ -329,14 +341,20 @@ def main() -> None:
     client = build_client()
     embedding_client = build_embedding_client()
     system_blocks = build_system_blocks(load_few_shot())
-    pdf_block = pdf_to_block(pdf_path)
+    try:
+        pdf_block = pdf_to_block(pdf_path)
+    except ValueError as e:
+        raise SystemExit(str(e))
     mineru_dir = discover_mineru_dir(input_dir)
     content_list = load_content_list(mineru_dir)
     tracker = CostTracker()
     human_review = args.review
 
     if phase == PHASE_BASE:
-        run_base_phase(client, system_blocks, pdf_block, content_list, state, OPUS, output_dir, tracker, human_review=human_review)
+        try:
+            run_base_phase(client, system_blocks, pdf_block, content_list, state, OPUS, output_dir, tracker, human_review=human_review)
+        except MaxRetriesExceeded as e:
+            raise SystemExit(str(e))
         phase = PHASE_EXPANSION
     if phase == PHASE_EXPANSION:
         run_expansion_phase(client, system_blocks, content_list, state, SONNET, output_dir, tracker, human_review=human_review)
