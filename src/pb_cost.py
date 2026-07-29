@@ -15,9 +15,24 @@ PRICING = {
         "cache_write":  6.00 / 1_000_000,
         "cache_read":   0.30 / 1_000_000,
     },
+    # o3-mini pricing as of 2026-07-29 (used only by the coverage-judge checkpoint).
+    # OpenAI pricing changes independently of this codebase's release cadence — verify
+    # against platform.openai.com/pricing before relying on cost totals for budgeting.
+    "o3-mini": {
+        "input":        1.10 / 1_000_000,
+        "output":       4.40 / 1_000_000,
+        "cache_write":  0.00,
+        "cache_read":   0.55 / 1_000_000,
+    },
 }
 
 _ZERO_COUNTS = {"input": 0, "output": 0, "cache_write": 0, "cache_read": 0}
+
+_PROVIDER_OF = {
+    "claude-opus-4-8": "Anthropic",
+    "claude-sonnet-5": "Anthropic",
+    "o3-mini": "OpenAI",
+}
 
 
 class CostTracker:
@@ -58,5 +73,15 @@ class CostTracker:
                 print(f"    Subtotal:           ${model_cost:>10.4f}")
             else:
                 print(f"    Subtotal:           (unknown model, no pricing data)")
+        provider_totals: dict[str, float] = {}
+        for model, counts in self._counts.items():
+            rates = PRICING.get(model, {})
+            provider = _PROVIDER_OF.get(model, "Unknown")
+            provider_totals[provider] = provider_totals.get(provider, 0.0) + sum(
+                counts[token_type] * rates.get(token_type, 0.0) for token_type in counts
+            )
+        print()
+        for provider, cost in provider_totals.items():
+            print(f"  {provider} subtotal:       ${cost:>10.4f}")
         print(f"\n  TOTAL COST:           ${self.total_cost():>10.4f}")
         print("=" * 52 + "\n")

@@ -5,7 +5,7 @@ from types import SimpleNamespace
 import pytest
 
 from pb_cost import PRICING, CostTracker
-from rubric_gen import OPUS, SONNET
+from rubric_gen import JUDGE_MODEL, OPUS, SONNET
 
 
 def _usage(input=0, output=0, cache_write=0, cache_read=0):
@@ -81,3 +81,27 @@ def test_pricing_covers_models_actually_used_by_the_pipeline():
         assert model in PRICING, f"{model} has no pricing entry; cost report will be silently wrong"
         rates = PRICING[model]
         assert all(rates[t] > 0 for t in ("input", "output", "cache_write", "cache_read"))
+
+
+def test_pricing_covers_judge_model():
+    assert JUDGE_MODEL in PRICING, f"{JUDGE_MODEL} has no pricing entry; cost report will be silently wrong"
+    rates = PRICING[JUDGE_MODEL]
+    assert rates["input"] > 0
+    assert rates["output"] > 0
+
+
+def test_total_cost_prices_judge_model():
+    tracker = CostTracker()
+    tracker.record(JUDGE_MODEL, _usage(input=1_000_000, output=1_000_000))
+    expected = PRICING[JUDGE_MODEL]["input"] * 1_000_000 + PRICING[JUDGE_MODEL]["output"] * 1_000_000
+    assert abs(tracker.total_cost() - expected) < 0.001
+
+
+def test_print_report_prints_provider_subtotals_for_anthropic_and_openai(capsys):
+    tracker = CostTracker()
+    tracker.record(SONNET, _usage(input=1000, output=500))
+    tracker.record(JUDGE_MODEL, _usage(input=1000, output=500))
+    tracker.print_report()
+    out = capsys.readouterr().out
+    assert "Anthropic subtotal" in out
+    assert "OpenAI subtotal" in out

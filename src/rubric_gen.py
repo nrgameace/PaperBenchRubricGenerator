@@ -25,22 +25,25 @@ except ImportError:
 from pb_cost import CostTracker
 from pb_embeddings import build_embedding_client, rescale_global_weights, write_flagged_duplicates
 from pb_input import discover_mineru_dir, discover_pdf, load_content_list
+from pb_judge import format_missing_as_feedback, run_coverage_judge
 from pb_mineru import blocks_to_text, slice_section
 from pb_passes import (MAX_BRANCH_NODES, apply_base, apply_dedup, apply_expansion, apply_split, apply_weights,
                        branch_size, build_client, build_system_blocks, find_invalid_weights,
                        force_branch_cap_leaves, pdf_to_block, run_base_llm, run_expansion_llm, run_split_check_llm,
                        run_weight_llm, run_weight_llm_branch)
 from pb_review import RerunPass, collect_weight_corrections, pretty_print_nodes, review_pass
-from pb_schema import all_ids, find_node, validate_final, validate_partial
+from pb_schema import all_ids, find_node, iter_nodes, validate_final, validate_partial
 from pb_state import (PHASE_BASE, PHASE_DONE, PHASE_EXPANSION, PHASE_WEIGHT, determine_phase,
                       empty_state, load_state, save_state)
 
 HERE = Path(__file__).resolve().parent
 OPUS = "claude-opus-4-8"
 SONNET = "claude-sonnet-5"
+JUDGE_MODEL = "o3-mini"
 FEW_SHOT_RUBRIC_PATH = Path(os.environ.get("FEW_SHOT_RUBRIC_PATH", HERE.parent / "examples" / "example_rubric.json"))
 MAX_WEIGHT_RESOLUTION_RETRIES = 5
 MAX_BASE_RETRIES = 3
+MAX_JUDGE_RETRIES = 2
 
 
 class MaxRetriesExceeded(Exception):
@@ -57,6 +60,8 @@ def parse_args():
     parser.add_argument("--review", action="store_true", help="Enable human-in-the-loop review after each pass.")
     parser.add_argument("--no-split-check", action="store_false", dest="split_check",
                         help="Disable the split-check pass that runs before weighting.")
+    parser.add_argument("--judge", action="store_true",
+                        help="Enable the coverage-judge checkpoint (OpenAI o3-mini) after split-check, before weighting.")
     return parser.parse_args()
 
 
@@ -89,7 +94,8 @@ def prune_hints(state: dict) -> None:
 def commit(state: dict, output_dir: Path) -> None:
     """Persist the current state to the checkpoint file in output_dir."""
     save_state(output_dir / "rubric_state.json", state["rubric"], state["queue"], state["hints"],
-              state.get("errors", []), state.get("capped_branches", []), state.get("section_map", {}))
+              state.get("errors", []), state.get("capped_branches", []), state.get("section_map", {}),
+              state.get("judge_approved", []), state.get("judge_retry_counts", {}), state.get("judge_escalations", []))
 
 
 def run_base_phase(client, system_blocks, pdf_block, content_list, state, model, output_dir, tracker=None, human_review=True) -> None:
@@ -217,6 +223,32 @@ def _resolve_invalid_weights(client, system_blocks, content_list_text, rubric, m
                     weights[node_id] = retry[node_id]
 
 
+def _run_split_check_on_branch(client, system_blocks, content_list, state, branch_node, model, tracker=None) -> None:
+    """Run split-check for a single top-level branch and apply its splits/dedups in place.
+
+    Shared by run_split_check_phase's per-branch loop and run_judge_phase's post-retry
+    re-split-check step, so the apply logic isn't duplicated.
+    """
+    section_text = blocks_to_text(slice_section(content_list, branch_node["requirements"]))
+    capped = set(state.get("capped_branches", []))
+    include_all = branch_node["id"] in capped
+    result = run_split_check_llm(client, system_blocks, section_text, state["rubric"], branch_node, model,
+                                 tracker=tracker, include_all_leaves=include_all)
+    for leaf_id, duplicate_of_id in result.get("duplicates", {}).items():
+        if leaf_id == duplicate_of_id:
+            continue
+        if find_node(state["rubric"], leaf_id) is None or find_node(state["rubric"], duplicate_of_id) is None:
+            continue
+        apply_dedup(state["rubric"], leaf_id, duplicate_of_id, errors=state["errors"])
+    for leaf_id, raw_children in result.get("splits", {}).items():
+        if find_node(state["rubric"], leaf_id) is None:
+            continue
+        new_children = apply_split(state["rubric"], leaf_id, raw_children, errors=state["errors"])
+        state["errors"].append(
+            f"{leaf_id}: split-check split into {len(new_children)} children (branch '{branch_node['id']}')."
+        )
+
+
 def run_split_check_phase(client, system_blocks, content_list, state, model, output_dir, tracker=None) -> None:
     """Check Evaluation/Metrics and Result Analysis leaves for semantic bundling, one call per branch.
 
@@ -225,26 +257,104 @@ def run_split_check_phase(client, system_blocks, content_list, state, model, out
     are cleared, so it no longer matches the split-check filter on a later run.
     """
     print("\n>>> SPLIT-CHECK PASS: checking Evaluation/Result-Analysis leaves for bundling...")
-    capped = set(state.get("capped_branches", []))
     for branch_node in state["rubric"].get("sub_tasks", []):
-        section_text = blocks_to_text(slice_section(content_list, branch_node["requirements"]))
-        include_all = branch_node["id"] in capped
-        result = run_split_check_llm(client, system_blocks, section_text, state["rubric"], branch_node, model,
-                                     tracker=tracker, include_all_leaves=include_all)
-        for leaf_id, duplicate_of_id in result.get("duplicates", {}).items():
-            if leaf_id == duplicate_of_id:
-                continue
-            if find_node(state["rubric"], leaf_id) is None or find_node(state["rubric"], duplicate_of_id) is None:
-                continue
-            apply_dedup(state["rubric"], leaf_id, duplicate_of_id, errors=state["errors"])
-        for leaf_id, raw_children in result.get("splits", {}).items():
-            if find_node(state["rubric"], leaf_id) is None:
-                continue
-            new_children = apply_split(state["rubric"], leaf_id, raw_children, errors=state["errors"])
-            state["errors"].append(
-                f"{leaf_id}: split-check split into {len(new_children)} children (branch '{branch_node['id']}')."
-            )
+        _run_split_check_on_branch(client, system_blocks, content_list, state, branch_node, model, tracker=tracker)
     commit(state, output_dir)
+
+
+def run_judge_phase(anthropic_client, openai_client, system_blocks, content_list, state, judge_model,
+                    split_check_model, output_dir, tracker=None) -> None:
+    """Coverage-judge checkpoint: for each top-level branch, ask a cross-model OpenAI judge
+    whether anything the paper's section text states is not represented by any leaf. On an
+    "insufficient" verdict, fully re-expand the branch (feedback-guided) and re-run split-check
+    on it, up to MAX_JUDGE_RETRIES times; if still insufficient, escalate to a human via
+    judge_escalations.txt rather than blocking the pipeline. This is fail-open, unlike every
+    other bounded-retry loop in this file (_resolve_invalid_weights, run_base_phase's base-retry
+    loop both raise MaxRetriesExceeded, caught in main() as SystemExit) — a coverage-judge miss
+    must not block pipeline completion; a human resolves the escalation file afterward, the same
+    way flagged_duplicates.json/errors.txt are informational, not blocking.
+
+    Self-gates per-branch via state["judge_approved"] so --resume skips branches already judged
+    sufficient or already escalated. Commits after EVERY branch (not once at the end, unlike
+    run_split_check_phase) since this phase's per-branch work is materially more expensive (a
+    judge call, and on retry a multi-call BFS re-expansion plus a re-split-check call) — losing
+    that work to a mid-run crash and repeating it on --resume would be costly.
+    """
+    print("\n>>> JUDGE PASS: checking each branch's leaves for paper-coverage gaps (o3-mini)...")
+    approved = set(state.get("judge_approved", []))
+    retry_counts = dict(state.get("judge_retry_counts", {}))
+    escalations = state.get("judge_escalations", [])
+
+    for branch_node in state["rubric"].get("sub_tasks", []):
+        branch_id = branch_node["id"]
+        if branch_id in approved:
+            continue
+
+        attempts_log = []
+        while True:
+            leaves = [n for n in iter_nodes(branch_node) if not n.get("sub_tasks")]
+            leaf_ids = {n["id"] for n in leaves}
+            branch_errors_context = "\n".join(
+                e for e in state["errors"] if branch_id in e or any(leaf_id in e for leaf_id in leaf_ids)
+            )
+            section_text = blocks_to_text(slice_section(content_list, branch_node["requirements"]))
+            result = run_coverage_judge(openai_client, section_text, branch_errors_context, leaves,
+                                        model=judge_model, tracker=tracker)
+
+            if result["verdict"] == "sufficient":
+                approved.add(branch_id)
+                state["judge_approved"] = sorted(approved)
+                state["judge_retry_counts"] = retry_counts
+                commit(state, output_dir)
+                break
+
+            attempts_log.append(result["missing"])
+            retry_counts[branch_id] = retry_counts.get(branch_id, 0) + 1
+            if retry_counts[branch_id] > MAX_JUDGE_RETRIES:
+                escalations.append({"branch_id": branch_id, "attempts": attempts_log})
+                state["judge_escalations"] = escalations
+                approved.add(branch_id)  # fail-open: don't block the pipeline
+                state["judge_approved"] = sorted(approved)
+                state["judge_retry_counts"] = retry_counts
+                commit(state, output_dir)
+                print(f"  Branch '{branch_id}' still insufficient after {MAX_JUDGE_RETRIES} retries; "
+                     f"escalated to judge_escalations.txt, proceeding.")
+                break
+
+            feedback = format_missing_as_feedback(result["missing"])
+            print(f"  Branch '{branch_id}' judged insufficient (attempt {retry_counts[branch_id]}/{MAX_JUDGE_RETRIES}); "
+                 "re-expanding...")
+            capped_branches = set(state.get("capped_branches", []))
+            _expand_subtree(anthropic_client, system_blocks, content_list, state["rubric"], branch_id,
+                            state["hints"], split_check_model, feedback=feedback, tracker=tracker,
+                            errors=state["errors"], capped_branches=capped_branches)
+            state["capped_branches"] = capped_branches
+            branch_node = find_node(state["rubric"], branch_id)
+            _run_split_check_on_branch(anthropic_client, system_blocks, content_list, state, branch_node,
+                                       split_check_model, tracker=tracker)
+            commit(state, output_dir)
+            # loop back to re-judge the freshly regenerated branch
+
+
+def write_judge_escalations(escalations: list, output_dir: Path) -> None:
+    """Write judge_escalations.txt alongside rubric_final.json — branches the coverage judge
+    still flagged as insufficient after MAX_JUDGE_RETRIES re-expansion attempts, for human
+    follow-up. Only created when at least one branch escalated.
+    """
+    if not escalations:
+        return
+    escalation_file = output_dir / "judge_escalations.txt"
+    blocks = []
+    for entry in escalations:
+        lines = [f"=== Branch: {entry['branch_id']} ==="]
+        for i, missing in enumerate(entry["attempts"], start=1):
+            lines.append(f"Attempt {i}:")
+            for m in missing:
+                lines.append(f'  - Missing: {m["claim"]} (evidence: "{m["evidence"]}")')
+        blocks.append("\n".join(lines))
+    with open(escalation_file, "w", encoding="utf-8") as handle:
+        handle.write("\n\n".join(blocks) + "\n")
+    print(f"\n{len(escalations)} branch(es) still flagged by the coverage judge after retries; logged to {escalation_file}")
 
 
 def run_weight_phase(client, embedding_client, system_blocks, content_list, state, model, output_dir, tracker=None, human_review=True) -> dict:
@@ -362,6 +472,8 @@ def main() -> None:
     if phase == PHASE_WEIGHT:
         if args.split_check:
             run_split_check_phase(client, system_blocks, content_list, state, SONNET, output_dir, tracker)
+        if args.judge:
+            run_judge_phase(client, embedding_client, system_blocks, content_list, state, JUDGE_MODEL, SONNET, output_dir, tracker)
         try:
             weighted_rubric = run_weight_phase(client, embedding_client, system_blocks, content_list, state, SONNET, output_dir, tracker, human_review=human_review)
         except MaxRetriesExceeded as e:
@@ -369,6 +481,7 @@ def main() -> None:
         finalize(weighted_rubric, output_dir)
         write_error_log(state.get("errors", []), output_dir)
         write_flagged_duplicates(state.get("duplicate_clusters", []), output_dir)
+        write_judge_escalations(state.get("judge_escalations", []), output_dir)
     tracker.print_report()
 
 

@@ -11,7 +11,8 @@ PHASE_BASE = "base"
 
 def empty_state() -> dict:
     """Return a fresh, empty state structure."""
-    return {"rubric": None, "queue": [], "hints": {}, "errors": [], "capped_branches": [], "section_map": {}}
+    return {"rubric": None, "queue": [], "hints": {}, "errors": [], "capped_branches": [], "section_map": {},
+             "judge_approved": [], "judge_retry_counts": {}, "judge_escalations": []}
 
 
 def load_state(path):
@@ -24,14 +25,20 @@ def load_state(path):
     state.setdefault("errors", [])
     state.setdefault("capped_branches", [])
     state.setdefault("section_map", {})
+    state.setdefault("judge_approved", [])
+    state.setdefault("judge_retry_counts", {})
+    state.setdefault("judge_escalations", [])
     return state
 
 
-def save_state(path, rubric, queue, hints, errors=None, capped_branches=None, section_map=None) -> None:
+def save_state(path, rubric, queue, hints, errors=None, capped_branches=None, section_map=None,
+                judge_approved=None, judge_retry_counts=None, judge_escalations=None) -> None:
     """Persist the rubric, expansion queue, hints, guardrail errors, node-cap-triggered
-    branch ids, and base-pass section_map atomically via a temp file."""
+    branch ids, base-pass section_map, and coverage-judge state atomically via a temp file."""
     payload = {"rubric": rubric, "queue": list(queue), "hints": dict(hints), "errors": list(errors or []),
-               "capped_branches": sorted(capped_branches or []), "section_map": dict(section_map or {})}
+               "capped_branches": sorted(capped_branches or []), "section_map": dict(section_map or {}),
+               "judge_approved": sorted(judge_approved or []), "judge_retry_counts": dict(judge_retry_counts or {}),
+               "judge_escalations": list(judge_escalations or [])}
     state_path = Path(path)
     tmp_path = state_path.with_suffix(state_path.suffix + ".tmp")
     with open(tmp_path, "w", encoding="utf-8") as handle:

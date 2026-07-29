@@ -1017,6 +1017,175 @@ def test_run_weight_phase_rerun_on_review_reruns_rescale_across_branches(tmp_pat
     assert mock_rescale.call_count == 2
 
 
+# ── run_judge_phase ────────────────────────────────────────────────────────────
+
+def _judge_state(branch_ids=("branch-a",)):
+    """One or more branches, each with one leaf, for run_judge_phase tests."""
+    sub_tasks = []
+    for bid in branch_ids:
+        sub_tasks.append({
+            "id": bid, "requirements": f"{bid} section", "weight": 0,
+            "task_category": None, "finegrained_task_category": None,
+            "sub_tasks": [
+                {"id": f"leaf-{bid}", "requirements": "implement the model", "weight": 0, "sub_tasks": [],
+                 "task_category": "Code Development", "finegrained_task_category": None},
+            ],
+        })
+    return {
+        "rubric": {"id": "root", "requirements": "r", "weight": 0, "task_category": None,
+                  "finegrained_task_category": None, "sub_tasks": sub_tasks},
+        "queue": [], "hints": {}, "errors": [], "capped_branches": [],
+        "judge_approved": [], "judge_retry_counts": {}, "judge_escalations": [],
+    }
+
+
+def test_run_judge_phase_approves_branch_on_sufficient_verdict(tmp_path):
+    state = _judge_state()
+
+    with patch("rubric_gen.run_coverage_judge", return_value={"verdict": "sufficient", "missing": []}), \
+         patch("rubric_gen._expand_subtree") as mock_expand, \
+         patch("rubric_gen._run_split_check_on_branch") as mock_split_check, \
+         patch("rubric_gen.blocks_to_text", return_value="text"), \
+         patch("rubric_gen.slice_section", return_value=[]), \
+         patch("rubric_gen.commit"):
+        rubric_gen.run_judge_phase(None, None, [], [], state, "judge-model", "split-model", tmp_path)
+
+    mock_expand.assert_not_called()
+    mock_split_check.assert_not_called()
+    assert state["judge_approved"] == ["branch-a"]
+
+
+def test_run_judge_phase_retries_then_approves_on_second_sufficient_verdict(tmp_path):
+    state = _judge_state()
+    responses = [
+        {"verdict": "insufficient", "missing": [{"claim": "x", "evidence": "y"}]},
+        {"verdict": "sufficient", "missing": []},
+    ]
+
+    with patch("rubric_gen.run_coverage_judge", side_effect=responses), \
+         patch("rubric_gen._expand_subtree") as mock_expand, \
+         patch("rubric_gen._run_split_check_on_branch") as mock_split_check, \
+         patch("rubric_gen.blocks_to_text", return_value="text"), \
+         patch("rubric_gen.slice_section", return_value=[]), \
+         patch("rubric_gen.commit"):
+        rubric_gen.run_judge_phase(None, None, [], [], state, "judge-model", "split-model", tmp_path)
+
+    assert mock_expand.call_count == 1
+    assert mock_split_check.call_count == 1
+    assert state["judge_approved"] == ["branch-a"]
+    assert state["judge_escalations"] == []
+
+
+def test_run_judge_phase_escalates_after_max_retries_without_raising(tmp_path):
+    state = _judge_state()
+    always_insufficient = {"verdict": "insufficient", "missing": [{"claim": "x", "evidence": "y"}]}
+
+    with patch("rubric_gen.run_coverage_judge", return_value=always_insufficient), \
+         patch("rubric_gen._expand_subtree") as mock_expand, \
+         patch("rubric_gen._run_split_check_on_branch"), \
+         patch("rubric_gen.blocks_to_text", return_value="text"), \
+         patch("rubric_gen.slice_section", return_value=[]), \
+         patch("rubric_gen.commit"):
+        rubric_gen.run_judge_phase(None, None, [], [], state, "judge-model", "split-model", tmp_path)
+
+    assert mock_expand.call_count == rubric_gen.MAX_JUDGE_RETRIES
+    assert state["judge_approved"] == ["branch-a"]
+    assert len(state["judge_escalations"]) == 1
+    assert state["judge_escalations"][0]["branch_id"] == "branch-a"
+    assert len(state["judge_escalations"][0]["attempts"]) == rubric_gen.MAX_JUDGE_RETRIES + 1
+
+
+def test_run_judge_phase_commits_once_per_branch(tmp_path):
+    state = _judge_state(("branch-a", "branch-b"))
+
+    with patch("rubric_gen.run_coverage_judge", return_value={"verdict": "sufficient", "missing": []}), \
+         patch("rubric_gen._expand_subtree"), \
+         patch("rubric_gen._run_split_check_on_branch"), \
+         patch("rubric_gen.blocks_to_text", return_value="text"), \
+         patch("rubric_gen.slice_section", return_value=[]), \
+         patch("rubric_gen.commit") as mock_commit:
+        rubric_gen.run_judge_phase(None, None, [], [], state, "judge-model", "split-model", tmp_path)
+
+    assert mock_commit.call_count == 2
+
+
+def test_run_judge_phase_skips_already_approved_branch_on_resume(tmp_path):
+    state = _judge_state(("branch-a", "branch-b"))
+    state["judge_approved"] = ["branch-a"]
+    judged_branches = []
+
+    def fake_judge(client, section_text, branch_errors_context, leaves, model=None, tracker=None):
+        judged_branches.append(leaves[0]["id"])
+        return {"verdict": "sufficient", "missing": []}
+
+    with patch("rubric_gen.run_coverage_judge", side_effect=fake_judge), \
+         patch("rubric_gen._expand_subtree"), \
+         patch("rubric_gen._run_split_check_on_branch"), \
+         patch("rubric_gen.blocks_to_text", return_value="text"), \
+         patch("rubric_gen.slice_section", return_value=[]), \
+         patch("rubric_gen.commit"):
+        rubric_gen.run_judge_phase(None, None, [], [], state, "judge-model", "split-model", tmp_path)
+
+    assert judged_branches == ["leaf-branch-b"]
+
+
+def test_run_judge_phase_includes_branch_relevant_errors_in_judge_context(tmp_path):
+    state = _judge_state()
+    state["errors"] = [
+        "leaf-branch-a: split-check split into 2 children (branch 'branch-a').",
+        "leaf-branch-b: split-check split into 2 children (branch 'branch-b').",
+    ]
+    captured = {}
+
+    def fake_judge(client, section_text, branch_errors_context, leaves, model=None, tracker=None):
+        captured["context"] = branch_errors_context
+        return {"verdict": "sufficient", "missing": []}
+
+    with patch("rubric_gen.run_coverage_judge", side_effect=fake_judge), \
+         patch("rubric_gen._expand_subtree"), \
+         patch("rubric_gen._run_split_check_on_branch"), \
+         patch("rubric_gen.blocks_to_text", return_value="text"), \
+         patch("rubric_gen.slice_section", return_value=[]), \
+         patch("rubric_gen.commit"):
+        rubric_gen.run_judge_phase(None, None, [], [], state, "judge-model", "split-model", tmp_path)
+
+    assert captured["context"] == "leaf-branch-a: split-check split into 2 children (branch 'branch-a')."
+
+
+def test_run_judge_phase_feedback_passed_to_expand_subtree(tmp_path):
+    state = _judge_state()
+    missing = [{"claim": "missing metric", "evidence": "table 3"}]
+    responses = [
+        {"verdict": "insufficient", "missing": missing},
+        {"verdict": "sufficient", "missing": []},
+    ]
+    expected_feedback = rubric_gen.format_missing_as_feedback(missing)
+
+    with patch("rubric_gen.run_coverage_judge", side_effect=responses), \
+         patch("rubric_gen._expand_subtree") as mock_expand, \
+         patch("rubric_gen._run_split_check_on_branch"), \
+         patch("rubric_gen.blocks_to_text", return_value="text"), \
+         patch("rubric_gen.slice_section", return_value=[]), \
+         patch("rubric_gen.commit"):
+        rubric_gen.run_judge_phase(None, None, [], [], state, "judge-model", "split-model", tmp_path)
+
+    assert mock_expand.call_args.kwargs["feedback"] == expected_feedback
+
+
+# ── --judge flag tests ──────────────────────────────────────────────────────────
+
+def test_parse_args_judge_false_by_default(monkeypatch):
+    monkeypatch.setattr(sys, "argv", ["rubric_gen", "--input", "in", "--output", "out"])
+    args = rubric_gen.parse_args()
+    assert args.judge is False
+
+
+def test_parse_args_judge_true_when_flag_passed(monkeypatch):
+    monkeypatch.setattr(sys, "argv", ["rubric_gen", "--input", "in", "--output", "out", "--judge"])
+    args = rubric_gen.parse_args()
+    assert args.judge is True
+
+
 # ── main() flagged_duplicates wiring ──────────────────────────────────────────
 
 def test_main_writes_flagged_duplicates_after_weight_phase(tmp_path):
@@ -1025,9 +1194,10 @@ def test_main_writes_flagged_duplicates_after_weight_phase(tmp_path):
     input_dir.mkdir()
     output_dir = tmp_path / "out"
     fake_args = SimpleNamespace(input=str(input_dir), output=str(output_dir), resume=False,
-                                review=False, split_check=False)
+                                review=False, split_check=False, judge=False)
     fake_state = {"rubric": {"id": "root", "sub_tasks": []}, "queue": [], "hints": {},
                   "errors": [], "capped_branches": [], "section_map": {},
+                  "judge_approved": [], "judge_retry_counts": {}, "judge_escalations": [],
                   "duplicate_clusters": [{"leaf_ids": ["a", "b"]}]}
 
     with patch("rubric_gen.parse_args", return_value=fake_args), \
@@ -1046,7 +1216,8 @@ def test_main_writes_flagged_duplicates_after_weight_phase(tmp_path):
          patch("rubric_gen.run_weight_phase", return_value=fake_state["rubric"]), \
          patch("rubric_gen.finalize"), \
          patch("rubric_gen.write_error_log"), \
-         patch("rubric_gen.write_flagged_duplicates") as mock_write_duplicates:
+         patch("rubric_gen.write_flagged_duplicates") as mock_write_duplicates, \
+         patch("rubric_gen.write_judge_escalations"):
         rubric_gen.main()
 
     mock_write_duplicates.assert_called_once_with(fake_state["duplicate_clusters"], output_dir)

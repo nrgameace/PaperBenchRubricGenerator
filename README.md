@@ -78,6 +78,20 @@ resumable. There are three phases:
    `errors.txt`, and if a replacement child still trips the enumeration threshold that's logged
    too, as a model-under-split warning. Disable with `--no-split-check`.
 
+   **Judge pass (opt-in, `--judge`)** — runs after split-check, before weighting. Split-check
+   only catches leaves that bundle *too much* into one node; it never catches leaves that
+   *miss* something the paper states. This pass closes that gap with a cross-model coverage
+   judge (OpenAI `o3-mini`, not Claude, so its blind spots don't overlap with the models that
+   generated the rubric): one call per top-level branch, sending the branch's source section
+   text plus its current leaves' requirements, asking whether anything the section states
+   isn't represented by any leaf. A "missing" claim must cite evidence from the section text
+   itself — an ungrounded claim (no evidence) is dropped rather than trusted. On an
+   `"insufficient"` verdict the branch is fully re-expanded (feedback describing what's
+   missing) and re-checked by split-check, up to `MAX_JUDGE_RETRIES` (2) times; if it's still
+   insufficient after that, the branch is logged to `judge_escalations.txt` for you to review
+   by hand and the pipeline moves on regardless — a judge miss never blocks the run. Off by
+   default; see [Output files](#output-files) for `judge_escalations.txt`.
+
 4. **Weight pass** — one LLM sub-phase (`claude-sonnet-5`) followed by a deterministic,
    embedding-based rescale (no LLM call):
    - **Local passes** — one LLM call per top-level branch. Each call is focused on a single
@@ -156,11 +170,12 @@ data/
     mineru_out/           ← any folder name; must contain content_list.json at its root
       content_list.json
   output/<paper>/
-    rubric_state.json     ← resumable checkpoint (rubric + expansion queue + hints + errors + capped_branches + section_map)
+    rubric_state.json     ← resumable checkpoint (rubric + expansion queue + hints + errors + capped_branches + section_map + judge state)
     rubric_draft.json     ← editable draft for the current pass
     rubric_final.json     ← final validated rubric (written when all phases complete)
     errors.txt              ← guardrail violations, if any occurred (see Output files)
     flagged_duplicates.json ← cross-branch duplicate leaves flagged for manual review, if any (see Output files)
+    judge_escalations.txt   ← branches the coverage judge still flagged after retries, if --judge was used (see Output files)
 examples/
   example_rubric.json     ← few-shot format/depth exemplar (different paper)
 tests/
@@ -170,15 +185,16 @@ tests/
 
 | File | Responsibility |
 |---|---|
-| `rubric_gen.py` | Entry point; CLI parsing (`--review`, `--resume`, `--no-split-check`); orchestrates all 4 phases; `human_review` flag threaded through phase functions; `_expand_subtree` enforces the `MAX_BRANCH_NODES` cap before every expansion call and threads a `capped_branches` set the same way it threads `errors`; `run_split_check_phase` runs the split-check pass per top-level branch before weighting, processing `"duplicates"` (via `apply_dedup`) before `"splits"` so a leaf flagged as both is removed rather than split, and passing `include_all_leaves=True` for branches in `capped_branches`; `run_weight_phase` runs the local branch LLM passes then `pb_embeddings.rescale_global_weights` for the deterministic cross-branch rescale; `_resolve_invalid_weights` correction loop, capped at `MAX_WEIGHT_RESOLUTION_RETRIES` (5) and raising `MaxRetriesExceeded` past that; `write_error_log` writes `errors.txt`; `write_flagged_duplicates` writes `flagged_duplicates.json`; prints cost report |
+| `rubric_gen.py` | Entry point; CLI parsing (`--review`, `--resume`, `--no-split-check`, `--judge`); orchestrates all phases; `human_review` flag threaded through phase functions; `_expand_subtree` enforces the `MAX_BRANCH_NODES` cap before every expansion call and threads a `capped_branches` set the same way it threads `errors`; `_run_split_check_on_branch` runs split-check for a single branch (extracted so `run_judge_phase`'s re-split-check step shares it, not a copy); `run_split_check_phase` loops that helper over every top-level branch before weighting; `run_judge_phase` drives the opt-in coverage-judge checkpoint — judge each branch, on `"insufficient"` re-expand + re-split-check up to `MAX_JUDGE_RETRIES` (2) times, then escalate (fail-open, never blocks the run) via `judge_escalations`; `write_judge_escalations` writes `judge_escalations.txt`; `run_weight_phase` runs the local branch LLM passes then `pb_embeddings.rescale_global_weights` for the deterministic cross-branch rescale; `_resolve_invalid_weights` correction loop, capped at `MAX_WEIGHT_RESOLUTION_RETRIES` (5) and raising `MaxRetriesExceeded` past that; `write_error_log` writes `errors.txt`; `write_flagged_duplicates` writes `flagged_duplicates.json`; prints cost report |
 | `pb_passes.py` | Anthropic SDK calls; prompt construction; JSON parsing; node normalization; tree mutation (`apply_base`, `apply_expansion`, `apply_split`, `apply_dedup`, `apply_weights`); `apply_base` also extracts the base pass's `section_map` as its 4th return value (defaults to `{}` if absent); `MAX_EXPANSION_DEPTH` (7) guardrail enforced in `apply_expansion`; `MAX_BRANCH_NODES` (40) guardrail via `branch_size`/`force_branch_cap_leaves`, checked by `rubric_gen._expand_subtree` before every expansion call; enumeration-triggered recursion override in `normalize_child` and prompt injection in `run_expansion_llm` (via `pb_enumeration`); `run_split_check_llm` — the semantic bundling/duplicate check scoped to `Evaluation, Metrics & Benchmarking` / `Result Analysis` leaves (or every leaf in the branch via `include_all_leaves=True`), one call per branch returning both `"splits"` and `"duplicates"`, skipped entirely when a branch has no candidate leaves; `apply_dedup` removes a duplicate leaf (via `pb_schema.find_parent`) and force-flattens its parent if that empties the parent's children; weight validation (`find_invalid_weights`); `run_weight_llm_branch` for per-branch local passes; `run_weight_llm` for targeted invalid-weight retries; `invoke_llm` raises `RuntimeError` if the model response is truncated (`stop_reason == "max_tokens"`) instead of failing downstream as an opaque JSON parse error, extracts text by filtering `response.content` for `type == "text"` blocks instead of assuming `content[0]` is text (a leading `thinking` block otherwise crashes with an opaque `AttributeError`), passes `thinking={"type": "disabled"}` on every call since some models default to adaptive thinking when the parameter is omitted (which eats into `max_tokens` and can truncate the JSON output), and calls the Anthropic SDK's streaming API (`client.messages.stream(...)` / `get_final_message()`) rather than the blocking `create(...)`, since large `max_tokens` values can otherwise be rejected outright by the SDK; `run_split_check_llm` scales its `max_tokens` (8000 up to a 32000 cap) with candidate leaf count since `include_all_leaves` branches can need much longer responses; `run_expansion_llm` scales its `max_tokens` the same way off `enum_count` so an ENUMERATION-GUARDRAIL-forced fan-out doesn't truncate; `parse_json_response` raises `ValueError` with a preview of the raw model text (up to 2000 chars) when a response isn't valid JSON, instead of a bare `JSONDecodeError` with no diagnostic context; `_extract_json_span` scans every `{`/`[` and keeps the longest balanced JSON decode rather than naively spanning first-open-to-last-close, so stray bracket characters in a model's reasoning prose (math ranges, citations) ahead of its real JSON answer can't be mistaken for the payload |
+| `pb_judge.py` | Cross-model coverage-judge checkpoint (opt-in, `--judge`). `run_coverage_judge` — one OpenAI `o3-mini` call per top-level branch judging whether the branch's leaves cover everything its source section states; requires each "missing" claim to cite `evidence` from the section text, silently dropping ungrounded entries instead of retrying; skips the API call entirely when the branch has zero leaves; `format_missing_as_feedback` turns "missing" claims into the same feedback text `--review` mode's typed `RerunPass` feedback already feeds into re-expansion; `_invoke_judge_llm` is the sole OpenAI call chokepoint (truncation check, robust content extraction, cost tracking — mirrors `pb_passes.invoke_llm`'s shape but is independent of it); `_usage_shim` adapts OpenAI's usage schema so `pb_cost.CostTracker.record` needs no changes |
 | `pb_embeddings.py` | Deterministic embedding-based replacement for the old global LLM weight-calibration pass. `build_embedding_client`/`embed_texts` wrap the OpenAI embeddings API (`text-embedding-3-small`, one batched call); `extract_leaves` tags every leaf with its top-level branch id; `cosine_similarity`/`cluster_by_threshold` are a hand-rolled greedy single-link clusterer (no numpy/scipy/sklearn); `branch_mass`/`compute_all_branch_masses` count distinct-claim clusters per branch, not raw leaf count; `derive_target_proportions` converts `section_map` into per-branch target weight shares, falling back to a uniform share per branch on a missing/malformed entry; `rescale_branch_weights` applies the per-branch factor, floored at weight 1; `cluster_cross_branch_duplicates`/`build_duplicate_report`/`write_flagged_duplicates` flag (never auto-delete) likely duplicate leaves across branches; `rescale_global_weights` is the top-level orchestrator |
-| `pb_cost.py` | `CostTracker` — accumulates token usage (input, output, cache write, cache read) per model; computes and prints a formatted cost report |
+| `pb_cost.py` | `CostTracker` — accumulates token usage (input, output, cache write, cache read) per model; computes and prints a formatted cost report, including a per-provider (Anthropic vs. OpenAI) subtotal so judge-pass spend is visible separately |
 | `pb_input.py` | Discovers PDF and MinerU folder from input dir; loads `content_list.json` |
 | `pb_enumeration.py` | `count_enumerated_items` and `build_enumeration_hint` — pure regex heuristics (no LLM/network dependency) detecting enumerated sub-items in requirements text; `MIN_ENUMERATED_ITEMS_TO_SPLIT` (3) constant |
 | `pb_mineru.py` | Converts MinerU blocks to LLM-readable text (`blocks_to_text`); slices content to a section by heading fuzzy-match (`slice_section`) |
 | `pb_schema.py` | Rubric dict traversal and validation (`validate_partial`, `validate_final`, `find_node`, `find_parent`, `all_ids`, `node_depth`, `iter_nodes`) |
-| `pb_state.py` | State persistence; phase constants (`PHASE_BASE → EXPANSION → WEIGHT → DONE`); atomic write via temp-file rename; state includes an `errors` list of guardrail violations, a `capped_branches` list of branch ids that hit `MAX_BRANCH_NODES`, and a `section_map` dict from the base pass |
+| `pb_state.py` | State persistence; phase constants (`PHASE_BASE → EXPANSION → WEIGHT → DONE`; the judge checkpoint has no dedicated phase constant, it self-gates within `PHASE_WEIGHT` via `judge_approved`); atomic write via temp-file rename; state includes an `errors` list of guardrail violations, a `capped_branches` list of branch ids that hit `MAX_BRANCH_NODES`, a `section_map` dict from the base pass, and the judge checkpoint's `judge_approved`/`judge_retry_counts`/`judge_escalations` |
 | `pb_review.py` | Blocks on `input()` for human review; raises `RerunPass(feedback)` when user types non-empty text; `collect_weight_corrections` handles interactive per-node weight correction |
 | `task_node.py` | Frozen `TaskNode` dataclass (adapted from OpenAI's frontier-evals); leaf/internal validation in `__post_init__` |
 
@@ -209,6 +225,53 @@ text. Falls back to the full list when the best heading score is below 0.3.
 ---
 
 ## Changelog
+
+### v15 — Coverage-judge checkpoint (o3-mini, opt-in)
+
+**The abandoned node-count heuristic.** A predicted-leaf-count guardrail (comparing generated
+leaf count against a target derived from paper structure) was validated against 22 real
+PaperBench rubrics and abandoned: leaf count turned out to be driven by annotator discretion,
+not by any cheap pre-generation text feature — the same section legitimately decomposes into
+anywhere from 1x to 14x the leaf count depending on how exhaustively it's graded. A numeric
+target can't work here.
+
+**`pb_judge.py` (new module) and `run_judge_phase` (`rubric_gen.py`).** Replaces that idea with
+a qualitative coverage check instead of a numeric one: a cross-model judge (OpenAI `o3-mini`,
+so its blind spots don't overlap with the Claude models that generated the rubric) reads a
+branch's source section text plus its current leaves and judges whether anything the paper
+states is *not* represented by any leaf. This catches under-expansion — missed claims, dropped
+figure/table sub-items — which the split-check pass never catches, since split-check only
+looks for over-bundling, never gaps.
+
+```
+BASE -> EXPANSION -> SPLIT-CHECK (--no-split-check) -> JUDGE (--judge) -> WEIGHT -> DONE
+```
+
+One `o3-mini` call per top-level branch; skipped entirely for a branch with zero leaves. A
+"missing" claim must cite `evidence` from the section text itself — entries without it are
+dropped silently rather than trusted, so a hallucinated gap can't trigger a re-expansion. On
+`"insufficient"`, the branch is fully re-expanded via the same `_expand_subtree` call shape
+`--review` mode's typed feedback already uses, then re-checked by split-check (via a newly
+extracted `_run_split_check_on_branch` helper, shared with `run_split_check_phase` so the
+apply logic isn't duplicated), up to `MAX_JUDGE_RETRIES` (2) times. Past that, the branch is
+logged to `judge_escalations.txt` and approved anyway — **fail-open**, the only bounded-retry
+loop in this codebase that doesn't raise on exhaustion (`_resolve_invalid_weights` and the
+base-pass retry both raise `MaxRetriesExceeded` → `SystemExit`); a coverage-judge miss must
+not block the run, a human resolves the escalation file afterward.
+
+Self-gates per-branch via a new `judge_approved` state list, so `--resume` skips branches
+already judged sufficient or already escalated — no new `PHASE_JUDGE` state constant needed,
+same idempotent-by-construction pattern split-check already uses. Commits after every branch
+(not once at the end like split-check), since a retry's cost (judge call + re-expansion +
+re-split-check) makes losing that work to a mid-run crash expensive to repeat.
+
+**Cost tracking.** `pb_cost.py` gains a `PRICING["o3-mini"]` entry and a per-provider
+(Anthropic vs. OpenAI) subtotal in the final report, via a usage-shim adapter in `pb_judge.py`
+that translates OpenAI's usage schema into the attribute names `CostTracker.record` already
+reads — `record()` itself is unchanged.
+
+**`--judge` flag.** Off by default, mirroring `--review`'s opt-in convention (unlike
+`--no-split-check`'s opt-out convention) — this is a new, still-being-evaluated checkpoint.
 
 ### v14 — Fix leaf-weight rescale ordering and expansion output-length truncation
 
@@ -498,7 +561,8 @@ pip install -r requirements.txt
 
 Create a `.env` file in the repo root. Two keys are required: `ANTHROPIC_API_KEY` for the
 base/expansion/split-check/weight LLM passes, and `OPENAI_API_KEY` for the weight pass's
-embedding-based rescale.
+embedding-based rescale (and, if `--judge` is used, the coverage-judge checkpoint's
+`o3-mini` calls).
 
 ```bash
 cat >> .env <<'EOF'
@@ -550,6 +614,14 @@ Add `--no-split-check` to skip the split-check pass (runs by default) that check
 `Evaluation, Metrics & Benchmarking` / `Result Analysis` leaves for semantic bundling before
 weighting — useful for faster iteration when you don't need that extra pass.
 
+Add `--judge` to enable the coverage-judge checkpoint (off by default) — a cross-model OpenAI
+`o3-mini` pass that checks each branch's leaves against its source section text for claims
+split-check's over-bundling check can't catch (missed content, not excess bundling):
+
+```bash
+python rubric_gen.py --input data/input/my-paper --output data/output/my-paper --judge
+```
+
 After every single LLM call (in both agentic and `--review` mode), a running total is
 printed to the screen: `Current usage: $0.0421`. This reflects only the current session —
 a `--resume` run starts the counter back at `$0.0000`, even though the underlying rubric
@@ -572,10 +644,11 @@ Without `--resume`, an existing `rubric_state.json` is overwritten and the run s
 | File | Description |
 |---|---|
 | `rubric_draft.json` | Editable draft for the current pass. |
-| `rubric_state.json` | Resumable checkpoint (rubric + expansion queue + hints + guardrail errors + capped branch ids + base-pass `section_map`). |
+| `rubric_state.json` | Resumable checkpoint (rubric + expansion queue + hints + guardrail errors + capped branch ids + base-pass `section_map` + judge state: `judge_approved`, `judge_retry_counts`, `judge_escalations`). |
 | `rubric_final.json` | Final validated rubric (written when all phases complete). |
 | `errors.txt` | Guardrail violations and split-check activity, one per line. Only written if at least one occurred. Includes: the model trying to expand a node past `MAX_EXPANSION_DEPTH` (7), logged as `"<node-id>: Model attempted to expand past the maximum depth of 7 nodes."`; a branch hitting `MAX_BRANCH_NODES` (40), logged per forced node as `"<node-id>: Branch '<branch-id>' hit the 40-node cap; forced to leaf."`; every split applied by the split-check pass, logged as `"<leaf-id>: split-check split into N children (branch '<branch-id>')."`; every duplicate leaf removed by the split-check pass, logged as `"<leaf-id>: split-check removed as duplicate of '<other-leaf-id>'."` (plus a second line if removing it force-flattened its now-childless parent); and any split-check child that still trips the enumeration threshold, logged as a model-under-split warning. |
 | `flagged_duplicates.json` | Leaves from *different* top-level branches that the weight pass's embedding-based rescale clustered together as likely restating the same claim (cosine similarity ≥ 0.92). Only written if at least one cross-branch cluster was found; never auto-deleted — for manual review. |
+| `judge_escalations.txt` | Branches the coverage judge (`--judge`) still flagged as `"insufficient"` after `MAX_JUDGE_RETRIES` (2) re-expansion attempts. One block per escalated branch: the branch id, then every missing-claim/evidence pair from every failed attempt. Only written if at least one branch escalated; the pipeline still completes normally (fail-open) — this file is for manual follow-up. |
 
 If `rubric_final.json` already exists and `--resume` is passed, the tool reports it and
 exits — delete it or omit `--resume` to start over.
@@ -590,6 +663,8 @@ exits — delete it or omit `--resume` to start over.
 | Embedding model | `pb_embeddings.EMBEDDING_MODEL` | `text-embedding-3-small` |
 | Within-branch cluster threshold | `pb_embeddings.BRANCH_CLUSTER_THRESHOLD` | `0.87` |
 | Cross-branch duplicate threshold | `pb_embeddings.DUPLICATE_CLUSTER_THRESHOLD` | `0.92` |
+| Coverage-judge model | `rubric_gen.JUDGE_MODEL` | `o3-mini` |
+| Coverage-judge retry cap | `rubric_gen.MAX_JUDGE_RETRIES` | `2` |
 
 ---
 

@@ -6,18 +6,21 @@ import pb_state
 def test_empty_state_shape():
     state = pb_state.empty_state()
     assert state == {"rubric": None, "queue": [], "hints": {}, "errors": [], "capped_branches": [],
-                      "section_map": {}}
+                      "section_map": {}, "judge_approved": [], "judge_retry_counts": {}, "judge_escalations": []}
 
 
 def test_save_and_load_roundtrip(tmp_path):
     path = tmp_path / "rubric_state.json"
     rubric = {"id": "root", "sub_tasks": []}
     pb_state.save_state(path, rubric, ["a", "b"], {"a": "hint"}, ["node-x: too deep"], ["branch-a"],
-                         {"branch-a": {"pages": [1, 5], "tables": 0, "figures": 0}})
+                         {"branch-a": {"pages": [1, 5], "tables": 0, "figures": 0}},
+                         ["branch-b"], {"branch-a": 1}, [{"branch_id": "branch-a", "attempts": []}])
     loaded = pb_state.load_state(path)
     assert loaded == {"rubric": rubric, "queue": ["a", "b"], "hints": {"a": "hint"},
                        "errors": ["node-x: too deep"], "capped_branches": ["branch-a"],
-                       "section_map": {"branch-a": {"pages": [1, 5], "tables": 0, "figures": 0}}}
+                       "section_map": {"branch-a": {"pages": [1, 5], "tables": 0, "figures": 0}},
+                       "judge_approved": ["branch-b"], "judge_retry_counts": {"branch-a": 1},
+                       "judge_escalations": [{"branch_id": "branch-a", "attempts": []}]}
 
 
 def test_save_state_defaults_errors_to_empty(tmp_path):
@@ -77,6 +80,34 @@ def test_load_backfills_missing_section_map_key_for_legacy_state(tmp_path):
         json.dump({"rubric": {"id": "root"}, "queue": [], "hints": {}, "errors": [], "capped_branches": []}, handle)
     loaded = pb_state.load_state(path)
     assert loaded["section_map"] == {}
+
+
+def test_load_backfills_missing_judge_keys_for_legacy_state(tmp_path):
+    import json
+    path = tmp_path / "rubric_state.json"
+    with open(path, "w", encoding="utf-8") as handle:
+        json.dump({"rubric": {"id": "root"}, "queue": [], "hints": {}, "errors": [],
+                   "capped_branches": [], "section_map": {}}, handle)
+    loaded = pb_state.load_state(path)
+    assert loaded["judge_approved"] == []
+    assert loaded["judge_retry_counts"] == {}
+    assert loaded["judge_escalations"] == []
+
+
+def test_save_state_defaults_judge_keys_to_empty(tmp_path):
+    path = tmp_path / "rubric_state.json"
+    pb_state.save_state(path, {"id": "root"}, [], {})
+    loaded = pb_state.load_state(path)
+    assert loaded["judge_approved"] == []
+    assert loaded["judge_retry_counts"] == {}
+    assert loaded["judge_escalations"] == []
+
+
+def test_save_state_accepts_set_for_judge_approved(tmp_path):
+    path = tmp_path / "rubric_state.json"
+    pb_state.save_state(path, {"id": "root"}, [], {}, judge_approved={"branch-b", "branch-a"})
+    loaded = pb_state.load_state(path)
+    assert loaded["judge_approved"] == ["branch-a", "branch-b"]
 
 
 def test_save_state_is_atomic_no_leftover_tmp(tmp_path):
