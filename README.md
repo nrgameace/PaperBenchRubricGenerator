@@ -41,23 +41,35 @@ resumable. There are three phases:
    (fallback `task_category` of `Code Development`) and records the violation. See
    [Output files](#output-files) for `errors.txt`.
 
-   **Max branch node cap.** Each top-level branch is capped at `MAX_BRANCH_NODES` (40) total
+   **Max branch node cap.** Each top-level branch is capped at `MAX_BRANCH_NODES` (100) total
    nodes, independent of the depth guardrail — a model stuck re-expanding many near-identical
    sub-items could otherwise stay within the depth limit while still generating an unbounded
-   number of nodes. The cap is checked before every expansion call; once a branch reaches 40
+   number of nodes. The cap is checked before every expansion call; once a branch reaches 100
    nodes, every node still queued for expansion in that branch is force-flattened into a leaf
    (fallback `task_category` of `Code Development`) without spending an LLM call on it, and the
    branch id is recorded so the split-check pass (below) prioritizes it for duplicate review.
 
    **Enumeration-triggered recursion.** Before a candidate leaf is finalized, its requirements
    text is scanned for enumeration signals — comma-separated lists after "including"/"such
-   as"/a colon, `et al.` citations, or `Table`/`Figure` references. If it names three or more
-   distinct sub-items (e.g. "All 10 environments are configured and runnable: env_a, env_b,
-   ..."), the node is forced back into an expandable/pending state instead of being accepted
-   as one dense leaf, and the next expansion call is explicitly told to produce at least that
-   many children — one per named item. This is a cheap regex pass (`pb_enumeration.py`), no
-   extra LLM call, and applies to both the base pass and every expansion pass since both share
-   `normalize_child`.
+   as"/a colon, a bare Oxford-comma list of capitalized items with no trigger phrase at all
+   (e.g. "...across OPT, BLOOM, GLM-130B, OPT-IML, ..., and Mixtral models" — model/dataset/
+   baseline name lists rarely follow "including"/"such as"), `et al.` citations, or
+   `Table`/`Figure` references. If it names three or more distinct sub-items (e.g. "All 10
+   environments are configured and runnable: env_a, env_b, ..."), the node is forced back into
+   an expandable/pending state instead of being accepted as one dense leaf, and the next
+   expansion call is explicitly told to produce at least that many children — one per named
+   item. This is a cheap regex pass (`pb_enumeration.py`), no extra LLM call, and applies to
+   both the base pass and every expansion pass since both share `normalize_child`.
+
+   **Task-category validation.** A leaf's `task_category`/`finegrained_task_category` are
+   checked against the schema's allowed values the moment the model returns them, in the same
+   `normalize_child` call — not trusted verbatim. A missing or hallucinated `task_category`
+   (e.g. `"Evaluation, Metrics & Presentation"`, a blend of two real categories) is forced to
+   the `Code Development` fallback; a hallucinated `finegrained_task_category` is cleared to
+   `None`. Each correction is logged to `errors.txt`. In agentic mode nothing else validates
+   the tree until the very last line of the run, so without this a hallucinated category would
+   silently ride through every pass and only surface as a crash at the end — after the full
+   run's LLM cost had already been spent.
 
 3. **Split-check pass** — `claude-sonnet-5`, one call per top-level branch, runs after
    expansion is fully complete and before weighting. `pb_enumeration.py`'s regex heuristic
@@ -186,12 +198,12 @@ tests/
 | File | Responsibility |
 |---|---|
 | `rubric_gen.py` | Entry point; CLI parsing (`--review`, `--resume`, `--no-split-check`, `--judge`); orchestrates all phases; `human_review` flag threaded through phase functions; `_expand_subtree` enforces the `MAX_BRANCH_NODES` cap before every expansion call and threads a `capped_branches` set the same way it threads `errors`; `_run_split_check_on_branch` runs split-check for a single branch (extracted so `run_judge_phase`'s re-split-check step shares it, not a copy); `run_split_check_phase` loops that helper over every top-level branch before weighting; `run_judge_phase` drives the opt-in coverage-judge checkpoint — judge each branch, on `"insufficient"` re-expand + re-split-check up to `MAX_JUDGE_RETRIES` (2) times, then escalate (fail-open, never blocks the run) via `judge_escalations`; `write_judge_escalations` writes `judge_escalations.txt`; `run_weight_phase` runs the local branch LLM passes then `pb_embeddings.rescale_global_weights` for the deterministic cross-branch rescale; `_resolve_invalid_weights` correction loop, capped at `MAX_WEIGHT_RESOLUTION_RETRIES` (5) and raising `MaxRetriesExceeded` past that; `write_error_log` writes `errors.txt`; `write_flagged_duplicates` writes `flagged_duplicates.json`; prints cost report |
-| `pb_passes.py` | Anthropic SDK calls; prompt construction; JSON parsing; node normalization; tree mutation (`apply_base`, `apply_expansion`, `apply_split`, `apply_dedup`, `apply_weights`); `apply_base` also extracts the base pass's `section_map` as its 4th return value (defaults to `{}` if absent); `MAX_EXPANSION_DEPTH` (7) guardrail enforced in `apply_expansion`; `MAX_BRANCH_NODES` (40) guardrail via `branch_size`/`force_branch_cap_leaves`, checked by `rubric_gen._expand_subtree` before every expansion call; enumeration-triggered recursion override in `normalize_child` and prompt injection in `run_expansion_llm` (via `pb_enumeration`); `run_split_check_llm` — the semantic bundling/duplicate check scoped to `Evaluation, Metrics & Benchmarking` / `Result Analysis` leaves (or every leaf in the branch via `include_all_leaves=True`), one call per branch returning both `"splits"` and `"duplicates"`, skipped entirely when a branch has no candidate leaves; `apply_dedup` removes a duplicate leaf (via `pb_schema.find_parent`) and force-flattens its parent if that empties the parent's children; weight validation (`find_invalid_weights`); `run_weight_llm_branch` for per-branch local passes; `run_weight_llm` for targeted invalid-weight retries; `invoke_llm` raises `RuntimeError` if the model response is truncated (`stop_reason == "max_tokens"`) instead of failing downstream as an opaque JSON parse error, extracts text by filtering `response.content` for `type == "text"` blocks instead of assuming `content[0]` is text (a leading `thinking` block otherwise crashes with an opaque `AttributeError`), passes `thinking={"type": "disabled"}` on every call since some models default to adaptive thinking when the parameter is omitted (which eats into `max_tokens` and can truncate the JSON output), and calls the Anthropic SDK's streaming API (`client.messages.stream(...)` / `get_final_message()`) rather than the blocking `create(...)`, since large `max_tokens` values can otherwise be rejected outright by the SDK; `run_split_check_llm` scales its `max_tokens` (8000 up to a 32000 cap) with candidate leaf count since `include_all_leaves` branches can need much longer responses; `run_expansion_llm` scales its `max_tokens` the same way off `enum_count` so an ENUMERATION-GUARDRAIL-forced fan-out doesn't truncate; `parse_json_response` raises `ValueError` with a preview of the raw model text (up to 2000 chars) when a response isn't valid JSON, instead of a bare `JSONDecodeError` with no diagnostic context; `_extract_json_span` scans every `{`/`[` and keeps the longest balanced JSON decode rather than naively spanning first-open-to-last-close, so stray bracket characters in a model's reasoning prose (math ranges, citations) ahead of its real JSON answer can't be mistaken for the payload |
+| `pb_passes.py` | Anthropic SDK calls; prompt construction; JSON parsing; node normalization; tree mutation (`apply_base`, `apply_expansion`, `apply_split`, `apply_dedup`, `apply_weights`); `apply_base` also extracts the base pass's `section_map` as its 4th return value (defaults to `{}` if absent); `MAX_EXPANSION_DEPTH` (7) guardrail enforced in `apply_expansion`; `MAX_BRANCH_NODES` (100) guardrail via `branch_size`/`force_branch_cap_leaves`, checked by `rubric_gen._expand_subtree` before every expansion call; enumeration-triggered recursion override in `normalize_child` and prompt injection in `run_expansion_llm` (via `pb_enumeration`); `normalize_child` also validates `task_category`/`finegrained_task_category` against `pb_schema.LEAF_CATEGORIES`/`FINEGRAINED_CATEGORIES`, forcing a hallucinated/missing `task_category` to the `Code Development` fallback and clearing a hallucinated `finegrained_task_category` to `None`, logged to `errors` (threaded through `apply_base`'s new `errors` param as well as `apply_expansion`/`apply_split`); `run_split_check_llm` — the semantic bundling/duplicate check scoped to `Evaluation, Metrics & Benchmarking` / `Result Analysis` leaves (or every leaf in the branch via `include_all_leaves=True`), one call per branch returning both `"splits"` and `"duplicates"`, skipped entirely when a branch has no candidate leaves; `apply_dedup` removes a duplicate leaf (via `pb_schema.find_parent`) and force-flattens its parent if that empties the parent's children; weight validation (`find_invalid_weights`); `run_weight_llm_branch` for per-branch local passes; `run_weight_llm` for targeted invalid-weight retries; `invoke_llm` raises `RuntimeError` if the model response is truncated (`stop_reason == "max_tokens"`) instead of failing downstream as an opaque JSON parse error, extracts text by filtering `response.content` for `type == "text"` blocks instead of assuming `content[0]` is text (a leading `thinking` block otherwise crashes with an opaque `AttributeError`), passes `thinking={"type": "disabled"}` on every call since some models default to adaptive thinking when the parameter is omitted (which eats into `max_tokens` and can truncate the JSON output), and calls the Anthropic SDK's streaming API (`client.messages.stream(...)` / `get_final_message()`) rather than the blocking `create(...)`, since large `max_tokens` values can otherwise be rejected outright by the SDK; `run_split_check_llm` scales its `max_tokens` (8000 up to a 32000 cap) with candidate leaf count since `include_all_leaves` branches can need much longer responses; `run_expansion_llm` scales its `max_tokens` the same way off `enum_count` so an ENUMERATION-GUARDRAIL-forced fan-out doesn't truncate; `parse_json_response` raises `ValueError` with a preview of the raw model text (up to 2000 chars) when a response isn't valid JSON, instead of a bare `JSONDecodeError` with no diagnostic context; `_extract_json_span` scans every `{`/`[` and keeps the longest balanced JSON decode rather than naively spanning first-open-to-last-close, so stray bracket characters in a model's reasoning prose (math ranges, citations) ahead of its real JSON answer can't be mistaken for the payload |
 | `pb_judge.py` | Cross-model coverage-judge checkpoint (opt-in, `--judge`). `run_coverage_judge` — one OpenAI `o3-mini` call per top-level branch judging whether the branch's leaves cover everything its source section states; requires each "missing" claim to cite `evidence` from the section text, silently dropping ungrounded entries instead of retrying; skips the API call entirely when the branch has zero leaves; `format_missing_as_feedback` turns "missing" claims into the same feedback text `--review` mode's typed `RerunPass` feedback already feeds into re-expansion; `_invoke_judge_llm` is the sole OpenAI call chokepoint (truncation check, robust content extraction, cost tracking — mirrors `pb_passes.invoke_llm`'s shape but is independent of it); `_usage_shim` adapts OpenAI's usage schema so `pb_cost.CostTracker.record` needs no changes |
-| `pb_embeddings.py` | Deterministic embedding-based replacement for the old global LLM weight-calibration pass. `build_embedding_client`/`embed_texts` wrap the OpenAI embeddings API (`text-embedding-3-small`, one batched call); `extract_leaves` tags every leaf with its top-level branch id; `cosine_similarity`/`cluster_by_threshold` are a hand-rolled greedy single-link clusterer (no numpy/scipy/sklearn); `branch_mass`/`compute_all_branch_masses` count distinct-claim clusters per branch, not raw leaf count; `derive_target_proportions` converts `section_map` into per-branch target weight shares, falling back to a uniform share per branch on a missing/malformed entry; `rescale_branch_weights` applies the per-branch factor, floored at weight 1; `cluster_cross_branch_duplicates`/`build_duplicate_report`/`write_flagged_duplicates` flag (never auto-delete) likely duplicate leaves across branches; `rescale_global_weights` is the top-level orchestrator |
-| `pb_cost.py` | `CostTracker` — accumulates token usage (input, output, cache write, cache read) per model; computes and prints a formatted cost report, including a per-provider (Anthropic vs. OpenAI) subtotal so judge-pass spend is visible separately |
+| `pb_embeddings.py` | Deterministic embedding-based replacement for the old global LLM weight-calibration pass. `build_embedding_client`/`embed_texts` wrap the OpenAI embeddings API (`text-embedding-3-small`, one batched call), recording usage on an optional `tracker` param via a `_usage_shim` (same pattern as `pb_judge._usage_shim`) and printing `Current usage: $X.XXXX` like every other pass; `extract_leaves` tags every leaf with its top-level branch id; `cosine_similarity`/`cluster_by_threshold` are a hand-rolled greedy single-link clusterer (no numpy/scipy/sklearn); `branch_mass`/`compute_all_branch_masses` count distinct-claim clusters per branch, not raw leaf count; `derive_target_proportions` converts `section_map` into per-branch target weight shares, falling back to a uniform share per branch on a missing/malformed entry; `rescale_branch_weights` applies the per-branch factor, floored at weight 1; `cluster_cross_branch_duplicates`/`build_duplicate_report`/`write_flagged_duplicates` flag (never auto-delete) likely duplicate leaves across branches; `rescale_global_weights` is the top-level orchestrator, threading `tracker` through to `embed_texts` |
+| `pb_cost.py` | `CostTracker` — accumulates token usage (input, output, cache write, cache read) per model; computes and prints a formatted cost report, including a per-provider (Anthropic vs. OpenAI) subtotal so judge-pass and embedding spend are visible separately; `PRICING` covers `claude-opus-4-8`, `claude-sonnet-5`, `o3-mini`, and `text-embedding-3-small` (input-only — no output/cache tokens) |
 | `pb_input.py` | Discovers PDF and MinerU folder from input dir; loads `content_list.json` |
-| `pb_enumeration.py` | `count_enumerated_items` and `build_enumeration_hint` — pure regex heuristics (no LLM/network dependency) detecting enumerated sub-items in requirements text; `MIN_ENUMERATED_ITEMS_TO_SPLIT` (3) constant |
+| `pb_enumeration.py` | `count_enumerated_items` and `build_enumeration_hint` — pure regex heuristics (no LLM/network dependency) detecting enumerated sub-items in requirements text: trigger-phrase comma lists ("including"/"such as"/a colon), bare Oxford-comma lists of capitalized items with no trigger phrase, `et al.` citations, and Table/Figure references, taking the max across all four; `MIN_ENUMERATED_ITEMS_TO_SPLIT` (3) constant |
 | `pb_mineru.py` | Converts MinerU blocks to LLM-readable text (`blocks_to_text`); slices content to a section by heading fuzzy-match (`slice_section`) |
 | `pb_schema.py` | Rubric dict traversal and validation (`validate_partial`, `validate_final`, `find_node`, `find_parent`, `all_ids`, `node_depth`, `iter_nodes`) |
 | `pb_state.py` | State persistence; phase constants (`PHASE_BASE → EXPANSION → WEIGHT → DONE`; the judge checkpoint has no dedicated phase constant, it self-gates within `PHASE_WEIGHT` via `judge_approved`); atomic write via temp-file rename; state includes an `errors` list of guardrail violations, a `capped_branches` list of branch ids that hit `MAX_BRANCH_NODES`, a `section_map` dict from the base pass, and the judge checkpoint's `judge_approved`/`judge_retry_counts`/`judge_escalations` |
@@ -225,6 +237,83 @@ text. Falls back to the full list when the best heading score is below 0.3.
 ---
 
 ## Changelog
+
+### v19 — Raise `MAX_BRANCH_NODES` from 40 to 100
+
+**Tuning.** The per-branch node cap introduced in v12 (see below) was hitting legitimate
+large branches, forcing them to flatten well before the branch was actually done expanding.
+`MAX_BRANCH_NODES` (`pb_passes.py`) is raised from 40 to 100 — the guardrail's mechanism is
+unchanged, only the threshold at which `rubric_gen._expand_subtree` force-flattens a branch
+via `pb_passes.force_branch_cap_leaves`.
+
+### v18 — Task-category validation in `normalize_child`
+
+**A hallucinated category crashed the run at the very last line, after full pipeline cost
+was spent.** `finalize()`'s `validate_final(rubric)` was the *only* place that ever checked a
+leaf's `task_category`/`finegrained_task_category` against the schema's allowed values
+(`TaskNode.__post_init__`, called transitively) — and `validate_final` runs once, at the very
+end of `main()`. In `--review` mode, `validate_partial` (called from inside `review_pass`)
+caught bad categories after every phase and looped the human back to fix the draft. But in
+agentic mode (no `--review`), `review_pass` is skipped entirely (`approved = candidate`), so
+nothing validated the tree in between — an LLM response like `"finegrained_task_category":
+"Evaluation, Metrics & Presentation"` (a hallucinated blend of the real `"Evaluation, Metrics
+& Benchmarking"` and `"Logging, Analysis & Presentation"` categories) rode silently through
+base, expansion, split-check, and weight, then crashed `finalize()` with a bare
+`ValueError` — after every LLM call in the run had already been paid for, with no retry path
+(`MaxRetriesExceeded`/`SystemExit` are for weight/base retries; nothing analogous existed
+for this).
+
+**Fix.** `normalize_child` (`pb_passes.py`) now validates a non-expandable child's
+`task_category`/`finegrained_task_category` the moment the model returns them, against
+`pb_schema.LEAF_CATEGORIES`/`FINEGRAINED_CATEGORIES` — the same source of truth the system
+prompt itself is built from. A missing or unrecognized `task_category` is forced to
+`_DEPTH_FALLBACK_CATEGORY` (`"Code Development"`, the fallback every other guardrail in this
+module already uses); an unrecognized `finegrained_task_category` is cleared to `None` (its
+schema-valid absent state, since it's optional). Each correction logs one `errors` line.
+`apply_base` gained an `errors` param to thread this through (previously it had none, since
+no guardrail lived in the base pass before this); `run_base_phase` now stages a
+`candidate_errors` copy per attempt the same way `run_expansion_phase` already does, discarded
+on `RerunPass`, committed to `state["errors"]` only on approval. `apply_expansion` and
+`apply_split` already accepted `errors` and now pass it through to `normalize_child` too.
+
+### v17 — Bare-list enumeration detection (fixes a truncation the v14 scaling formula couldn't reach)
+
+**Still truncating despite the v14 `max_tokens` scaling.** `run_expansion_llm`'s
+`max_tokens = min(8000 + 400 * enum_count, 32000)` formula (v14) only scales up when
+`count_enumerated_items` finds a signal — and its comma-list detector only fired after a
+trigger phrase ("including"/"such as"/a colon). A requirements text like "...demonstrating
+that SmoothQuant preserves FP16 accuracy across OPT, BLOOM, GLM-130B, OPT-IML, LLaMA,
+Llama-2, Falcon, Mistral, and Mixtral models against the baselines" enumerates 9 models with
+no trigger phrase ahead of the list (it follows "across"), so `enum_count` stayed 0,
+`max_tokens` stayed at the 8000 floor, and the ENUMERATION GUARDRAIL still fired off the
+node's own requirements — a mismatch between what the guardrail prompt asked for and what
+`max_tokens` budgeted for, truncating the 9-child response.
+
+**Fix.** `pb_enumeration.py` gains `_count_bare_comma_list_items`, a trigger-phrase-free
+detector for Oxford-comma lists of capitalized items (`[A-Z][\w\-]*` tokens, 3 or more,
+joined by commas and a trailing "and X") — the pattern model/dataset/baseline name lists
+almost always take. `count_enumerated_items` now takes the max across four signals instead
+of three. Verified against the exact failing text (now detects 9, scaling `max_tokens` to
+11600) with new unit tests in `tests/test_enumeration.py`, including a guard that a plain
+two-item "X and Y" phrase (no comma) still doesn't false-trigger.
+
+### v16 — Cost tracking for the embedding call
+
+**Untracked OpenAI spend.** The weight pass's `text-embedding-3-small` call (`pb_embeddings.
+embed_texts`, via `rescale_global_weights`) had no `PRICING` entry and was never recorded on
+the `CostTracker` passed everywhere else — the final cost report and the live per-call
+`Current usage: $X.XXXX` indicator both silently omitted it, understating total OpenAI spend
+whenever the weight pass ran (i.e. every run, since the embedding rescale isn't gated by
+`--judge`).
+
+**Fix.** `pb_cost.PRICING` gains a `"text-embedding-3-small"` entry (input-only; embeddings
+have no output/cache tokens) and an `_PROVIDER_OF` mapping to `"OpenAI"`. `embed_texts` takes
+an optional `tracker` param, records usage via a `SimpleNamespace` shim (same pattern as
+`pb_judge._usage_shim`) translating OpenAI's `usage.prompt_tokens` into the attribute names
+`CostTracker.record` reads, and prints the same `Current usage: $X.XXXX` line every other pass
+does. `rescale_global_weights` threads `tracker` through to `embed_texts`; `run_weight_phase`
+passes its existing `tracker` through to `rescale_global_weights`, so no new tracker plumbing
+was needed at the call site.
 
 ### v15 — Coverage-judge checkpoint (o3-mini, opt-in)
 
@@ -646,7 +735,7 @@ Without `--resume`, an existing `rubric_state.json` is overwritten and the run s
 | `rubric_draft.json` | Editable draft for the current pass. |
 | `rubric_state.json` | Resumable checkpoint (rubric + expansion queue + hints + guardrail errors + capped branch ids + base-pass `section_map` + judge state: `judge_approved`, `judge_retry_counts`, `judge_escalations`). |
 | `rubric_final.json` | Final validated rubric (written when all phases complete). |
-| `errors.txt` | Guardrail violations and split-check activity, one per line. Only written if at least one occurred. Includes: the model trying to expand a node past `MAX_EXPANSION_DEPTH` (7), logged as `"<node-id>: Model attempted to expand past the maximum depth of 7 nodes."`; a branch hitting `MAX_BRANCH_NODES` (40), logged per forced node as `"<node-id>: Branch '<branch-id>' hit the 40-node cap; forced to leaf."`; every split applied by the split-check pass, logged as `"<leaf-id>: split-check split into N children (branch '<branch-id>')."`; every duplicate leaf removed by the split-check pass, logged as `"<leaf-id>: split-check removed as duplicate of '<other-leaf-id>'."` (plus a second line if removing it force-flattened its now-childless parent); and any split-check child that still trips the enumeration threshold, logged as a model-under-split warning. |
+| `errors.txt` | Guardrail violations and split-check activity, one per line. Only written if at least one occurred. Includes: the model trying to expand a node past `MAX_EXPANSION_DEPTH` (7), logged as `"<node-id>: Model attempted to expand past the maximum depth of 7 nodes."`; a branch hitting `MAX_BRANCH_NODES` (100), logged per forced node as `"<node-id>: Branch '<branch-id>' hit the 100-node cap; forced to leaf."`; every split applied by the split-check pass, logged as `"<leaf-id>: split-check split into N children (branch '<branch-id>')."`; every duplicate leaf removed by the split-check pass, logged as `"<leaf-id>: split-check removed as duplicate of '<other-leaf-id>'."` (plus a second line if removing it force-flattened its now-childless parent); and any split-check child that still trips the enumeration threshold, logged as a model-under-split warning. |
 | `flagged_duplicates.json` | Leaves from *different* top-level branches that the weight pass's embedding-based rescale clustered together as likely restating the same claim (cosine similarity ≥ 0.92). Only written if at least one cross-branch cluster was found; never auto-deleted — for manual review. |
 | `judge_escalations.txt` | Branches the coverage judge (`--judge`) still flagged as `"insufficient"` after `MAX_JUDGE_RETRIES` (2) re-expansion attempts. One block per escalated branch: the branch id, then every missing-claim/evidence pair from every failed attempt. Only written if at least one branch escalated; the pipeline still completes normally (fail-open) — this file is for manual follow-up. |
 

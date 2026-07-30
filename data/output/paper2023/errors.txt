@@ -1,96 +1,109 @@
-softmax-fp16: Branch 'quantization-settings' hit the 40-node cap; forced to leaf.
-av-bmm-int8: Branch 'quantization-settings' hit the 40-node cap; forced to leaf.
-layernorm-fp16: Branch 'quantization-settings' hit the 40-node cap; forced to leaf.
-ffn-activation-fp16: Branch 'quantization-settings' hit the 40-node cap; forced to leaf.
-wikitext-ppl-computation-implementation: Branch 'experimental-setup' hit the 40-node cap; forced to leaf.
-wikitext-ppl-computation-pipeline: Branch 'experimental-setup' hit the 40-node cap; forced to leaf.
-ft-memory-aggregated-peak-measurement-code: Branch 'speedup-memory-results' hit the 40-node cap; forced to leaf.
-ft-memory-fp16-baseline-measurement: Branch 'speedup-memory-results' hit the 40-node cap; forced to leaf.
-ft-memory-smoothquant-o3-measurement: Branch 'speedup-memory-results' hit the 40-node cap; forced to leaf.
-table8-opt175b-bs1-seq512: Branch 'scaling-530b' hit the 40-node cap; forced to leaf.
-table8-opt175b-bs1-seq1024: Branch 'scaling-530b' hit the 40-node cap; forced to leaf.
-table8-opt175b-bs16-seq512: Branch 'scaling-530b' hit the 40-node cap; forced to leaf.
-table8-opt175b-bs16-seq1024: Branch 'scaling-530b' hit the 40-node cap; forced to leaf.
-alpha-zero-accuracy-degradation-verification: split-check removed as duplicate of 'alpha-zero-accuracy-degradation-result'.
-symmetric-rounding-quantization: split-check removed as duplicate of 'symmetric-quantization-step-size'.
-dynamic-quantization-runtime-delta: split-check removed as duplicate of 'smoothquant-o1-setting'.
-calibration-forward-pass-execution: split-check removed as duplicate of 'calibration-sample-collection'.
-static-delta-storage-and-reuse: split-check removed as duplicate of 'static-quantization-offline-delta'.
-qkv-int8-execution-verification: split-check removed as duplicate of 'q-projection-int8'.
-qkt-bmm-int8-execution-verification: split-check removed as duplicate of 'qkt-bmm-int8-gemm-execution'.
-post-gemm-rescaling-correctness-verification: split-check removed as duplicate of 'post-gemm-weight-scale-outer-dim'.
-static-vs-dynamic-latency-comparison: split-check split into 3 children (branch 'quantization-settings').
-wikitext-seqlen-512-config: split-check removed as duplicate of 'wikitext-ppl-llama1-table6'.
-wikitext-seqlen-2048-config: split-check removed as duplicate of 'table7-wikitext2-seqlen-2048-eval'.
-wikitext-ppl-computation-implementation: split-check removed as duplicate of 'wikitext-ppl-computation-pipeline'.
-llama1-7b-load-and-smooth: split-check removed as duplicate of 'eval-models-opt-bloom-glm'.
-llama1-13b-load-and-smooth: split-check removed as duplicate of 'eval-models-opt-bloom-glm'.
-llama1-30b-load-and-smooth: split-check removed as duplicate of 'eval-models-opt-bloom-glm'.
-llama1-65b-load-and-smooth: split-check removed as duplicate of 'eval-models-opt-bloom-glm'.
-llama2-7b-load-and-smooth: split-check removed as duplicate of 'eval-models-opt-bloom-glm'.
-llama2-13b-load-and-smooth: split-check removed as duplicate of 'eval-models-opt-bloom-glm'.
-llama2-70b-load-and-smooth: split-check removed as duplicate of 'eval-models-opt-bloom-glm'.
-falcon-7b-load-and-smooth: split-check removed as duplicate of 'eval-models-opt-bloom-glm'.
-falcon-40b-load-and-smooth: split-check removed as duplicate of 'eval-models-opt-bloom-glm'.
-mistral-7b-load-and-smooth: split-check removed as duplicate of 'eval-models-opt-bloom-glm'.
-mixtral-8x7b-load-and-smooth: split-check removed as duplicate of 'eval-models-opt-bloom-glm'.
-newer-arch-per-token-per-channel-quantization-config: split-check removed as duplicate of 'table7-wikitext2-seqlen-2048-eval'.
-eval-models-opt-scales-load: split-check child of 'eval-models-opt-bloom-glm' still enumerates >= 3 items after splitting (model under-split).
-eval-models-opt-bloom-glm: split-check split into 3 children (branch 'experimental-setup').
-wikitext-ppl-newer-arch-table7: split-check split into 7 children (branch 'experimental-setup').
-wikitext-ppl-llama1-table6: split-check split into 4 children (branch 'experimental-setup').
-alpha-selection-per-model-family: split-check split into 7 children (branch 'experimental-setup').
-quant-difficulty-per-channel-hardware-incompatibility-note: split-check split into 3 children (branch 'quantization-difficulty-analysis').
-opt-175b-accuracy-table3: split-check split into 8 children (branch 'accuracy-results').
-multi-llm-accuracy-table4: split-check split into 8 children (branch 'accuracy-results').
-opt-iml-30b-accuracy-table5: split-check split into 6 children (branch 'accuracy-results').
-llama1-accuracy-table6: split-check split into 2 children (branch 'accuracy-results').
-newer-arch-accuracy-table7: split-check split into 7 children (branch 'accuracy-results').
-ft-memory-opt13b: split-check removed as duplicate of 'ft-context-memory-figure9-bottom-panel-result'.
-ft-memory-opt30b: split-check removed as duplicate of 'ft-context-memory-figure9-bottom-panel-result'.
-ft-memory-opt66b: split-check removed as duplicate of 'ft-context-memory-figure9-bottom-panel-result'.
-ft-memory-opt175b: split-check removed as duplicate of 'ft-context-memory-figure9-bottom-panel-result'.
-ft-memory-benchmark-execution: split-check removed as duplicate of 'ft-context-opt66b-tensor-parallel-execution'.
-ft-memory-fp16-baseline-measurement: split-check removed as duplicate of 'ft-context-opt13b-single-gpu-execution'.
-ft-memory-smoothquant-o3-measurement: split-check removed as duplicate of 'ft-context-opt175b-tensor-parallel-execution'.
-ft-memory-figure9-bottom-panel-plot: split-check removed as duplicate of 'figure9-fastertransformer-memory-plot'.
-fastertransformer-context-stage-execution: split-check removed as duplicate of 'ft-context-opt66b-tensor-parallel-execution'.
-figure9-fastertransformer-latency-plot: split-check removed as duplicate of 'figure8-figure9-plotting-code'.
-figure9-fastertransformer-memory-plot: split-check removed as duplicate of 'figure8-figure9-plotting-code'.
-ft-memory-int8-fully-quantized-advantage: split-check removed as duplicate of 'pytorch-context-stage-memory-results'.
-pytorch-context-stage-latency-results: split-check split into 3 children (branch 'speedup-memory-results').
-fastertransformer-single-gpu-latency-reduction: split-check split into 2 children (branch 'speedup-memory-results').
-decoding-stage-latency-results-table8: split-check split into 2 children (branch 'speedup-memory-results').
-o1-o2-o3-latency-comparison-table11: split-check split into 3 children (branch 'speedup-memory-results').
-ft-memory-model-weights-captured: split-check split into 2 children (branch 'speedup-memory-results').
-ft-context-latency-figure9-top-panel-result: split-check split into 2 children (branch 'speedup-memory-results').
-mt-nlg-530b-lambada-evaluation: split-check removed as duplicate of 'mt-nlg-530b-accuracy-table9-results'.
-mt-nlg-530b-hellaswag-evaluation: split-check removed as duplicate of 'mt-nlg-530b-accuracy-table9-results'.
-mt-nlg-530b-piqa-evaluation: split-check removed as duplicate of 'mt-nlg-530b-accuracy-table9-results'.
-mt-nlg-530b-winogrande-evaluation: split-check removed as duplicate of 'mt-nlg-530b-accuracy-table9-results'.
-mt-nlg-530b-average-accuracy-evaluation: split-check removed as duplicate of 'mt-nlg-530b-accuracy-table9-results'.
-mt-nlg-530b-single-node-serving-table10: split-check removed as duplicate of 'mt-nlg-530b-table10-latency-memory-results'.
-table8-opt30b-bs1-seq512-speedup-ratio: split-check removed as duplicate of 'table8-opt30b-bs1-seq512-latency'.
-table8-opt30b-bs1-seq1024-speedup-ratio: split-check removed as duplicate of 'table8-opt30b-bs1-seq1024-latency'.
-table8-opt30b-bs16-seq512-speedup-ratio: split-check removed as duplicate of 'table8-opt30b-bs16-seq512-latency'.
-mt-nlg-530b-table10-latency-memory-results: split-check split into 8 children (branch 'scaling-530b').
-mt-nlg-530b-accuracy-table9-results: split-check split into 2 children (branch 'scaling-530b').
-table8-opt175b-bs1-seq512-latency: split-check child of 'table8-opt175b-bs1-seq512' still enumerates >= 3 items after splitting (model under-split).
-table8-opt175b-bs1-seq512-memory: split-check child of 'table8-opt175b-bs1-seq512' still enumerates >= 3 items after splitting (model under-split).
-table8-opt175b-bs1-seq512: split-check split into 2 children (branch 'scaling-530b').
-table8-opt175b-bs1-seq1024-latency: split-check child of 'table8-opt175b-bs1-seq1024' still enumerates >= 3 items after splitting (model under-split).
-table8-opt175b-bs1-seq1024-memory: split-check child of 'table8-opt175b-bs1-seq1024' still enumerates >= 3 items after splitting (model under-split).
-table8-opt175b-bs1-seq1024: split-check split into 2 children (branch 'scaling-530b').
-table8-opt175b-bs16-seq512-latency: split-check child of 'table8-opt175b-bs16-seq512' still enumerates >= 3 items after splitting (model under-split).
-table8-opt175b-bs16-seq512-memory: split-check child of 'table8-opt175b-bs16-seq512' still enumerates >= 3 items after splitting (model under-split).
-table8-opt175b-bs16-seq512: split-check split into 2 children (branch 'scaling-530b').
-table8-opt175b-bs16-seq1024-latency: split-check child of 'table8-opt175b-bs16-seq1024' still enumerates >= 3 items after splitting (model under-split).
-table8-opt175b-bs16-seq1024-memory: split-check child of 'table8-opt175b-bs16-seq1024' still enumerates >= 3 items after splitting (model under-split).
-table8-opt175b-bs16-seq1024: split-check split into 2 children (branch 'scaling-530b').
-table8-opt30b-bs1-seq512-latency: split-check split into 2 children (branch 'scaling-530b').
-table8-opt30b-bs1-seq512-memory: split-check split into 2 children (branch 'scaling-530b').
-table8-opt30b-bs1-seq1024-latency: split-check split into 2 children (branch 'scaling-530b').
-table8-opt30b-bs1-seq1024-memory: split-check split into 2 children (branch 'scaling-530b').
-table8-opt30b-bs16-seq512-latency: split-check split into 2 children (branch 'scaling-530b').
-table8-opt30b-bs16-seq512-memory: split-check split into 2 children (branch 'scaling-530b').
-alpha-sweet-spot-region-accuracy: split-check split into 2 children (branch 'migration-strength-ablation').
+table1-per-tensor-quant-opt-66b: Branch 'quantization-difficulty-analysis' hit the 40-node cap; forced to leaf.
+table1-per-tensor-quant-opt-175b: Branch 'quantization-difficulty-analysis' hit the 40-node cap; forced to leaf.
+table1-per-tensor-quant-implementation: Branch 'quantization-difficulty-analysis' hit the 40-node cap; forced to leaf.
+table1-per-token-quant-opt-6-7b: Branch 'quantization-difficulty-analysis' hit the 40-node cap; forced to leaf.
+table1-per-token-quant-opt-13b: Branch 'quantization-difficulty-analysis' hit the 40-node cap; forced to leaf.
+table1-per-token-quant-opt-30b: Branch 'quantization-difficulty-analysis' hit the 40-node cap; forced to leaf.
+table1-per-token-quant-opt-66b: Branch 'quantization-difficulty-analysis' hit the 40-node cap; forced to leaf.
+table1-per-token-quant-opt-175b: Branch 'quantization-difficulty-analysis' hit the 40-node cap; forced to leaf.
+table1-per-token-quant-implementation: Branch 'quantization-difficulty-analysis' hit the 40-node cap; forced to leaf.
+table1-per-channel-quant-opt-6-7b: Branch 'quantization-difficulty-analysis' hit the 40-node cap; forced to leaf.
+table1-per-channel-quant-opt-13b: Branch 'quantization-difficulty-analysis' hit the 40-node cap; forced to leaf.
+table1-per-channel-quant-opt-30b: Branch 'quantization-difficulty-analysis' hit the 40-node cap; forced to leaf.
+table1-per-channel-quant-opt-66b: Branch 'quantization-difficulty-analysis' hit the 40-node cap; forced to leaf.
+table1-per-channel-quant-opt-175b: Branch 'quantization-difficulty-analysis' hit the 40-node cap; forced to leaf.
+table1-per-channel-quant-implementation: Branch 'quantization-difficulty-analysis' hit the 40-node cap; forced to leaf.
+table1-per-tensor-quant-opt-6-7b-eval-harness: Branch 'quantization-difficulty-analysis' hit the 40-node cap; forced to leaf.
+table1-per-tensor-quant-opt-6-7b-average-metric: Branch 'quantization-difficulty-analysis' hit the 40-node cap; forced to leaf.
+table1-per-tensor-quant-opt-13b-eval-harness: Branch 'quantization-difficulty-analysis' hit the 40-node cap; forced to leaf.
+table1-per-tensor-quant-opt-13b-average-metric: Branch 'quantization-difficulty-analysis' hit the 40-node cap; forced to leaf.
+table1-per-tensor-quant-opt-30b-eval-harness: Branch 'quantization-difficulty-analysis' hit the 40-node cap; forced to leaf.
+table1-per-tensor-quant-opt-30b-average-metric: Branch 'quantization-difficulty-analysis' hit the 40-node cap; forced to leaf.
+table4-opt175b-implementation-execution: Branch 'accuracy-experiments' hit the 40-node cap; forced to leaf.
+table4-bloom176b-implementation-execution: Branch 'accuracy-experiments' hit the 40-node cap; forced to leaf.
+table4-glm130b-implementation-execution: Branch 'accuracy-experiments' hit the 40-node cap; forced to leaf.
+table4-eval-harness-tooling-setup: Branch 'accuracy-experiments' hit the 40-node cap; forced to leaf.
+fastertransformer-used-for-larger-models-instead: Branch 'speedup-memory-experiments' hit the 40-node cap; forced to leaf.
+pytorch-benchmark-no-other-opt-sizes: Branch 'speedup-memory-experiments' hit the 40-node cap; forced to leaf.
+table1-per-tensor-quant-implementation: split-check removed as duplicate of 'table1-per-tensor-quant-opt-6-7b-implementation'.
+table1-per-token-quant-implementation: split-check removed as duplicate of 'table1-per-token-quant-opt-6-7b'.
+table1-per-channel-quant-implementation: split-check removed as duplicate of 'table1-per-channel-quant-opt-6-7b'.
+table4-glm130b-implementation-execution-methods: split-check child of 'table4-glm130b-implementation-execution' still enumerates >= 3 items after splitting (model under-split).
+table4-glm130b-smoothquant-implementation-execution: split-check child of 'table4-glm130b-implementation-execution' still enumerates >= 3 items after splitting (model under-split).
+table4-glm130b-implementation-execution: split-check split into 2 children (branch 'accuracy-experiments').
+table7-llama2-falcon-mistral-mixtral-implementation-execution: split-check split into 4 children (branch 'accuracy-experiments').
+pytorch-benchmark-no-other-opt-sizes: split-check removed as duplicate of 'pytorch-benchmark-excludes-opt-66b-175b'.
+decoding-stage-latency-speedup-1-42x: split-check removed as duplicate of 'decoding-stage-benchmark-execution'.
+pytorch-context-benchmark-int8-linear-bmm-integration: split-check split into 2 children (branch 'speedup-memory-experiments').
+pytorch-llm-int8-overhead-attribution: split-check split into 2 children (branch 'speedup-memory-experiments').
+fastertransformer-int8-linear-bmm-integration: split-check split into 2 children (branch 'speedup-memory-experiments').
+decoding-stage-benchmark-execution: split-check split into 2 children (branch 'speedup-memory-experiments').
+mt-nlg-530b-fp16-average-result: split-check child of 'mt-nlg-530b-fp16-baseline-result' still enumerates >= 3 items after splitting (model under-split).
+mt-nlg-530b-fp16-baseline-result: split-check split into 5 children (branch 'scaling-530b').
+mt-nlg-530b-int8-negligible-loss-result: split-check split into 5 children (branch 'scaling-530b').
+table11-llm-int8-usually-slower-than-fp16: split-check removed as duplicate of 'table11-granularity-latency-trend'.
+table11-fp16-baseline-latency-implementation: split-check split into 2 children (branch 'ablation-studies').
+table11-llm-int8-latency-implementation: split-check split into 2 children (branch 'ablation-studies').
+table11-smoothquant-o1-latency-implementation: split-check split into 2 children (branch 'ablation-studies').
+table11-smoothquant-o2-latency-implementation: split-check split into 2 children (branch 'ablation-studies').
+table11-smoothquant-o3-latency-implementation: split-check split into 2 children (branch 'ablation-studies').
+table11-static-faster-than-dynamic: split-check split into 1 children (branch 'ablation-studies').
+table11-smoothquant-faster-than-fp16-all-settings: split-check split into 3 children (branch 'ablation-studies').
+accuracy-experiments: Branch 'accuracy-experiments' hit the 40-node cap; forced to leaf.
+table1-per-tensor-accuracy-collapse: split-check removed as duplicate of 'table1-per-tensor-quant-opt-6-7b-result-match'.
+table1-per-tensor-quant-opt-66b-eval-harness: split-check child of 'table1-per-tensor-quant-opt-66b' still enumerates >= 3 items after splitting (model under-split).
+table1-per-tensor-quant-opt-66b-average-metric: split-check child of 'table1-per-tensor-quant-opt-66b' still enumerates >= 3 items after splitting (model under-split).
+table1-per-tensor-quant-opt-66b: split-check split into 4 children (branch 'quantization-difficulty-analysis').
+table1-per-tensor-quant-opt-175b-eval-harness: split-check child of 'table1-per-tensor-quant-opt-175b' still enumerates >= 3 items after splitting (model under-split).
+table1-per-tensor-quant-opt-175b-average-metric: split-check child of 'table1-per-tensor-quant-opt-175b' still enumerates >= 3 items after splitting (model under-split).
+table1-per-tensor-quant-opt-175b: split-check split into 4 children (branch 'quantization-difficulty-analysis').
+table1-per-token-quant-opt-6-7b-eval-harness: split-check child of 'table1-per-token-quant-opt-6-7b' still enumerates >= 3 items after splitting (model under-split).
+table1-per-token-quant-opt-6-7b: split-check split into 3 children (branch 'quantization-difficulty-analysis').
+table1-per-token-quant-opt-13b-eval-harness: split-check child of 'table1-per-token-quant-opt-13b' still enumerates >= 3 items after splitting (model under-split).
+table1-per-token-quant-opt-13b: split-check split into 3 children (branch 'quantization-difficulty-analysis').
+table1-per-token-quant-opt-30b-eval-harness: split-check child of 'table1-per-token-quant-opt-30b' still enumerates >= 3 items after splitting (model under-split).
+table1-per-token-quant-opt-30b: split-check split into 3 children (branch 'quantization-difficulty-analysis').
+table1-per-token-quant-opt-66b-eval-harness: split-check child of 'table1-per-token-quant-opt-66b' still enumerates >= 3 items after splitting (model under-split).
+table1-per-token-quant-opt-66b: split-check split into 3 children (branch 'quantization-difficulty-analysis').
+table1-per-token-quant-opt-175b-eval-harness: split-check child of 'table1-per-token-quant-opt-175b' still enumerates >= 3 items after splitting (model under-split).
+table1-per-token-quant-opt-175b: split-check split into 3 children (branch 'quantization-difficulty-analysis').
+table1-per-channel-quant-opt-6-7b-eval-harness: split-check child of 'table1-per-channel-quant-opt-6-7b' still enumerates >= 3 items after splitting (model under-split).
+table1-per-channel-quant-opt-6-7b: split-check split into 3 children (branch 'quantization-difficulty-analysis').
+table1-per-channel-quant-opt-13b-eval-harness: split-check child of 'table1-per-channel-quant-opt-13b' still enumerates >= 3 items after splitting (model under-split).
+table1-per-channel-quant-opt-13b: split-check split into 3 children (branch 'quantization-difficulty-analysis').
+table1-per-channel-quant-opt-30b-eval-harness: split-check child of 'table1-per-channel-quant-opt-30b' still enumerates >= 3 items after splitting (model under-split).
+table1-per-channel-quant-opt-30b: split-check split into 3 children (branch 'quantization-difficulty-analysis').
+table1-per-channel-quant-opt-66b-eval-harness: split-check child of 'table1-per-channel-quant-opt-66b' still enumerates >= 3 items after splitting (model under-split).
+table1-per-channel-quant-opt-66b: split-check split into 3 children (branch 'quantization-difficulty-analysis').
+table1-per-channel-quant-opt-175b-eval-harness: split-check child of 'table1-per-channel-quant-opt-175b' still enumerates >= 3 items after splitting (model under-split).
+table1-per-channel-quant-opt-175b: split-check split into 3 children (branch 'quantization-difficulty-analysis').
+table1-fp16-baseline-accuracy: split-check split into 5 children (branch 'quantization-difficulty-analysis').
+pytorch-benchmark-includes-opt-6-7b: split-check removed as duplicate of 'pytorch-context-benchmark-opt-6-7b'.
+pytorch-benchmark-includes-opt-13b: split-check removed as duplicate of 'pytorch-context-benchmark-opt-13b'.
+pytorch-benchmark-includes-opt-30b: split-check removed as duplicate of 'pytorch-context-benchmark-opt-30b'.
+pytorch-benchmark-restricted-opt-6-7b-13b-30b: forced to leaf after its last child 'pytorch-benchmark-includes-opt-30b' was removed as a duplicate.
+pytorch-benchmark-single-gpu-huggingface-cause: split-check removed as duplicate of 'pytorch-benchmark-excludes-opt-66b-175b'.
+pytorch-llm-int8-slower-opt-6-7b: split-check removed as duplicate of 'pytorch-llm-int8-overhead-attribution-statement'.
+pytorch-llm-int8-slower-opt-13b: split-check removed as duplicate of 'pytorch-llm-int8-overhead-attribution-statement'.
+pytorch-llm-int8-slower-opt-30b: split-check removed as duplicate of 'pytorch-llm-int8-overhead-attribution-statement'.
+fastertransformer-half-gpu-serving-opt66b: split-check removed as duplicate of 'fastertransformer-benchmark-opt-66b'.
+fastertransformer-half-gpu-serving-opt175b: split-check removed as duplicate of 'fastertransformer-benchmark-opt-175b'.
+decoding-stage-memory-halved: split-check removed as duplicate of 'decoding-stage-benchmark-opt30b-execution'.
+table11-full-latency-reproduction: split-check child of 'pytorch-llm-int8-overhead-table11-crossref' still enumerates >= 3 items after splitting (model under-split).
+pytorch-llm-int8-overhead-table11-crossref: split-check split into 2 children (branch 'speedup-memory-experiments').
+mt-nlg-530b-average-arithmetic-mean-formula: split-check removed as duplicate of 'mt-nlg-530b-int8-average-matches-fp16-result'.
+mt-nlg-530b-memory-halving-consistency-check: split-check removed as duplicate of 'mt-nlg-530b-table10-seqlen1024-memory-halving'.
+table11-fp16-latency-opt13b: split-check split into 2 children (branch 'ablation-studies').
+table11-fp16-latency-opt30b: split-check split into 2 children (branch 'ablation-studies').
+table11-llm-int8-latency-opt13b: split-check split into 2 children (branch 'ablation-studies').
+table11-llm-int8-latency-opt30b: split-check split into 2 children (branch 'ablation-studies').
+table11-smoothquant-o1-latency-opt13b: split-check split into 2 children (branch 'ablation-studies').
+table11-smoothquant-o1-latency-opt30b: split-check split into 2 children (branch 'ablation-studies').
+table11-smoothquant-o2-latency-opt13b: split-check split into 2 children (branch 'ablation-studies').
+table11-smoothquant-o2-latency-opt30b: split-check split into 2 children (branch 'ablation-studies').
+table11-smoothquant-o3-latency-opt13b: split-check split into 2 children (branch 'ablation-studies').
+table11-smoothquant-o3-latency-opt30b: split-check split into 2 children (branch 'ablation-studies').
+table11-smoothquant-o1-faster-than-fp16: split-check split into 2 children (branch 'ablation-studies').
+table11-smoothquant-o2-faster-than-fp16: split-check split into 2 children (branch 'ablation-studies').
+table11-smoothquant-o3-faster-than-fp16: split-check split into 2 children (branch 'ablation-studies').
+table11-o3-faster-than-o2-static-vs-dynamic: split-check split into 2 children (branch 'ablation-studies').

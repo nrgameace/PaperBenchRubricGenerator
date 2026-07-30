@@ -9,6 +9,7 @@ from the base pass's section_map), not from raw leaf/weight counts an LLM guesse
 import json
 import math
 from pathlib import Path
+from types import SimpleNamespace
 
 import openai
 
@@ -24,11 +25,25 @@ def build_embedding_client() -> openai.OpenAI:
     return openai.OpenAI()
 
 
-def embed_texts(client, texts: list, model: str = EMBEDDING_MODEL) -> list:
+def _usage_shim(usage) -> SimpleNamespace:
+    """Adapt an OpenAI embeddings usage object (prompt_tokens only, no completion or
+    cache tokens) into the attribute names pb_cost.CostTracker.record reads via getattr."""
+    return SimpleNamespace(
+        input_tokens=getattr(usage, "prompt_tokens", 0) or 0,
+        output_tokens=0,
+        cache_creation_input_tokens=0,
+        cache_read_input_tokens=0,
+    )
+
+
+def embed_texts(client, texts: list, model: str = EMBEDDING_MODEL, tracker=None) -> list:
     """Return one embedding vector per input text, in order, via a single batched call."""
     if not texts:
         return []
     response = client.embeddings.create(model=model, input=texts)
+    if tracker is not None:
+        tracker.record(model, _usage_shim(response.usage))
+        print(f"  Current usage: ${tracker.total_cost():.4f}")
     return [item.embedding for item in response.data]
 
 
@@ -172,7 +187,7 @@ def write_flagged_duplicates(report: list, output_dir) -> None:
     path.write_text(json.dumps(report, indent=2))
 
 
-def rescale_global_weights(rubric: dict, client, section_map: dict) -> tuple:
+def rescale_global_weights(rubric: dict, client, section_map: dict, tracker=None) -> tuple:
     """Extract leaves, embed once, compute branch masses, derive targets, rescale weights,
     and flag cross-branch duplicates.
 
@@ -181,7 +196,7 @@ def rescale_global_weights(rubric: dict, client, section_map: dict) -> tuple:
     existing weights dict.
     """
     leaves = extract_leaves(rubric)
-    vectors = embed_texts(client, [leaf["requirements"] for leaf in leaves])
+    vectors = embed_texts(client, [leaf["requirements"] for leaf in leaves], tracker=tracker)
     vectors_by_id = {leaf["id"]: vector for leaf, vector in zip(leaves, vectors)}
 
     branch_ids = [branch["id"] for branch in rubric.get("sub_tasks", []) or []]

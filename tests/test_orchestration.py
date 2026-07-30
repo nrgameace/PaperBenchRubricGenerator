@@ -588,6 +588,28 @@ def test_run_base_phase_stores_section_map_in_state(tmp_path):
     assert state["section_map"] == fake_section_map
 
 
+def test_run_base_phase_logs_hallucinated_category_in_agentic_mode(tmp_path):
+    """A hallucinated task_category must be caught and logged during the base pass itself in
+    agentic mode (no human review to catch it), not silently ride through to validate_final at
+    the very end of the run after the full pipeline cost has been spent."""
+    state = {"rubric": {}, "queue": [], "hints": {}, "errors": []}
+    llm_response = {
+        "root": {"requirements": "r"},
+        "children": [{"id": "leaf", "requirements": "atomic", "expandable": False,
+                      "task_category": "Evaluation, Metrics & Presentation"}],
+    }
+
+    with patch("rubric_gen.run_base_llm", return_value=llm_response), \
+         patch("rubric_gen.pretty_print_nodes"), \
+         patch("rubric_gen.commit"), \
+         patch("rubric_gen.blocks_to_text", return_value=""):
+        rubric_gen.run_base_phase(None, [], None, [], state, "model", tmp_path, human_review=False)
+
+    assert state["rubric"]["sub_tasks"][0]["task_category"] == "Code Development"
+    assert len(state["errors"]) == 1
+    assert "leaf" in state["errors"][0]
+
+
 def test_run_base_phase_retries_on_empty_top_level_children(tmp_path):
     """A base pass with zero top-level children must not be accepted silently (it would blow up
     with a ZeroDivisionError deep in the weight phase's embedding rescale); it should retry."""

@@ -15,7 +15,10 @@ class _FakeEmbeddings:
     def create(self, model, input):
         # Deterministic vectors derived from text length so results are stable across runs.
         vectors = [[float(len(text) % 7 + 1), 1.0] for text in input]
-        return SimpleNamespace(data=[SimpleNamespace(embedding=v) for v in vectors])
+        return SimpleNamespace(
+            data=[SimpleNamespace(embedding=v) for v in vectors],
+            usage=SimpleNamespace(prompt_tokens=sum(len(text) for text in input)),
+        )
 
 
 class _FakeEmbeddingClient:

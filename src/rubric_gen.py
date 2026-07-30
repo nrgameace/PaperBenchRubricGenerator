@@ -105,7 +105,9 @@ def run_base_phase(client, system_blocks, pdf_block, content_list, state, model,
     feedback = ""
     attempt = 0
     while True:
-        rubric, queue, hints, section_map = apply_base(run_base_llm(client, system_blocks, pdf_block, content_list_text, model, tracker=tracker))
+        candidate_errors = list(state.get("errors", []))
+        rubric, queue, hints, section_map = apply_base(
+            run_base_llm(client, system_blocks, pdf_block, content_list_text, model, tracker=tracker), errors=candidate_errors)
         if not rubric["sub_tasks"]:
             attempt += 1
             if attempt > MAX_BASE_RETRIES:
@@ -128,6 +130,7 @@ def run_base_phase(client, system_blocks, pdf_block, content_list, state, model,
         state["rubric"], state["hints"] = approved, hints
         state["queue"] = reconcile_queue(approved, queue)
         state["section_map"] = section_map
+        state["errors"] = candidate_errors
         prune_hints(state)
         commit(state, output_dir)
         return
@@ -378,7 +381,7 @@ def run_weight_phase(client, embedding_client, system_blocks, content_list, stat
 
         print("  Rescaling weights via embedding-based branch mass and section coverage...")
         rescaled_leaf_weights, duplicate_clusters = rescale_global_weights(
-            candidate, embedding_client, state.get("section_map", {})
+            candidate, embedding_client, state.get("section_map", {}), tracker=tracker
         )
         weights.update(rescaled_leaf_weights)
         weights[root_id] = 1

@@ -1,0 +1,24 @@
+=== Branch: quantization-preliminaries ===
+Attempt 1:
+  - Missing: activation smoothing transformation with migration strength hyperparameter (evidence: "Instead of per-channel activation quantization (which is infeasible), we propose to “smooth” the input activation by dividing it by a per-channel smoothing factor s ∈ R^{C_i}. To keep the mathematical equivalence of a linear layer, we scale the weights accordingly in the reversed direction:
+
+      Y = (X diag(s)^{-1}) · (diag(s) W) = X̂ Ŵ (Equation 3)
+
+Later, the text introduces a hyper-parameter, migration strength α, and specifies its computation in Equation 4:
+
+      s_j = max(|X_j|)^α / max(|W_j|)^(1 - α)
+
+These details regarding the smoothing transformation and the migration strength hyperparameter are required by the section but are not covered by any existing rubric leaf.")
+Attempt 2:
+  - Missing: activation-smoothing-transformation (evidence: "Instead of per-channel activation quantization (which is infeasible), we propose to “smooth” the input activation by dividing it by a per-channel smoothing factor s ∈ R^(C_i). To keep the mathematical equivalence of a linear layer, we scale the weights accordingly in the reversed direction: Y = (X diag(s)^(-1)) · (diag(s) W) = ˆX ˆW.")
+  - Missing: migration-strength-hyperparameter (evidence: "Here we introduce a hyper-parameter, migration strength α, to control how much difficulty we want to migrate from activation to weights, using the following equation: s_j = max(|X_j|)^α / max(|W_j|)^(1-α)")
+Attempt 3:
+  - Missing: SmoothQuant activation smoothing transformation implementation, including the computation and application of the per‐channel smoothing factor s (and thereby the migration strength α) as described in Equations (3) and (4) (evidence: "Instead of per-channel activation quantization (which is infeasible), we propose to “smooth” the input activation by dividing it by a per-channel smoothing factor s. To keep the mathematical equivalence of a linear layer, we scale the weights accordingly in the reversed direction:
+
+[Equation: Y = (X diag(s)^{-1}) · (diag(s) W) = X̂ Ŵ]
+
+... 
+
+Here we introduce a hyper-parameter, migration strength α, to control how much difficulty we want to migrate from activation to weights, using the following equation:
+
+[Equation: s_j = max(|X_j|)^α / max(|W_j|)^(1 - α)]")

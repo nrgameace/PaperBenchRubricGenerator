@@ -49,6 +49,23 @@ def test_count_enumerated_items_takes_max_not_sum():
     assert pb_enumeration.count_enumerated_items(text) == 4
 
 
+def test_count_enumerated_items_bare_comma_list_no_trigger_phrase():
+    text = ("The accuracy experiments have been reproduced, demonstrating that SmoothQuant "
+            "preserves FP16 accuracy across OPT, BLOOM, GLM-130B, OPT-IML, LLaMA, Llama-2, "
+            "Falcon, Mistral, and Mixtral models against the baselines.")
+    assert pb_enumeration.count_enumerated_items(text) == 9
+
+
+def test_count_enumerated_items_bare_comma_list_minimum_three_items():
+    text = "We evaluate on ImageNet, CIFAR-10, and SVHN."
+    assert pb_enumeration.count_enumerated_items(text) == 3
+
+
+def test_count_enumerated_items_bare_two_item_and_does_not_trigger():
+    text = "The model was trained on ImageNet and CIFAR-10."
+    assert pb_enumeration.count_enumerated_items(text) == 0
+
+
 def test_build_enumeration_hint_falls_back_when_existing_hint_empty():
     hint = pb_enumeration.build_enumeration_hint(None, 5)
     assert hint.startswith("Expand this node into its sub-tasks based on the paper.")

@@ -5,23 +5,26 @@ from types import SimpleNamespace
 import pytest
 
 import pb_embeddings
+from pb_cost import CostTracker
 
 
 # ── fake OpenAI embeddings client ─────────────────────────────────────────────
 
 class _FakeEmbeddingResponse:
-    def __init__(self, vectors):
+    def __init__(self, vectors, prompt_tokens=42):
         self.data = [SimpleNamespace(embedding=v) for v in vectors]
+        self.usage = SimpleNamespace(prompt_tokens=prompt_tokens)
 
 
 class _FakeEmbeddings:
-    def __init__(self, vectors):
+    def __init__(self, vectors, prompt_tokens=42):
         self.calls = []
         self._vectors = vectors
+        self._prompt_tokens = prompt_tokens
 
     def create(self, **kwargs):
         self.calls.append(kwargs)
-        return _FakeEmbeddingResponse(self._vectors)
+        return _FakeEmbeddingResponse(self._vectors, self._prompt_tokens)
 
 
 class _FakeEmbeddingClient:
@@ -70,6 +73,26 @@ def test_embed_texts_empty_list_makes_no_call():
     client = _FakeEmbeddingClient([])
     assert pb_embeddings.embed_texts(client, []) == []
     assert client.embeddings.calls == []
+
+
+def test_embed_texts_records_usage_when_tracker_provided():
+    client = _FakeEmbeddingClient([[1.0, 0.0], [0.0, 1.0]])
+    client.embeddings._prompt_tokens = 123
+    tracker = CostTracker()
+    pb_embeddings.embed_texts(client, ["a", "b"], tracker=tracker)
+    assert tracker.totals_for(pb_embeddings.EMBEDDING_MODEL)["input"] == 123
+
+
+def test_embed_texts_no_tracker_does_not_crash():
+    client = _FakeEmbeddingClient([[1.0, 0.0]])
+    assert pb_embeddings.embed_texts(client, ["a"]) == [[1.0, 0.0]]
+
+
+def test_embed_texts_empty_list_skips_tracker_even_when_provided():
+    client = _FakeEmbeddingClient([])
+    tracker = CostTracker()
+    pb_embeddings.embed_texts(client, [], tracker=tracker)
+    assert tracker.totals_for(pb_embeddings.EMBEDDING_MODEL)["input"] == 0
 
 
 # ── extract_leaves ─────────────────────────────────────────────────────────
@@ -290,3 +313,12 @@ def test_rescale_global_weights_flags_cross_branch_duplicates():
     weights, duplicate_report = pb_embeddings.rescale_global_weights(rubric, client, {})
     flagged_ids = {leaf_id for entry in duplicate_report for leaf_id in entry["leaf_ids"]}
     assert "a1" in flagged_ids and "b1" in flagged_ids
+
+
+def test_rescale_global_weights_forwards_tracker_to_embed_texts():
+    rubric = _branch_rubric()
+    client = _FakeEmbeddingClient([[1.0, 0.0], [0.99, 0.01], [0.0, 1.0]])
+    client.embeddings._prompt_tokens = 77
+    tracker = CostTracker()
+    pb_embeddings.rescale_global_weights(rubric, client, {}, tracker=tracker)
+    assert tracker.totals_for(pb_embeddings.EMBEDDING_MODEL)["input"] == 77

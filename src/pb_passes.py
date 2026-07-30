@@ -17,7 +17,7 @@ from pb_schema import FINEGRAINED_CATEGORIES, LEAF_CATEGORIES, all_ids, find_nod
 
 MAX_EXPANSION_DEPTH = 7
 _DEPTH_FALLBACK_CATEGORY = "Code Development"
-MAX_BRANCH_NODES = 40
+MAX_BRANCH_NODES = 100
 
 # Anthropic's Messages API caps total request size at 32 MB. Base64 inflates raw bytes by
 # ~4/3, and the base pass's system prompt + few-shot example + MinerU text ride in the same
@@ -307,7 +307,7 @@ def choose_id(raw: dict, used_ids: set) -> str:
     return ensure_unique_id(base, used_ids)
 
 
-def normalize_child(raw: dict, used_ids: set) -> tuple:
+def normalize_child(raw: dict, used_ids: set, errors: list = None) -> tuple:
     """Convert a generated child object into a (node_dict, hint_or_None) pair, honoring its id.
 
     A node the model marked non-expandable is still forced into a pending/expandable
@@ -316,6 +316,16 @@ def normalize_child(raw: dict, used_ids: set) -> tuple:
     references) — this catches dense leaves like "all 10 environments are ...: a, b,
     c, ..." that should split into one child per item instead of remaining a single
     node.
+
+    A leaf's task_category/finegrained_task_category are validated against the schema's
+    allowed values here rather than trusting the model verbatim: an unrecognized
+    task_category (missing, or a hallucinated string — e.g. a mashed-together category
+    name blending two real ones) is forced to the same depth-guardrail fallback category
+    every other guardrail in this module uses, and an unrecognized finegrained_task_category
+    is cleared to None (its schema-valid "absent" state), each logged to ``errors`` if
+    provided. Without this, a hallucinated category silently rides through every later pass
+    and only surfaces as a crash in the final ``validate_final`` call at the very end of the
+    run — after the full pipeline cost has already been spent, with no retry mechanism.
     """
     node = {
         "id": choose_id(raw, used_ids),
@@ -333,10 +343,24 @@ def normalize_child(raw: dict, used_ids: set) -> tuple:
         return node, build_enumeration_hint(raw.get("expansion_hint"), enum_count)
     node["task_category"] = raw.get("task_category")
     node["finegrained_task_category"] = raw.get("finegrained_task_category")
+    if node["task_category"] not in LEAF_CATEGORIES:
+        if errors is not None:
+            errors.append(
+                f"{node['id']}: Model returned invalid task_category {node['task_category']!r}; "
+                f"forced to '{_DEPTH_FALLBACK_CATEGORY}'."
+            )
+        node["task_category"] = _DEPTH_FALLBACK_CATEGORY
+    if node["finegrained_task_category"] is not None and node["finegrained_task_category"] not in FINEGRAINED_CATEGORIES:
+        if errors is not None:
+            errors.append(
+                f"{node['id']}: Model returned invalid finegrained_task_category "
+                f"{node['finegrained_task_category']!r}; cleared to None."
+            )
+        node["finegrained_task_category"] = None
     return node, None
 
 
-def apply_base(parsed: dict) -> tuple:
+def apply_base(parsed: dict, errors: list = None) -> tuple:
     """Build the initial rubric, expansion queue, hints, and section_map from a base-pass response."""
     root_requirements = (parsed.get("root", {}).get("requirements") or "Reproduce the paper from scratch.").strip()
     rubric = {
@@ -349,7 +373,7 @@ def apply_base(parsed: dict) -> tuple:
     }
     queue, hints, used_ids = [], {}, {"root"}
     for raw in parsed.get("children", []):
-        node, hint = normalize_child(raw, used_ids)
+        node, hint = normalize_child(raw, used_ids, errors=errors)
         rubric["sub_tasks"].append(node)
         if hint is not None:
             queue.append(node["id"])
@@ -384,7 +408,7 @@ def apply_expansion(rubric: dict, node_id: str, parsed, hints: dict, errors: lis
     new_pending = []
     used_ids = set(all_ids(rubric))
     for raw in _children_from_parsed(parsed):
-        node, hint = normalize_child(raw, used_ids)
+        node, hint = normalize_child(raw, used_ids, errors=errors)
         target["sub_tasks"].append(node)
         if hint is not None and child_depth > max_depth:
             node["task_category"] = _DEPTH_FALLBACK_CATEGORY
@@ -674,7 +698,7 @@ def apply_split(rubric: dict, leaf_id: str, children: list, errors: list = None)
     used_ids = set(all_ids(rubric)) - {leaf_id}
     new_children = []
     for raw in children:
-        node, hint = normalize_child(raw, used_ids)
+        node, hint = normalize_child(raw, used_ids, errors=errors)
         if hint is not None:
             node["task_category"] = _DEPTH_FALLBACK_CATEGORY
             if errors is not None:

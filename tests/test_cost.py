@@ -5,6 +5,7 @@ from types import SimpleNamespace
 import pytest
 
 from pb_cost import PRICING, CostTracker
+from pb_embeddings import EMBEDDING_MODEL
 from rubric_gen import JUDGE_MODEL, OPUS, SONNET
 
 
@@ -94,6 +95,22 @@ def test_total_cost_prices_judge_model():
     tracker = CostTracker()
     tracker.record(JUDGE_MODEL, _usage(input=1_000_000, output=1_000_000))
     expected = PRICING[JUDGE_MODEL]["input"] * 1_000_000 + PRICING[JUDGE_MODEL]["output"] * 1_000_000
+    assert abs(tracker.total_cost() - expected) < 0.001
+
+
+def test_pricing_covers_embedding_model():
+    assert EMBEDDING_MODEL in PRICING, f"{EMBEDDING_MODEL} has no pricing entry; cost report will be silently wrong"
+    rates = PRICING[EMBEDDING_MODEL]
+    assert rates["input"] > 0
+    assert rates["output"] == 0
+    assert rates["cache_write"] == 0
+    assert rates["cache_read"] == 0
+
+
+def test_total_cost_prices_embedding_model():
+    tracker = CostTracker()
+    tracker.record(EMBEDDING_MODEL, _usage(input=1_000_000))
+    expected = PRICING[EMBEDDING_MODEL]["input"] * 1_000_000
     assert abs(tracker.total_cost() - expected) < 0.001
 
 

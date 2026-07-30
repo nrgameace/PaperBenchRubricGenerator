@@ -161,6 +161,57 @@ def test_normalize_child_expandable_flag_takes_precedence_over_enumeration_check
     assert hint == "model's own hint"
 
 
+def test_normalize_child_hallucinated_task_category_forced_to_fallback():
+    errors = []
+    node, hint = pb_passes.normalize_child(
+        {"requirements": "do x", "expandable": False, "task_category": "Evaluation, Metrics & Presentation"},
+        set(), errors=errors)
+    assert hint is None
+    assert node["task_category"] == "Code Development"
+    assert len(errors) == 1
+    assert "Evaluation, Metrics & Presentation" in errors[0]
+
+
+def test_normalize_child_missing_task_category_forced_to_fallback():
+    errors = []
+    node, hint = pb_passes.normalize_child({"requirements": "do x", "expandable": False}, set(), errors=errors)
+    assert hint is None
+    assert node["task_category"] == "Code Development"
+    assert len(errors) == 1
+
+
+def test_normalize_child_hallucinated_finegrained_category_cleared_to_none():
+    errors = []
+    node, hint = pb_passes.normalize_child(
+        {"requirements": "do x", "expandable": False, "task_category": "Code Execution",
+         "finegrained_task_category": "Not A Real Category"},
+        set(), errors=errors)
+    assert hint is None
+    assert node["task_category"] == "Code Execution"
+    assert node["finegrained_task_category"] is None
+    assert len(errors) == 1
+    assert "Not A Real Category" in errors[0]
+
+
+def test_normalize_child_valid_categories_produce_no_errors():
+    errors = []
+    node, hint = pb_passes.normalize_child(
+        {"requirements": "do x", "expandable": False, "task_category": "Result Analysis",
+         "finegrained_task_category": "Evaluation, Metrics & Benchmarking"},
+        set(), errors=errors)
+    assert hint is None
+    assert node["task_category"] == "Result Analysis"
+    assert node["finegrained_task_category"] == "Evaluation, Metrics & Benchmarking"
+    assert errors == []
+
+
+def test_normalize_child_category_validation_tolerates_no_errors_list():
+    node, hint = pb_passes.normalize_child(
+        {"requirements": "do x", "expandable": False, "task_category": "bogus"}, set())
+    assert hint is None
+    assert node["task_category"] == "Code Development"
+
+
 def test_apply_base_uses_model_ids():
     parsed = {"root": {"requirements": "reproduce paper"},
               "children": [{"id": "env-setup", "requirements": "setup", "expandable": True, "expansion_hint": "env"},
@@ -178,6 +229,16 @@ def test_apply_base_dedupes_colliding_model_ids():
                            {"id": "build-model", "requirements": "b", "expandable": False, "task_category": "Code Development"}]}
     rubric, _, _, _ = pb_passes.apply_base(parsed)
     assert [child["id"] for child in rubric["sub_tasks"]] == ["build-model", "build-model-2"]
+
+
+def test_apply_base_forces_hallucinated_task_category_and_logs_error():
+    parsed = {"root": {"requirements": "r"},
+              "children": [{"id": "final-metric", "requirements": "atomic", "expandable": False,
+                             "task_category": "Evaluation, Metrics & Presentation"}]}
+    errors = []
+    rubric, _, _, _ = pb_passes.apply_base(parsed, errors=errors)
+    assert rubric["sub_tasks"][0]["task_category"] == "Code Development"
+    assert len(errors) == 1 and "final-metric" in errors[0]
 
 
 def test_apply_expansion_attaches_children_and_returns_pending():

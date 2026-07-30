@@ -24,6 +24,14 @@ PRICING = {
         "cache_write":  0.00,
         "cache_read":   0.55 / 1_000_000,
     },
+    # text-embedding-3-small pricing as of 2026-07-29 (used only by the Phase 4
+    # embedding-based weight rescale). Embeddings have no output/cache tokens.
+    "text-embedding-3-small": {
+        "input":        0.02 / 1_000_000,
+        "output":       0.00,
+        "cache_write":  0.00,
+        "cache_read":   0.00,
+    },
 }
 
 _ZERO_COUNTS = {"input": 0, "output": 0, "cache_write": 0, "cache_read": 0}
@@ -32,6 +40,7 @@ _PROVIDER_OF = {
     "claude-opus-4-8": "Anthropic",
     "claude-sonnet-5": "Anthropic",
     "o3-mini": "OpenAI",
+    "text-embedding-3-small": "OpenAI",
 }
 
 
