@@ -1,0 +1,114 @@
+[
+  {
+    "leaf_ids": [
+      "smoothquant-alpha-grid-search",
+      "setup-alpha-grid-search-pile-subset"
+    ],
+    "branch_ids": [
+      "experimental-setup",
+      "smoothquant-method"
+    ],
+    "requirements": {
+      "smoothquant-alpha-grid-search": "A suitable alpha is obtained by running a grid search on a subset of the Pile validation set, as described in Section 5.1 (Activation smoothing).",
+      "setup-alpha-grid-search-pile-subset": "A suitable alpha value is obtained by running a quick grid search on a subset of the Pile validation set, as stated in Section 5.1 (Activation smoothing)."
+    }
+  },
+  {
+    "leaf_ids": [
+      "alpha-too-small-activation-degradation",
+      "alpha-too-large-weight-degradation",
+      "alpha-ablation-too-small-activation-quantization-degradation",
+      "alpha-ablation-too-large-weight-quantization-degradation"
+    ],
+    "branch_ids": [
+      "ablation-studies",
+      "smoothquant-method"
+    ],
+    "requirements": {
+      "alpha-too-small-activation-degradation": "Figure 10 shows that when migration strength alpha is too small (<0.4) on OPT-175B with LAMBADA, the activations become hard to quantize, leading to model accuracy degradation, consistent with Section 5.5 ablation study.",
+      "alpha-too-large-weight-degradation": "Figure 10 shows that when migration strength alpha is too large (>0.6) on OPT-175B with LAMBADA, the weights become hard to quantize, leading to model accuracy degradation, consistent with Section 5.5 ablation study.",
+      "alpha-ablation-too-small-activation-quantization-degradation": "Figure 10 shows that when migration strength alpha is too small (<0.4) on OPT-175B evaluated with LAMBADA, the activations become hard to quantize and model accuracy degrades, consistent with Section 5.5's statement: 'When \u03b1 is too small (<0.4), the activations are hard to quantize.'",
+      "alpha-ablation-too-large-weight-quantization-degradation": "Figure 10 shows that when migration strength alpha is too large (>0.6) on OPT-175B evaluated with LAMBADA, the weights become hard to quantize and model accuracy degrades, consistent with Section 5.5's statement: 'when \u03b1 is too large (>0.6), the weights will be hard to quantize.'"
+    }
+  },
+  {
+    "leaf_ids": [
+      "alpha-sweet-spot-region",
+      "alpha-ablation-sweet-spot-region-preserves-performance"
+    ],
+    "branch_ids": [
+      "ablation-studies",
+      "smoothquant-method"
+    ],
+    "requirements": {
+      "alpha-sweet-spot-region": "Figure 10 shows that only within the sweet-spot region of alpha between 0.4 and 0.6 on OPT-175B with LAMBADA, both weights and activations achieve small quantization errors and model performance is maintained close to FP16, consistent with Section 5.5 ablation study.",
+      "alpha-ablation-sweet-spot-region-preserves-performance": "Figure 10 shows that only when alpha is chosen from the sweet-spot region (0.4-0.6) on OPT-175B evaluated with LAMBADA do both weights and activations achieve small quantization errors, maintaining model performance close to FP16 after quantization, consistent with Section 5.5's statement: 'Only when we choose \u03b1 from the sweet spot region (0.4-0.6) can we get small quantization errors for both weights and activations, and maintain the model performance after quantization.'"
+    }
+  },
+  {
+    "leaf_ids": [
+      "smoothquant-o1-definition-and-scope",
+      "smoothquant-o3-definition-and-scope",
+      "smoothquant-o1-config-definition",
+      "smoothquant-o3-config-definition"
+    ],
+    "branch_ids": [
+      "experimental-setup",
+      "quantization-flow-and-settings"
+    ],
+    "requirements": {
+      "smoothquant-o1-definition-and-scope": "SmoothQuant-O1 is defined and implemented exactly as specified in Table 2: the weight quantization column specifies 'per-tensor' (static, i.e. calibrated offline) and the activation quantization column specifies 'per-token dynamic', representing the highest-accuracy but least computationally efficient of the three SmoothQuant settings (O1, O2, O3), as described in Section 5.1 ('Baselines') and Table 2.",
+      "smoothquant-o3-definition-and-scope": "SmoothQuant-O3 is defined and implemented exactly as specified in Table 2: the weight quantization column specifies 'per-tensor' and the activation quantization column specifies 'per-tensor static', representing the most aggressive and most computationally efficient (lowest-latency) of the three SmoothQuant settings (O1, O2, O3), as described in Section 5.1 ('Baselines') and Table 2.",
+      "smoothquant-o1-config-definition": "SmoothQuant-O1 has been configured per Table 2 as using per-tensor static weight quantization combined with per-token dynamic activation quantization, representing the highest-accuracy but least-efficient of the three SmoothQuant settings, as stated in Section 5.1 (Baselines) and Table 2.",
+      "smoothquant-o3-config-definition": "SmoothQuant-O3 has been configured per Table 2 as using per-tensor weight quantization combined with per-tensor static activation quantization, representing the most aggressive and most efficient (lowest-latency) of the three SmoothQuant settings, as stated in Section 5.1 (Baselines) and Table 2."
+    }
+  },
+  {
+    "leaf_ids": [
+      "table11-llm-int8-slower-opt13b-seqlen256",
+      "table11-llm-int8-slower-opt13b-seqlen512",
+      "table11-llm-int8-slower-opt30b-seqlen256",
+      "table11-llm-int8-marginally-faster-opt30b-seqlen512",
+      "table11-opt13b-llmint8-seqlen256",
+      "table11-opt13b-llmint8-seqlen512",
+      "table11-opt30b-llmint8-seqlen256",
+      "table11-opt30b-llmint8-seqlen512",
+      "table11-llm-int8-usually-slower-opt13b-seqlen256-config",
+      "table11-llm-int8-usually-slower-opt13b-seqlen512-config",
+      "table11-llm-int8-usually-slower-opt30b-seqlen256-config",
+      "table11-llm-int8-sole-exception-opt30b-seqlen512-config"
+    ],
+    "branch_ids": [
+      "ablation-studies",
+      "accuracy-experiments"
+    ],
+    "requirements": {
+      "table11-llm-int8-slower-opt13b-seqlen256": "Table 11 reports LLM.int8() latency of 237.1ms versus FP16 latency of 152.6ms for OPT-13B at sequence length 256, showing LLM.int8() is slower.",
+      "table11-llm-int8-slower-opt13b-seqlen512": "Table 11 reports LLM.int8() latency of 371.5ms versus FP16 latency of 296.3ms for OPT-13B at sequence length 512, showing LLM.int8() is slower.",
+      "table11-llm-int8-slower-opt30b-seqlen256": "Table 11 reports LLM.int8() latency of 387.9ms versus FP16 latency of 343.0ms for OPT-30B at sequence length 256, showing LLM.int8() is slower.",
+      "table11-llm-int8-marginally-faster-opt30b-seqlen512": "Table 11 reports LLM.int8() latency of 654.9ms versus FP16 latency of 659.9ms for OPT-30B at sequence length 512, the sole exception where LLM.int8() is marginally faster than FP16.",
+      "table11-opt13b-llmint8-seqlen256": "Table 11 reports the LLM.int8() latency for OPT-13B of 237.1ms at sequence length 256, slower than the FP16 baseline of 152.6ms.",
+      "table11-opt13b-llmint8-seqlen512": "Table 11 reports the LLM.int8() latency for OPT-13B of 371.5ms at sequence length 512, slower than the FP16 baseline of 296.3ms.",
+      "table11-opt30b-llmint8-seqlen256": "Table 11 reports the LLM.int8() latency for OPT-30B of 387.9ms at sequence length 256, slower than the FP16 baseline of 343.0ms.",
+      "table11-opt30b-llmint8-seqlen512": "Table 11 reports the LLM.int8() latency for OPT-30B of 654.9ms at sequence length 512, marginally faster than the FP16 baseline of 659.9ms, the sole exception to LLM.int8() being slower across the table.",
+      "table11-llm-int8-usually-slower-opt13b-seqlen256-config": "Table 11 reports LLM.int8() latency of 237.1ms versus FP16 latency of 152.6ms for OPT-13B at sequence length 256 (batch size 4), showing LLM.int8() is slower than FP16 in this configuration, consistent with Section 5.5's statement 'while LLM.int8() is usually slower.'",
+      "table11-llm-int8-usually-slower-opt13b-seqlen512-config": "Table 11 reports LLM.int8() latency of 371.5ms versus FP16 latency of 296.3ms for OPT-13B at sequence length 512 (batch size 4), showing LLM.int8() is slower than FP16 in this configuration, consistent with Section 5.5's statement 'while LLM.int8() is usually slower.'",
+      "table11-llm-int8-usually-slower-opt30b-seqlen256-config": "Table 11 reports LLM.int8() latency of 387.9ms versus FP16 latency of 343.0ms for OPT-30B at sequence length 256 (batch size 4), showing LLM.int8() is slower than FP16 in this configuration, consistent with Section 5.5's statement 'while LLM.int8() is usually slower.'",
+      "table11-llm-int8-sole-exception-opt30b-seqlen512-config": "Table 11 reports LLM.int8() latency of 654.9ms versus FP16 latency of 659.9ms for OPT-30B at sequence length 512 (batch size 4), the sole exception among the 4 configurations where LLM.int8() is marginally faster than FP16, confirming that LLM.int8() is slower in exactly 3 of the 4 model/sequence-length configurations measured in Table 11."
+    }
+  },
+  {
+    "leaf_ids": [
+      "accuracy-mtnlg-530b-negligible-loss-result",
+      "mtnlg-530b-negligible-accuracy-loss-claim"
+    ],
+    "branch_ids": [
+      "accuracy-experiments",
+      "scaling-530b"
+    ],
+    "requirements": {
+      "accuracy-mtnlg-530b-negligible-loss-result": "Table 9 has been reproduced, reporting that SmoothQuant enables W8A8 quantization of MT-NLG 530B with negligible accuracy loss on LAMBADA, HellaSwag, PIQA, and WinoGrande, as stated in Section 5.4: 'SmoothQuant enables W8A8 quantization of the 530B model at a negligible accuracy loss.'",
+      "mtnlg-530b-negligible-accuracy-loss-claim": "It has been verified that SmoothQuant enables W8A8 quantization of MT-NLG 530B at negligible accuracy loss, as explicitly stated in Section 5.4: 'SmoothQuant enables W8A8 quantization of the 530B model at a negligible accuracy loss,' cross-verified against the INT8 vs FP16 average accuracy values of 73.1% vs 73.1% in the associated accuracy table, and noting individual task differences (LAMBADA +0.6%, HellaSwag -1.7%, PIQA -0.3%, WinoGrande +1.2%) that offset to produce an identical average."
+    }
+  }
+]
