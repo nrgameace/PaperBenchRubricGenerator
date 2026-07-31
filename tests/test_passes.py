@@ -509,6 +509,57 @@ def test_find_invalid_weights_includes_requirements_in_tuple():
     assert invalid[0][1] == "do b"
 
 
+# ── build_other_branches_block / build_weight_context_block tests ────────────
+
+def _multi_branch_rubric():
+    return {
+        "id": "root", "requirements": "reproduce the paper", "weight": 0, "task_category": None,
+        "finegrained_task_category": None,
+        "sub_tasks": [
+            {"id": "branch-a", "requirements": "branch a", "weight": 0, "sub_tasks": [],
+             "task_category": "Code Development", "finegrained_task_category": None},
+            {"id": "branch-b", "requirements": "branch b", "weight": 0, "sub_tasks": [],
+             "task_category": "Code Development", "finegrained_task_category": None},
+        ],
+    }
+
+
+def test_build_other_branches_block_excludes_current_branch_id():
+    block = pb_passes.build_other_branches_block(_multi_branch_rubric(), "branch-a")
+    assert "branch-b" in block["text"]
+    assert "\"id\": \"branch-a\"" not in block["text"]
+
+
+def test_build_other_branches_block_includes_other_top_level_branches():
+    block = pb_passes.build_other_branches_block(_multi_branch_rubric(), "branch-a")
+    assert "branch-b" in block["text"]
+
+
+def test_build_other_branches_block_has_ephemeral_cache_control():
+    block = pb_passes.build_other_branches_block(_multi_branch_rubric(), "branch-a")
+    assert block["type"] == "text"
+    assert block["cache_control"] == {"type": "ephemeral", "ttl": "1h"}
+
+
+def test_build_other_branches_block_is_byte_identical_across_calls_on_unchanged_rubric():
+    rubric = _multi_branch_rubric()
+    first = pb_passes.build_other_branches_block(rubric, "branch-a")
+    second = pb_passes.build_other_branches_block(rubric, "branch-a")
+    assert first["text"] == second["text"]
+
+
+def test_build_weight_context_block_has_ephemeral_cache_control():
+    block = pb_passes.build_weight_context_block("paper text", _two_leaf_rubric())
+    assert block["type"] == "text"
+    assert block["cache_control"] == {"type": "ephemeral", "ttl": "1h"}
+
+
+def test_build_weight_context_block_contains_paper_text_and_rubric():
+    block = pb_passes.build_weight_context_block("unique paper text marker", _two_leaf_rubric())
+    assert "unique paper text marker" in block["text"]
+    assert "\"id\": \"a\"" in block["text"]
+
+
 # ── run_weight_llm_branch tests ──────────────────────────────────────────────
 
 def _branch_rubric():
@@ -541,29 +592,34 @@ def _branch_rubric():
 def test_run_weight_llm_branch_targets_subtree_ids():
     rubric = _branch_rubric()
     branch_node = rubric["sub_tasks"][0]
+    context_block = pb_passes.build_weight_context_block("text", rubric)
     client = _FakeClient('{"weights": {"section-a": 3, "leaf-a1": 2, "leaf-a2": 1}}')
-    pb_passes.run_weight_llm_branch(client, [], "text", rubric, branch_node, "model")
-    instruction = client.messages.calls[0]["messages"][0]["content"][0]["text"]
+    pb_passes.run_weight_llm_branch(client, [], context_block, branch_node, "model")
+    instruction = client.messages.calls[0]["messages"][0]["content"][1]["text"]
     assert "section-a" in instruction
     assert "leaf-a1" in instruction
     assert "leaf-a2" in instruction
     assert "EVERY node" not in instruction
 
 
-def test_run_weight_llm_branch_includes_full_rubric_for_context():
+def test_run_weight_llm_branch_message_includes_cached_context_block_with_full_rubric():
     rubric = _branch_rubric()
     branch_node = rubric["sub_tasks"][0]
+    context_block = pb_passes.build_weight_context_block("text", rubric)
     client = _FakeClient('{"weights": {"section-a": 3, "leaf-a1": 2, "leaf-a2": 1}}')
-    pb_passes.run_weight_llm_branch(client, [], "text", rubric, branch_node, "model")
-    instruction = client.messages.calls[0]["messages"][0]["content"][0]["text"]
-    assert "section-b" in instruction
+    pb_passes.run_weight_llm_branch(client, [], context_block, branch_node, "model")
+    sent_context_block = client.messages.calls[0]["messages"][0]["content"][0]
+    assert sent_context_block is context_block
+    assert "section-b" in sent_context_block["text"]
+    assert sent_context_block["cache_control"] == {"type": "ephemeral", "ttl": "1h"}
 
 
 def test_run_weight_llm_branch_returns_partial_weights():
     rubric = _branch_rubric()
     branch_node = rubric["sub_tasks"][0]
+    context_block = pb_passes.build_weight_context_block("text", rubric)
     client = _FakeClient('{"weights": {"section-a": 3, "leaf-a1": 2, "leaf-a2": 1}}')
-    result = pb_passes.run_weight_llm_branch(client, [], "text", rubric, branch_node, "model")
+    result = pb_passes.run_weight_llm_branch(client, [], context_block, branch_node, "model")
     assert result == {"section-a": 3, "leaf-a1": 2, "leaf-a2": 1}
 
 
@@ -571,28 +627,31 @@ def test_run_weight_llm_branch_returns_partial_weights():
 
 def _weight_instruction(client):
     """Extract the instruction text from the first run_weight_llm call."""
-    return client.messages.calls[0]["messages"][0]["content"][0]["text"]
+    return client.messages.calls[0]["messages"][0]["content"][1]["text"]
 
 
 def test_run_weight_llm_targeted_node_ids_narrows_instruction():
+    context_block = pb_passes.build_weight_context_block("text", _two_leaf_rubric())
     client = _FakeClient('{"weights": {"a": 3}}')
-    pb_passes.run_weight_llm(client, [], "text", _two_leaf_rubric(), "model", node_ids=["a"])
+    pb_passes.run_weight_llm(client, [], context_block, "model", node_ids=["a"])
     instruction = _weight_instruction(client)
     assert "a" in instruction
     assert "EVERY node" not in instruction
 
 
 def test_run_weight_llm_feedback_appended():
+    context_block = pb_passes.build_weight_context_block("text", _two_leaf_rubric())
     client = _FakeClient('{"weights": {"root": 1, "a": 3, "b": 2}}')
-    pb_passes.run_weight_llm(client, [], "text", _two_leaf_rubric(), "model", feedback="recheck table 3")
+    pb_passes.run_weight_llm(client, [], context_block, "model", feedback="recheck table 3")
     instruction = _weight_instruction(client)
     assert "USER FEEDBACK" in instruction
     assert "recheck table 3" in instruction
 
 
 def test_run_weight_llm_no_feedback_block_when_none():
+    context_block = pb_passes.build_weight_context_block("text", _two_leaf_rubric())
     client = _FakeClient('{"weights": {"root": 1, "a": 3, "b": 2}}')
-    pb_passes.run_weight_llm(client, [], "text", _two_leaf_rubric(), "model")
+    pb_passes.run_weight_llm(client, [], context_block, "model")
     assert "USER FEEDBACK" not in _weight_instruction(client)
 
 
@@ -691,6 +750,11 @@ def _target_rubric():
     }
 
 
+_EMPTY_OTHER_BRANCHES_BLOCK = pb_passes.build_other_branches_block(
+    {"id": "root", "requirements": "r", "sub_tasks": []}, "target"
+)
+
+
 def test_run_expansion_llm_appends_feedback_when_provided():
     client = _FakeClient('{"children": []}')
     pb_passes.run_expansion_llm(
@@ -701,9 +765,10 @@ def test_run_expansion_llm_appends_feedback_when_provided():
         "target",
         "expansion hint",
         "claude-sonnet-5",
+        _EMPTY_OTHER_BRANCHES_BLOCK,
         feedback="check table 3",
     )
-    instruction = client.messages.calls[0]["messages"][0]["content"][0]["text"]
+    instruction = client.messages.calls[0]["messages"][0]["content"][1]["text"]
     assert "USER FEEDBACK" in instruction
     assert "check table 3" in instruction
 
@@ -718,10 +783,60 @@ def test_run_expansion_llm_no_feedback_block_when_empty():
         "target",
         "expansion hint",
         "claude-sonnet-5",
+        _EMPTY_OTHER_BRANCHES_BLOCK,
         feedback="",
     )
-    instruction = client.messages.calls[0]["messages"][0]["content"][0]["text"]
+    instruction = client.messages.calls[0]["messages"][0]["content"][1]["text"]
     assert "USER FEEDBACK" not in instruction
+
+
+def test_run_expansion_llm_message_content_has_cache_control_only_on_first_block():
+    client = _FakeClient('{"children": []}')
+    pb_passes.run_expansion_llm(
+        client,
+        [{"type": "text", "text": "sys"}],
+        "section text",
+        _target_rubric(),
+        "target",
+        "expansion hint",
+        "claude-sonnet-5",
+        _EMPTY_OTHER_BRANCHES_BLOCK,
+    )
+    content = client.messages.calls[0]["messages"][0]["content"]
+    assert len(content) == 2
+    assert content[0] is _EMPTY_OTHER_BRANCHES_BLOCK
+    assert content[0]["cache_control"] == {"type": "ephemeral", "ttl": "1h"}
+    assert "cache_control" not in content[1]
+
+
+def test_run_expansion_llm_current_branch_block_reflects_growing_subtree():
+    branch_node = _target_rubric()
+    client = _FakeClient('{"children": []}')
+    pb_passes.run_expansion_llm(
+        client, [{"type": "text", "text": "sys"}], "section text", branch_node, "target",
+        "expansion hint", "claude-sonnet-5", _EMPTY_OTHER_BRANCHES_BLOCK,
+    )
+    first_instruction = client.messages.calls[0]["messages"][0]["content"][1]["text"]
+
+    # Simulate apply_expansion growing the branch's own subtree between calls.
+    branch_node["sub_tasks"][0]["sub_tasks"] = [
+        {"id": "new-child", "requirements": "new", "weight": 0, "sub_tasks": [],
+         "task_category": "Code Development", "finegrained_task_category": None}
+    ]
+    branch_node["sub_tasks"][0]["task_category"] = None
+    pb_passes.run_expansion_llm(
+        client, [{"type": "text", "text": "sys"}], "section text", branch_node, "target",
+        "expansion hint", "claude-sonnet-5", _EMPTY_OTHER_BRANCHES_BLOCK,
+    )
+    second_instruction = client.messages.calls[1]["messages"][0]["content"][1]["text"]
+
+    assert "new-child" not in first_instruction
+    assert "new-child" in second_instruction
+    assert first_instruction != second_instruction
+    # The cached "other branches" block itself is untouched by the branch growing.
+    first_cached = client.messages.calls[0]["messages"][0]["content"][0]["text"]
+    second_cached = client.messages.calls[1]["messages"][0]["content"][0]["text"]
+    assert first_cached == second_cached
 
 
 def _dense_target_rubric():
@@ -743,8 +858,9 @@ def test_run_expansion_llm_injects_enumeration_guardrail_for_dense_target():
         "target",
         "expansion hint",
         "claude-sonnet-5",
+        _EMPTY_OTHER_BRANCHES_BLOCK,
     )
-    instruction = client.messages.calls[0]["messages"][0]["content"][0]["text"]
+    instruction = client.messages.calls[0]["messages"][0]["content"][1]["text"]
     assert "ENUMERATION GUARDRAIL" in instruction
     assert "10" in instruction
 
@@ -759,8 +875,9 @@ def test_run_expansion_llm_omits_enumeration_guardrail_for_single_item_target():
         "target",
         "expansion hint",
         "claude-sonnet-5",
+        _EMPTY_OTHER_BRANCHES_BLOCK,
     )
-    instruction = client.messages.calls[0]["messages"][0]["content"][0]["text"]
+    instruction = client.messages.calls[0]["messages"][0]["content"][1]["text"]
     assert "ENUMERATION GUARDRAIL" not in instruction
 
 
@@ -774,9 +891,10 @@ def test_run_expansion_llm_enumeration_guardrail_appears_before_feedback_block()
         "target",
         "expansion hint",
         "claude-sonnet-5",
+        _EMPTY_OTHER_BRANCHES_BLOCK,
         feedback="check table 3",
     )
-    instruction = client.messages.calls[0]["messages"][0]["content"][0]["text"]
+    instruction = client.messages.calls[0]["messages"][0]["content"][1]["text"]
     assert instruction.index("ENUMERATION GUARDRAIL") < instruction.index("USER FEEDBACK")
 
 
@@ -880,7 +998,7 @@ def test_run_split_check_llm_only_includes_matching_category_leaves_in_prompt():
     rubric = _split_check_rubric()
     branch = rubric["sub_tasks"][0]
     client = _FakeClient('{"splits": {}}')
-    pb_passes.run_split_check_llm(client, [], "section text", rubric, branch, "model")
+    pb_passes.run_split_check_llm(client, [], "section text", branch, "model")
     instruction = client.messages.calls[0]["messages"][0]["content"][0]["text"]
     assert "result-leaf" in instruction
     assert "eval-leaf" in instruction
@@ -891,7 +1009,7 @@ def test_run_split_check_llm_includes_section_text():
     rubric = _split_check_rubric()
     branch = rubric["sub_tasks"][0]
     client = _FakeClient('{"splits": {}}')
-    pb_passes.run_split_check_llm(client, [], "unique section text marker", rubric, branch, "model")
+    pb_passes.run_split_check_llm(client, [], "unique section text marker", branch, "model")
     instruction = client.messages.calls[0]["messages"][0]["content"][0]["text"]
     assert "unique section text marker" in instruction
 
@@ -907,7 +1025,7 @@ def test_run_split_check_llm_skips_llm_call_when_no_matching_leaves():
               ]}
     branch = rubric["sub_tasks"][0]
     client = _FakeClient('{"splits": {}}')
-    result = pb_passes.run_split_check_llm(client, [], "text", rubric, branch, "model")
+    result = pb_passes.run_split_check_llm(client, [], "text", branch, "model")
     assert result == {"splits": {}, "duplicates": {}}
     assert client.messages.calls == []
 
@@ -919,7 +1037,7 @@ def test_run_split_check_llm_returns_splits_and_duplicates_dict():
         '{"splits": {"result-leaf": [{"id": "a", "requirements": "x"}]}, '
         '"duplicates": {"eval-leaf": "result-leaf"}}'
     )
-    result = pb_passes.run_split_check_llm(client, [], "text", rubric, branch, "model")
+    result = pb_passes.run_split_check_llm(client, [], "text", branch, "model")
     assert result == {"splits": {"result-leaf": [{"id": "a", "requirements": "x"}]},
                        "duplicates": {"eval-leaf": "result-leaf"}}
 
@@ -928,7 +1046,7 @@ def test_run_split_check_llm_defaults_missing_duplicates_key_to_empty_dict():
     rubric = _split_check_rubric()
     branch = rubric["sub_tasks"][0]
     client = _FakeClient('{"splits": {"result-leaf": [{"id": "a", "requirements": "x"}]}}')
-    result = pb_passes.run_split_check_llm(client, [], "text", rubric, branch, "model")
+    result = pb_passes.run_split_check_llm(client, [], "text", branch, "model")
     assert result["duplicates"] == {}
 
 
@@ -936,7 +1054,7 @@ def test_run_split_check_llm_prompt_mentions_duplicates():
     rubric = _split_check_rubric()
     branch = rubric["sub_tasks"][0]
     client = _FakeClient('{"splits": {}, "duplicates": {}}')
-    pb_passes.run_split_check_llm(client, [], "text", rubric, branch, "model")
+    pb_passes.run_split_check_llm(client, [], "text", branch, "model")
     instruction = client.messages.calls[0]["messages"][0]["content"][0]["text"]
     assert "duplicates" in instruction.lower()
 
@@ -945,7 +1063,7 @@ def test_run_split_check_llm_includes_all_leaves_when_flagged():
     rubric = _split_check_rubric()
     branch = rubric["sub_tasks"][0]
     client = _FakeClient('{"splits": {}, "duplicates": {}}')
-    pb_passes.run_split_check_llm(client, [], "text", rubric, branch, "model", include_all_leaves=True)
+    pb_passes.run_split_check_llm(client, [], "text", branch, "model", include_all_leaves=True)
     instruction = client.messages.calls[0]["messages"][0]["content"][0]["text"]
     assert "code-leaf" in instruction
 
@@ -954,7 +1072,7 @@ def test_run_split_check_llm_include_all_leaves_defaults_false():
     rubric = _split_check_rubric()
     branch = rubric["sub_tasks"][0]
     client = _FakeClient('{"splits": {}, "duplicates": {}}')
-    pb_passes.run_split_check_llm(client, [], "text", rubric, branch, "model")
+    pb_passes.run_split_check_llm(client, [], "text", branch, "model")
     instruction = client.messages.calls[0]["messages"][0]["content"][0]["text"]
     assert "code-leaf" not in instruction
 
@@ -969,7 +1087,7 @@ def test_run_split_check_llm_scales_max_tokens_with_candidate_count():
     rubric = _split_check_rubric()
     branch = rubric["sub_tasks"][0]
     client = _FakeClient('{"splits": {}, "duplicates": {}}')
-    pb_passes.run_split_check_llm(client, [], "text", rubric, branch, "model")
+    pb_passes.run_split_check_llm(client, [], "text", branch, "model")
     assert client.messages.calls[0]["max_tokens"] == 8000 + 400 * 2
 
 
@@ -977,7 +1095,7 @@ def test_run_split_check_llm_scales_max_tokens_higher_with_include_all_leaves():
     rubric = _split_check_rubric()
     branch = rubric["sub_tasks"][0]
     client = _FakeClient('{"splits": {}, "duplicates": {}}')
-    pb_passes.run_split_check_llm(client, [], "text", rubric, branch, "model", include_all_leaves=True)
+    pb_passes.run_split_check_llm(client, [], "text", branch, "model", include_all_leaves=True)
     assert client.messages.calls[0]["max_tokens"] == 8000 + 400 * 3
 
 
@@ -994,7 +1112,7 @@ def test_run_split_check_llm_caps_max_tokens_at_32000():
     rubric = {"id": "root", "requirements": "r", "weight": 0, "task_category": None,
               "finegrained_task_category": None, "sub_tasks": [branch]}
     client = _FakeClient('{"splits": {}, "duplicates": {}}')
-    pb_passes.run_split_check_llm(client, [], "text", rubric, branch, "model", include_all_leaves=True)
+    pb_passes.run_split_check_llm(client, [], "text", branch, "model", include_all_leaves=True)
     assert client.messages.calls[0]["max_tokens"] == 32000
 
 

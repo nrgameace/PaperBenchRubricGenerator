@@ -9,7 +9,8 @@ parse, then drives Claude through a sequence of human-reviewed passes to build a
 of the paper must satisfy. You review and edit the model's output at every step.
 
 > **Cost:** A full rubric for one paper costs roughly **~$4 USD** in Anthropic API usage.
-> Costs are kept low via extended prompt caching (1-hour TTL on the PDF and system preamble)
+> Costs are kept low via extended prompt caching (1-hour TTL, with per-branch cache
+> breakpoints for the expansion and weight passes — see [Prompt caching](#prompt-caching))
 > and model tiering (Opus only for the base pass; Sonnet for all expansion and weight passes).
 
 The pipeline supports two modes: **agentic** (default — no prompts, runs end-to-end unattended) and
@@ -142,14 +143,26 @@ resumable. There are three phases:
 
 ### Prompt caching
 
-Two blocks are cached with a 1-hour TTL (`cache_control: {type: ephemeral, ttl: "1h"}`,
-no beta header required):
+Every pass marks `cache_control: {type: ephemeral, ttl: "1h"}` on its stable content (no beta
+header required):
 
-- **System preamble** — grounding rules and the few-shot format exemplar.
+- **System preamble** — grounding rules and the few-shot format exemplar (all passes).
 - **PDF document block** — base64-encoded PDF, sent only in the base pass.
+- **Other-branches block** (expansion pass) — everything in the rubric *outside* the top-level
+  branch currently being expanded, built once per branch (`pb_passes.build_other_branches_block`)
+  and reused verbatim across every call in that branch's BFS loop. `_expand_subtree` fully
+  expands one branch (often dozens of calls) before moving to the next, so the rest of the tree
+  is frozen for that whole duration — this block turns that dead weight from full-price input
+  tokens into a single cache write plus many cheap cache reads. The branch's own (growing)
+  subtree and the per-node instruction are sent uncached after it, bounded by `MAX_BRANCH_NODES`
+  rather than overall rubric size.
+- **Weight context block** (weight pass) — the paper content plus the full rubric, built once
+  per `run_weight_phase` stage (`pb_passes.build_weight_context_block`) and reused across every
+  top-level branch's local weight call and every `_resolve_invalid_weights` retry, since neither
+  input changes until `apply_weights` runs.
 
-The cache survives the human-review window between phases, so you don't pay to re-send the
-PDF or system prompt on expansion and weight calls.
+The cache survives the human-review window between phases, so you don't pay to re-send stable
+context on later calls within the same phase.
 
 ### Human-in-the-loop review (`--review` only)
 
@@ -197,8 +210,8 @@ tests/
 
 | File | Responsibility |
 |---|---|
-| `rubric_gen.py` | Entry point; CLI parsing (`--review`, `--resume`, `--no-split-check`, `--judge`); orchestrates all phases; `human_review` flag threaded through phase functions; `_expand_subtree` enforces the `MAX_BRANCH_NODES` cap before every expansion call and threads a `capped_branches` set the same way it threads `errors`; `_run_split_check_on_branch` runs split-check for a single branch (extracted so `run_judge_phase`'s re-split-check step shares it, not a copy); `run_split_check_phase` loops that helper over every top-level branch before weighting; `run_judge_phase` drives the opt-in coverage-judge checkpoint — judge each branch, on `"insufficient"` re-expand + re-split-check up to `MAX_JUDGE_RETRIES` (2) times, then escalate (fail-open, never blocks the run) via `judge_escalations`; `write_judge_escalations` writes `judge_escalations.txt`; `run_weight_phase` runs the local branch LLM passes then `pb_embeddings.rescale_global_weights` for the deterministic cross-branch rescale; `_resolve_invalid_weights` correction loop, capped at `MAX_WEIGHT_RESOLUTION_RETRIES` (5) and raising `MaxRetriesExceeded` past that; `write_error_log` writes `errors.txt`; `write_flagged_duplicates` writes `flagged_duplicates.json`; prints cost report |
-| `pb_passes.py` | Anthropic SDK calls; prompt construction; JSON parsing; node normalization; tree mutation (`apply_base`, `apply_expansion`, `apply_split`, `apply_dedup`, `apply_weights`); `apply_base` also extracts the base pass's `section_map` as its 4th return value (defaults to `{}` if absent); `MAX_EXPANSION_DEPTH` (7) guardrail enforced in `apply_expansion`; `MAX_BRANCH_NODES` (100) guardrail via `branch_size`/`force_branch_cap_leaves`, checked by `rubric_gen._expand_subtree` before every expansion call; enumeration-triggered recursion override in `normalize_child` and prompt injection in `run_expansion_llm` (via `pb_enumeration`); `normalize_child` also validates `task_category`/`finegrained_task_category` against `pb_schema.LEAF_CATEGORIES`/`FINEGRAINED_CATEGORIES`, forcing a hallucinated/missing `task_category` to the `Code Development` fallback and clearing a hallucinated `finegrained_task_category` to `None`, logged to `errors` (threaded through `apply_base`'s new `errors` param as well as `apply_expansion`/`apply_split`); `run_split_check_llm` — the semantic bundling/duplicate check scoped to `Evaluation, Metrics & Benchmarking` / `Result Analysis` leaves (or every leaf in the branch via `include_all_leaves=True`), one call per branch returning both `"splits"` and `"duplicates"`, skipped entirely when a branch has no candidate leaves; `apply_dedup` removes a duplicate leaf (via `pb_schema.find_parent`) and force-flattens its parent if that empties the parent's children; weight validation (`find_invalid_weights`); `run_weight_llm_branch` for per-branch local passes; `run_weight_llm` for targeted invalid-weight retries; `invoke_llm` raises `RuntimeError` if the model response is truncated (`stop_reason == "max_tokens"`) instead of failing downstream as an opaque JSON parse error, extracts text by filtering `response.content` for `type == "text"` blocks instead of assuming `content[0]` is text (a leading `thinking` block otherwise crashes with an opaque `AttributeError`), passes `thinking={"type": "disabled"}` on every call since some models default to adaptive thinking when the parameter is omitted (which eats into `max_tokens` and can truncate the JSON output), and calls the Anthropic SDK's streaming API (`client.messages.stream(...)` / `get_final_message()`) rather than the blocking `create(...)`, since large `max_tokens` values can otherwise be rejected outright by the SDK; `run_split_check_llm` scales its `max_tokens` (8000 up to a 32000 cap) with candidate leaf count since `include_all_leaves` branches can need much longer responses; `run_expansion_llm` scales its `max_tokens` the same way off `enum_count` so an ENUMERATION-GUARDRAIL-forced fan-out doesn't truncate; `parse_json_response` raises `ValueError` with a preview of the raw model text (up to 2000 chars) when a response isn't valid JSON, instead of a bare `JSONDecodeError` with no diagnostic context; `_extract_json_span` scans every `{`/`[` and keeps the longest balanced JSON decode rather than naively spanning first-open-to-last-close, so stray bracket characters in a model's reasoning prose (math ranges, citations) ahead of its real JSON answer can't be mistaken for the payload |
+| `rubric_gen.py` | Entry point; CLI parsing (`--review`, `--resume`, `--no-split-check`, `--judge`); orchestrates all phases; `human_review` flag threaded through phase functions; `_expand_subtree` enforces the `MAX_BRANCH_NODES` cap before every expansion call, builds the cached `other_branches_block` once per branch (`pb_passes.build_other_branches_block`) and reuses it across the branch's whole BFS loop, and threads a `capped_branches` set the same way it threads `errors`; `_run_split_check_on_branch` runs split-check for a single branch (extracted so `run_judge_phase`'s re-split-check step shares it, not a copy); `run_split_check_phase` loops that helper over every top-level branch before weighting; `run_judge_phase` drives the opt-in coverage-judge checkpoint — judge each branch, on `"insufficient"` re-expand + re-split-check up to `MAX_JUDGE_RETRIES` (2) times, then escalate (fail-open, never blocks the run) via `judge_escalations`; `write_judge_escalations` writes `judge_escalations.txt`; `run_weight_phase` builds a cached `weight_context_block` (`pb_passes.build_weight_context_block`) once per stage, runs the local branch LLM passes then `pb_embeddings.rescale_global_weights` for the deterministic cross-branch rescale, and rebuilds the cached block after `apply_weights` changes the rubric's weight fields; `_resolve_invalid_weights` correction loop, capped at `MAX_WEIGHT_RESOLUTION_RETRIES` (5) and raising `MaxRetriesExceeded` past that; `write_error_log` writes `errors.txt`; `write_flagged_duplicates` writes `flagged_duplicates.json`; prints cost report |
+| `pb_passes.py` | Anthropic SDK calls; prompt construction; JSON parsing; node normalization; tree mutation (`apply_base`, `apply_expansion`, `apply_split`, `apply_dedup`, `apply_weights`); `apply_base` also extracts the base pass's `section_map` as its 4th return value (defaults to `{}` if absent); `MAX_EXPANSION_DEPTH` (7) guardrail enforced in `apply_expansion`; `MAX_BRANCH_NODES` (100) guardrail via `branch_size`/`force_branch_cap_leaves`, checked by `rubric_gen._expand_subtree` before every expansion call; enumeration-triggered recursion override in `normalize_child` and prompt injection in `run_expansion_llm` (via `pb_enumeration`); `normalize_child` also validates `task_category`/`finegrained_task_category` against `pb_schema.LEAF_CATEGORIES`/`FINEGRAINED_CATEGORIES`, forcing a hallucinated/missing `task_category` to the `Code Development` fallback and clearing a hallucinated `finegrained_task_category` to `None`, logged to `errors` (threaded through `apply_base`'s new `errors` param as well as `apply_expansion`/`apply_split`); `build_other_branches_block`/`build_weight_context_block` build the cached context blocks described in [Prompt caching](#prompt-caching); `run_expansion_llm` takes the current branch's own subtree (not the full rubric) plus a caller-built `other_branches_block`, sent as a separate cached content block ahead of the volatile per-call instruction (via `_cached_context_message`); `run_weight_llm`/`run_weight_llm_branch` take a caller-built `weight_context_block` the same way, in place of separately-passed `content_list_text`/`rubric` params; `run_split_check_llm` — the semantic bundling/duplicate check scoped to `Evaluation, Metrics & Benchmarking` / `Result Analysis` leaves (or every leaf in the branch via `include_all_leaves=True`), one call per branch returning both `"splits"` and `"duplicates"`, skipped entirely when a branch has no candidate leaves (never embedded the full rubric to begin with, since it only needs the branch's own leaves); `apply_dedup` removes a duplicate leaf (via `pb_schema.find_parent`) and force-flattens its parent if that empties the parent's children; weight validation (`find_invalid_weights`); `invoke_llm` raises `RuntimeError` if the model response is truncated (`stop_reason == "max_tokens"`) instead of failing downstream as an opaque JSON parse error, extracts text by filtering `response.content` for `type == "text"` blocks instead of assuming `content[0]` is text (a leading `thinking` block otherwise crashes with an opaque `AttributeError`), passes `thinking={"type": "disabled"}` on every call since some models default to adaptive thinking when the parameter is omitted (which eats into `max_tokens` and can truncate the JSON output), and calls the Anthropic SDK's streaming API (`client.messages.stream(...)` / `get_final_message()`) rather than the blocking `create(...)`, since large `max_tokens` values can otherwise be rejected outright by the SDK; `run_split_check_llm` scales its `max_tokens` (8000 up to a 32000 cap) with candidate leaf count since `include_all_leaves` branches can need much longer responses; `run_expansion_llm` scales its `max_tokens` the same way off `enum_count` so an ENUMERATION-GUARDRAIL-forced fan-out doesn't truncate; `parse_json_response` raises `ValueError` with a preview of the raw model text (up to 2000 chars) when a response isn't valid JSON, instead of a bare `JSONDecodeError` with no diagnostic context; `_extract_json_span` scans every `{`/`[` and keeps the longest balanced JSON decode rather than naively spanning first-open-to-last-close, so stray bracket characters in a model's reasoning prose (math ranges, citations) ahead of its real JSON answer can't be mistaken for the payload |
 | `pb_judge.py` | Cross-model coverage-judge checkpoint (opt-in, `--judge`). `run_coverage_judge` — one OpenAI `o3-mini` call per top-level branch judging whether the branch's leaves cover everything its source section states; requires each "missing" claim to cite `evidence` from the section text, silently dropping ungrounded entries instead of retrying; skips the API call entirely when the branch has zero leaves; `format_missing_as_feedback` turns "missing" claims into the same feedback text `--review` mode's typed `RerunPass` feedback already feeds into re-expansion; `_invoke_judge_llm` is the sole OpenAI call chokepoint (truncation check, robust content extraction, cost tracking — mirrors `pb_passes.invoke_llm`'s shape but is independent of it); `_usage_shim` adapts OpenAI's usage schema so `pb_cost.CostTracker.record` needs no changes |
 | `pb_embeddings.py` | Deterministic embedding-based replacement for the old global LLM weight-calibration pass. `build_embedding_client`/`embed_texts` wrap the OpenAI embeddings API (`text-embedding-3-small`, one batched call), recording usage on an optional `tracker` param via a `_usage_shim` (same pattern as `pb_judge._usage_shim`) and printing `Current usage: $X.XXXX` like every other pass; `extract_leaves` tags every leaf with its top-level branch id; `cosine_similarity`/`cluster_by_threshold` are a hand-rolled greedy single-link clusterer (no numpy/scipy/sklearn); `branch_mass`/`compute_all_branch_masses` count distinct-claim clusters per branch, not raw leaf count; `derive_target_proportions` converts `section_map` into per-branch target weight shares, falling back to a uniform share per branch on a missing/malformed entry; `rescale_branch_weights` applies the per-branch factor, floored at weight 1; `cluster_cross_branch_duplicates`/`build_duplicate_report`/`write_flagged_duplicates` flag (never auto-delete) likely duplicate leaves across branches; `rescale_global_weights` is the top-level orchestrator, threading `tracker` through to `embed_texts` |
 | `pb_cost.py` | `CostTracker` — accumulates token usage (input, output, cache write, cache read) per model; computes and prints a formatted cost report, including a per-provider (Anthropic vs. OpenAI) subtotal so judge-pass and embedding spend are visible separately; `PRICING` covers `claude-opus-4-8`, `claude-sonnet-5`, `o3-mini`, and `text-embedding-3-small` (input-only — no output/cache tokens) |
@@ -237,6 +250,45 @@ text. Falls back to the full list when the best heading score is below 0.3.
 ---
 
 ## Changelog
+
+### v20 — Multi-breakpoint prompt caching for the expansion and weight passes
+
+**84% of Sonnet's input tokens were uncached.** `run_expansion_llm` embedded the *entire*
+rubric tree — every already-finalized top-level branch, not just the one being expanded — as
+fresh, uncached text on every single expansion call. `_expand_subtree` fully expands one
+top-level branch's BFS queue (often dozens of calls) before moving to the next, so everything
+outside the current branch is frozen for that whole duration; that's exactly what prompt
+caching is for, but the "other branches" content was interleaved with per-call volatile
+content in one uncached string, so it was billed at full input price every time. On one
+production run this was the dominant cost driver (~$56 of $57.61 total).
+
+**Fix: split the prompt into a cached prefix and a volatile suffix.** `run_expansion_llm` now
+takes the current top-level branch's own subtree (not the full rubric) plus a caller-built
+`other_branches_block` — a separate message content block carrying its own `cache_control`
+breakpoint, placed before the volatile "current branch + instruction" content
+(`pb_passes._cached_context_message`). `_expand_subtree` builds that block once per branch
+(`pb_passes.build_other_branches_block`), before its BFS loop starts, and passes the exact
+same block object into every expansion call in that loop — since expanding one branch never
+mutates any other branch, the block's serialized text is byte-identical across every call
+within it, so Anthropic serves it from cache after the first write. Cross-branch leaf
+citations (e.g. a leaf under one branch citing a table that lives under another) still work —
+nothing is scoped away, just re-partitioned for caching.
+
+`run_weight_llm_branch` had the same full-rubric-per-call pattern in `run_weight_phase`'s
+per-branch loop, and turned out to be an even cleaner caching win: the rubric is completely
+static across that entire loop (weights aren't written back via `apply_weights` until after
+every branch is scored), so the whole rubric can be one cached block
+(`pb_passes.build_weight_context_block`) reused by every branch call with no splitting needed.
+`run_weight_llm` (used by `_resolve_invalid_weights`'s retry loop) shares the same block.
+`run_weight_phase` rebuilds the block once after each `apply_weights` call, since weight
+values get baked into the cached rubric JSON and must stay byte-accurate within each retry
+stage. `run_split_check_llm` turned out *not* to have this pattern on inspection — it accepted
+a `rubric` parameter but never used it in the prompt (only the branch's own leaves + section
+text) — so that dead parameter was dropped as a small incidental cleanup, not a caching change.
+
+No prompt *content* changed, only how it's partitioned across message content blocks — the
+model receives the same information either way. See [Prompt caching](#prompt-caching) for the
+resulting cache layout.
 
 ### v19 — Raise `MAX_BRANCH_NODES` from 40 to 100
 

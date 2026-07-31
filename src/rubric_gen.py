@@ -28,9 +28,9 @@ from pb_input import discover_mineru_dir, discover_pdf, load_content_list
 from pb_judge import format_missing_as_feedback, run_coverage_judge
 from pb_mineru import blocks_to_text, slice_section
 from pb_passes import (MAX_BRANCH_NODES, apply_base, apply_dedup, apply_expansion, apply_split, apply_weights,
-                       branch_size, build_client, build_system_blocks, find_invalid_weights,
-                       force_branch_cap_leaves, pdf_to_block, run_base_llm, run_expansion_llm, run_split_check_llm,
-                       run_weight_llm, run_weight_llm_branch)
+                       branch_size, build_client, build_other_branches_block, build_system_blocks,
+                       build_weight_context_block, find_invalid_weights, force_branch_cap_leaves, pdf_to_block,
+                       run_base_llm, run_expansion_llm, run_split_check_llm, run_weight_llm, run_weight_llm_branch)
 from pb_review import RerunPass, collect_weight_corrections, pretty_print_nodes, review_pass
 from pb_schema import all_ids, find_node, iter_nodes, validate_final, validate_partial
 from pb_state import (PHASE_BASE, PHASE_DONE, PHASE_EXPANSION, PHASE_WEIGHT, determine_phase,
@@ -145,6 +145,8 @@ def _expand_subtree(client, system_blocks, content_list, rubric, node_id, hints,
     still queued for expansion is force-flattened into a leaf instead of making further LLM calls.
     """
     branch_id = node_id
+    branch_node = find_node(rubric, branch_id)
+    other_branches_block = build_other_branches_block(rubric, branch_id)
     local_queue = [node_id]
     while local_queue:
         if branch_size(rubric, branch_id) >= MAX_BRANCH_NODES:
@@ -154,7 +156,8 @@ def _expand_subtree(client, system_blocks, content_list, rubric, node_id, hints,
         hint = hints.get(current_id, "Expand this node into its sub-tasks based on the paper.")
         section_text = blocks_to_text(slice_section(content_list, hint))
         print(f"  Expanding '{current_id}'...")
-        parsed = run_expansion_llm(client, system_blocks, section_text, rubric, current_id, hint, model, feedback=feedback, tracker=tracker)
+        parsed = run_expansion_llm(client, system_blocks, section_text, branch_node, current_id, hint, model,
+                                   other_branches_block, feedback=feedback, tracker=tracker)
         new_pending = apply_expansion(rubric, current_id, parsed, hints, errors=errors)
         local_queue.extend(new_pending)
 
@@ -195,7 +198,7 @@ def run_expansion_phase(client, system_blocks, content_list, state, model, outpu
             break
 
 
-def _resolve_invalid_weights(client, system_blocks, content_list_text, rubric, model, weights, tracker=None, input_fn=input, human_review=True):
+def _resolve_invalid_weights(client, system_blocks, weight_context_block, rubric, model, weights, tracker=None, input_fn=input, human_review=True):
     """Loop until all weights in the dict are valid for rubric.
 
     Raises MaxRetriesExceeded if MAX_WEIGHT_RESOLUTION_RETRIES attempts still leave invalid
@@ -220,7 +223,7 @@ def _resolve_invalid_weights(client, system_blocks, content_list_text, rubric, m
         else:
             regen_ids = [node_id for node_id, _, _ in invalid]
         if regen_ids:
-            retry = run_weight_llm(client, system_blocks, content_list_text, rubric, model, tracker=tracker, node_ids=regen_ids)
+            retry = run_weight_llm(client, system_blocks, weight_context_block, model, tracker=tracker, node_ids=regen_ids)
             for node_id in regen_ids:
                 if node_id in retry:
                     weights[node_id] = retry[node_id]
@@ -235,7 +238,7 @@ def _run_split_check_on_branch(client, system_blocks, content_list, state, branc
     section_text = blocks_to_text(slice_section(content_list, branch_node["requirements"]))
     capped = set(state.get("capped_branches", []))
     include_all = branch_node["id"] in capped
-    result = run_split_check_llm(client, system_blocks, section_text, state["rubric"], branch_node, model,
+    result = run_split_check_llm(client, system_blocks, section_text, branch_node, model,
                                  tracker=tracker, include_all_leaves=include_all)
     for leaf_id, duplicate_of_id in result.get("duplicates", {}).items():
         if leaf_id == duplicate_of_id:
@@ -369,14 +372,15 @@ def run_weight_phase(client, embedding_client, system_blocks, content_list, stat
     while True:
         candidate = copy.deepcopy(state["rubric"])
         weights = {root_id: 1}
+        weight_context_block = build_weight_context_block(content_list_text, candidate)
 
         print("  Running local weight pass for each top-level branch...")
         for branch_node in candidate.get("sub_tasks", []):
             print(f"    Branch: {branch_node['id']}")
-            branch_weights = run_weight_llm_branch(client, system_blocks, content_list_text, candidate, branch_node, model, tracker=tracker)
+            branch_weights = run_weight_llm_branch(client, system_blocks, weight_context_block, branch_node, model, tracker=tracker)
             weights.update(branch_weights)
 
-        weights = _resolve_invalid_weights(client, system_blocks, content_list_text, candidate, model, weights, tracker=tracker, human_review=human_review)
+        weights = _resolve_invalid_weights(client, system_blocks, weight_context_block, candidate, model, weights, tracker=tracker, human_review=human_review)
         apply_weights(candidate, weights)
 
         print("  Rescaling weights via embedding-based branch mass and section coverage...")
@@ -386,7 +390,10 @@ def run_weight_phase(client, embedding_client, system_blocks, content_list, stat
         weights.update(rescaled_leaf_weights)
         weights[root_id] = 1
 
-        weights = _resolve_invalid_weights(client, system_blocks, content_list_text, candidate, model, weights, tracker=tracker, human_review=human_review)
+        # candidate's weight fields changed via apply_weights above, so the cached block (which
+        # embeds the full rubric JSON) must be rebuilt to stay byte-accurate for this stage.
+        weight_context_block = build_weight_context_block(content_list_text, candidate)
+        weights = _resolve_invalid_weights(client, system_blocks, weight_context_block, candidate, model, weights, tracker=tracker, human_review=human_review)
 
         apply_weights(candidate, weights)
         pretty_print_nodes("Weighted rubric", candidate)

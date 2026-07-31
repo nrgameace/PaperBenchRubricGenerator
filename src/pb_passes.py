@@ -181,6 +181,54 @@ def _text_message(instruction: str) -> dict:
     return {"role": "user", "content": [{"type": "text", "text": instruction}]}
 
 
+def _cached_context_message(cached_block: dict, instruction: str) -> dict:
+    """Return a user-role message: a cached context block followed by fresh instruction text.
+
+    The cached block (built by the caller, e.g. build_other_branches_block or
+    build_weight_context_block) carries its own cache_control breakpoint and must be
+    byte-identical across calls meant to share its cache entry; the instruction text is
+    appended uncached since it changes on every call.
+    """
+    return {"role": "user", "content": [cached_block, {"type": "text", "text": instruction}]}
+
+
+def build_other_branches_block(rubric: dict, branch_id: str) -> dict:
+    """Serialize every top-level branch except branch_id into a cached context block.
+
+    Frozen for the entire duration of branch_id's expansion (_expand_subtree only mutates
+    nodes inside branch_id's own subtree), so this exact block is reused verbatim across every
+    expansion call within that branch's BFS loop, letting Anthropic's prompt cache serve it
+    instead of billing it as fresh input tokens on every call.
+    """
+    other_branches = [child for child in rubric.get("sub_tasks", []) if child.get("id") != branch_id]
+    context = {
+        "id": rubric["id"],
+        "requirements": rubric["requirements"],
+        "other_top_level_branches": other_branches,
+    }
+    text = (
+        "OTHER TOP-LEVEL BRANCHES (context only — already generated elsewhere in the rubric; "
+        "do not repeat or modify these, but you may reference facts stated in them):\n"
+        f"{json.dumps(context, indent=2, ensure_ascii=False)}"
+    )
+    return {"type": "text", "text": text, "cache_control": {"type": "ephemeral", "ttl": "1h"}}
+
+
+def build_weight_context_block(content_list_text: str, rubric: dict) -> dict:
+    """Serialize the paper content and full rubric into a single cached context block.
+
+    Reused verbatim across every top-level branch's weight call in run_weight_phase's local
+    pass, and across every retry in _resolve_invalid_weights, since neither input changes for
+    that duration (weights aren't written back into the rubric via apply_weights until after
+    all branch calls for that stage complete).
+    """
+    text = (
+        f"PAPER CONTENT (MinerU structured parse):\n{content_list_text}\n\n"
+        f"FULL RUBRIC (context only, ids included):\n{json.dumps(rubric, indent=2, ensure_ascii=False)}"
+    )
+    return {"type": "text", "text": text, "cache_control": {"type": "ephemeral", "ttl": "1h"}}
+
+
 def invoke_llm(client, system_blocks, messages, model, max_tokens=8000, tracker=None) -> str:
     """Invoke the model and return its text. Raises RuntimeError on API failure.
 
@@ -524,20 +572,27 @@ def run_base_llm(client, system_blocks, pdf_block, content_list_text, model, tra
     )
 
 
-def run_expansion_llm(client, system_blocks, section_text, rubric: dict, node_id: str, hint: str, model, feedback: str = "", tracker=None) -> dict:
+def run_expansion_llm(client, system_blocks, section_text, branch_node: dict, node_id: str, hint: str, model,
+                      other_branches_block: dict, feedback: str = "", tracker=None) -> dict:
     """Run an expansion pass for one node; sends only the relevant section text (no PDF).
+
+    ``branch_node`` is the current top-level branch's own subtree (not the full rubric) —
+    everything outside it is passed separately as ``other_branches_block``, a cached content
+    block built once per branch by the caller (see build_other_branches_block) so it's reused
+    across every call in that branch's BFS loop instead of being resent as fresh input tokens
+    each time.
 
     Injects an ENUMERATION GUARDRAIL instruction when the node's own requirements
     enumerate >= MIN_ENUMERATED_ITEMS_TO_SPLIT named sub-items, telling the model to
     produce at least that many children rather than collapsing them.
     """
-    target = find_node(rubric, node_id)
+    target = find_node(branch_node, node_id)
     instruction = (
         "TASK: Expand ONE node of the in-progress rubric into its DIRECT children, grounded in the "
         "paper. Do not repeat or modify any other node.\n\n"
         f"RELEVANT PAPER SECTION:\n{section_text}\n\n"
         f"NODE TO EXPAND:\n- requirements: {target['requirements']}\n- expansion hint: {hint}\n\n"
-        f"FULL RUBRIC SO FAR (context only):\n{json.dumps(rubric, indent=2, ensure_ascii=False)}\n\n"
+        f"CURRENT BRANCH SUBTREE SO FAR (context only):\n{json.dumps(branch_node, indent=2, ensure_ascii=False)}\n\n"
         'Respond with JSON ONLY: {"children": [ <child objects> ]}\n\n' + _CHILD_SHAPE
     )
     enum_count = count_enumerated_items(target["requirements"])
@@ -552,15 +607,19 @@ def run_expansion_llm(client, system_blocks, section_text, rubric: dict, node_id
         instruction += f"\n\nUSER FEEDBACK (incorporate this when generating children):\n{feedback}"
     max_tokens = min(8000 + 400 * enum_count, 32000)
     return parse_json_response(
-        invoke_llm(client, system_blocks, [_text_message(instruction)], model, max_tokens=max_tokens, tracker=tracker)
+        invoke_llm(client, system_blocks, [_cached_context_message(other_branches_block, instruction)],
+                  model, max_tokens=max_tokens, tracker=tracker)
     )
 
 
-def run_weight_llm(client, system_blocks, content_list_text, rubric: dict, model, tracker=None, feedback=None, node_ids=None) -> dict:
+def run_weight_llm(client, system_blocks, weight_context_block: dict, model, tracker=None, feedback=None, node_ids=None) -> dict:
     """Run the weight pass; sends the full MinerU text only (no PDF).
 
-    When node_ids is set, the instruction targets only those ids (full rubric still sent for context).
-    When feedback is provided, a USER FEEDBACK block is appended.
+    ``weight_context_block`` (see build_weight_context_block) carries the paper content and
+    full rubric as a single cached block, built once by the caller and reused across every
+    call in the same run_weight_phase stage. When node_ids is set, the instruction targets
+    only those ids (full rubric still sent for context). When feedback is provided, a USER
+    FEEDBACK block is appended.
     """
     if node_ids:
         id_list = ", ".join(f'"{nid}"' for nid in node_ids)
@@ -580,25 +639,25 @@ def run_weight_llm(client, system_blocks, content_list_text, rubric: dict, model
         response_shape = 'Respond with JSON ONLY mapping EVERY node id to an integer: {"weights": {"<id>": <int>, ...}}'
     instruction = (
         task_line
-        + f"PAPER CONTENT (MinerU structured parse):\n{content_list_text}\n\n"
-        "Within each group of sibling nodes, assign non-negative integers for relative importance "
+        + "Within each group of sibling nodes, assign non-negative integers for relative importance "
         "(they need NOT sum to any fixed value; the benchmark normalizes within each group). More "
         "important or more effort-intensive siblings get larger integers. Use 1 for the root.\n\n"
-        f"FULL RUBRIC (ids included):\n{json.dumps(rubric, indent=2, ensure_ascii=False)}\n\n"
         + response_shape
     )
     if feedback:
         instruction += f"\n\nUSER FEEDBACK (incorporate this when assigning weights):\n{feedback}"
     parsed = parse_json_response(
-        invoke_llm(client, system_blocks, [_text_message(instruction)], model, tracker=tracker)
+        invoke_llm(client, system_blocks, [_cached_context_message(weight_context_block, instruction)], model, tracker=tracker)
     )
     return parsed.get("weights", parsed) if isinstance(parsed, dict) else {}
 
 
-def run_weight_llm_branch(client, system_blocks, content_list_text, rubric: dict, branch_node: dict, model, tracker=None) -> dict:
+def run_weight_llm_branch(client, system_blocks, weight_context_block: dict, branch_node: dict, model, tracker=None) -> dict:
     """Assign weights to every node in branch_node's subtree (branch_node + all descendants).
 
-    Full rubric is sent for context but only weights for the subtree are requested.
+    ``weight_context_block`` carries the paper content and full rubric as a single cached
+    block (see build_weight_context_block), reused verbatim across every top-level branch's
+    call within run_weight_phase's local pass since neither input changes during that loop.
     """
     branch_ids = [node["id"] for node in iter_nodes(branch_node)]
     id_list = ", ".join(f'"{nid}"' for nid in branch_ids)
@@ -609,15 +668,13 @@ def run_weight_llm_branch(client, system_blocks, content_list_text, rubric: dict
     instruction = (
         f"TASK: Assign integer WEIGHTS to every node in the subtree rooted at \"{branch_node['id']}\" "
         f"(node IDs: [{id_list}]). The full rubric is provided for context but only return weights for those IDs.\n\n"
-        f"PAPER CONTENT (MinerU structured parse):\n{content_list_text}\n\n"
         "Within each group of sibling nodes, assign non-negative integers for relative importance "
         "(they need NOT sum to any fixed value; the benchmark normalizes within each group). More "
         "important or more effort-intensive siblings get larger integers.\n\n"
-        f"FULL RUBRIC (context only):\n{json.dumps(rubric, indent=2, ensure_ascii=False)}\n\n"
         + response_shape
     )
     parsed = parse_json_response(
-        invoke_llm(client, system_blocks, [_text_message(instruction)], model, tracker=tracker)
+        invoke_llm(client, system_blocks, [_cached_context_message(weight_context_block, instruction)], model, tracker=tracker)
     )
     return parsed.get("weights", parsed) if isinstance(parsed, dict) else {}
 
@@ -643,7 +700,7 @@ def _split_check_candidates(branch_node: dict, include_all: bool = False) -> lis
     ]
 
 
-def run_split_check_llm(client, system_blocks, section_text, rubric: dict, branch_node: dict, model,
+def run_split_check_llm(client, system_blocks, section_text, branch_node: dict, model,
                         tracker=None, include_all_leaves: bool = False) -> dict:
     """Check leaves in a branch for semantic bundling (splits) and restated duplicate claims.
 

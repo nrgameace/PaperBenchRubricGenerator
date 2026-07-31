@@ -77,7 +77,7 @@ def test_expand_subtree_expands_all_levels():
     }
     expanded_order = []
 
-    def fake_run_expansion_llm(client, system_blocks, section_text, rb, node_id, hint, model, feedback="", tracker=None):
+    def fake_run_expansion_llm(client, system_blocks, section_text, rb, node_id, hint, model, other_branches_block, feedback="", tracker=None):
         expanded_order.append(node_id)
         return expansion_responses[node_id]
 
@@ -97,7 +97,7 @@ def test_expand_subtree_forwards_feedback_to_all_calls():
     hints = {"section-a": "hint"}
     feedback_seen = []
 
-    def fake_run_expansion_llm(client, system_blocks, section_text, rb, node_id, hint, model, feedback="", tracker=None):
+    def fake_run_expansion_llm(client, system_blocks, section_text, rb, node_id, hint, model, other_branches_block, feedback="", tracker=None):
         feedback_seen.append(feedback)
         return {"children": [
             {"id": f"leaf-{node_id}", "requirements": "x",
@@ -145,7 +145,7 @@ def test_expand_subtree_caps_infinite_expansion_at_max_branch_nodes():
     hints = {"section-a": "hint for section a"}
     counter = {"n": 0}
 
-    def fake_run_expansion_llm(client, system_blocks, section_text, rb, node_id, hint, model, feedback="", tracker=None):
+    def fake_run_expansion_llm(client, system_blocks, section_text, rb, node_id, hint, model, other_branches_block, feedback="", tracker=None):
         counter["n"] += 1
         return {"children": [
             {"id": f"gen-{counter['n']}-a", "requirements": "x", "expandable": True, "expansion_hint": "keep going"},
@@ -175,7 +175,7 @@ def test_expand_subtree_no_cap_effect_when_under_limit():
     hints = {"section-a": "hint for section a"}
     capped = set()
 
-    def fake_run_expansion_llm(client, system_blocks, section_text, rb, node_id, hint, model, feedback="", tracker=None):
+    def fake_run_expansion_llm(client, system_blocks, section_text, rb, node_id, hint, model, other_branches_block, feedback="", tracker=None):
         return {"children": [
             {"id": "leaf-1", "requirements": "x", "expandable": False, "task_category": "Code Development"},
         ]}
@@ -193,7 +193,7 @@ def test_expand_subtree_no_feedback_passes_empty_string():
     hints = {"section-a": "hint"}
     feedback_seen = []
 
-    def fake_run_expansion_llm(client, system_blocks, section_text, rb, node_id, hint, model, feedback="", tracker=None):
+    def fake_run_expansion_llm(client, system_blocks, section_text, rb, node_id, hint, model, other_branches_block, feedback="", tracker=None):
         feedback_seen.append(feedback)
         return {"children": [
             {"id": "leaf", "requirements": "x", "expandable": False, "task_category": "Code Development"}
@@ -205,6 +205,46 @@ def test_expand_subtree_no_feedback_passes_empty_string():
         rubric_gen._expand_subtree(None, [], [], rubric, "section-a", hints, "model")
 
     assert feedback_seen == [""]
+
+
+def test_expand_subtree_builds_other_branches_block_once_per_branch_not_per_node():
+    """section-a expands across 2 LLM calls (section-a itself, then its expandable child
+    child-1) — build_other_branches_block must be called exactly once for the whole branch,
+    not once per node, so the resulting cached block is reused (same object) across every
+    expansion call in the branch's BFS loop."""
+    rubric = _rubric_with_expandable_node()
+    hints = {"section-a": "hint for section a"}
+
+    expansion_responses = {
+        "section-a": {"children": [
+            {"id": "child-1", "requirements": "child one", "expandable": True, "expansion_hint": "child 1 hint"},
+        ]},
+        "child-1": {"children": [
+            {"id": "child-1-a", "requirements": "leaf", "expandable": False, "task_category": "Code Execution"},
+        ]},
+    }
+    seen_blocks = []
+
+    def fake_run_expansion_llm(client, system_blocks, section_text, rb, node_id, hint, model, other_branches_block, feedback="", tracker=None):
+        seen_blocks.append(other_branches_block)
+        return expansion_responses[node_id]
+
+    real_build = pb_passes.build_other_branches_block
+    build_calls = []
+
+    def counting_build(rubric_arg, branch_id_arg):
+        build_calls.append(branch_id_arg)
+        return real_build(rubric_arg, branch_id_arg)
+
+    with patch("rubric_gen.run_expansion_llm", side_effect=fake_run_expansion_llm), \
+         patch("rubric_gen.build_other_branches_block", side_effect=counting_build), \
+         patch("rubric_gen.blocks_to_text", return_value="text"), \
+         patch("rubric_gen.slice_section", return_value=[]):
+        rubric_gen._expand_subtree(None, [], [], rubric, "section-a", hints, "model")
+
+    assert build_calls == ["section-a"]
+    assert len(seen_blocks) == 2
+    assert seen_blocks[0] is seen_blocks[1]
 
 
 # ── run_expansion_phase review-frequency test ─────────────────────────────────
@@ -708,7 +748,7 @@ def test_run_weight_phase_calls_branch_llm_per_top_level_child(tmp_path):
     state = _multi_branch_state()
     branch_calls = []
 
-    def fake_branch(client, system_blocks, content_list_text, rubric, branch_node, model, tracker=None):
+    def fake_branch(client, system_blocks, weight_context_block, branch_node, model, tracker=None):
         branch_calls.append(branch_node["id"])
         return {}
 
@@ -816,7 +856,7 @@ def _split_check_state():
 def test_run_split_check_phase_splits_only_bundled_leaf(tmp_path):
     state = _split_check_state()
 
-    def fake_split_check_llm(client, system_blocks, section_text, rubric, branch_node, model, tracker=None, include_all_leaves=False):
+    def fake_split_check_llm(client, system_blocks, section_text, branch_node, model, tracker=None, include_all_leaves=False):
         if branch_node["id"] == "branch-a":
             return {"splits": {"bundled-leaf": [
                 {"id": "small-variant", "requirements": "small variant matches", "expandable": False, "task_category": "Result Analysis"},
@@ -844,7 +884,7 @@ def test_run_split_check_phase_splits_only_bundled_leaf(tmp_path):
 def test_run_split_check_phase_logs_applied_split(tmp_path):
     state = _split_check_state()
 
-    def fake_split_check_llm(client, system_blocks, section_text, rubric, branch_node, model, tracker=None, include_all_leaves=False):
+    def fake_split_check_llm(client, system_blocks, section_text, branch_node, model, tracker=None, include_all_leaves=False):
         if branch_node["id"] == "branch-a":
             return {"splits": {"bundled-leaf": [
                 {"id": "small-variant", "requirements": "x", "expandable": False, "task_category": "Result Analysis"},
@@ -865,7 +905,7 @@ def test_run_split_check_phase_calls_llm_once_per_branch_regardless_of_matches(t
     state = _split_check_state()
     branch_calls = []
 
-    def fake_split_check_llm(client, system_blocks, section_text, rubric, branch_node, model, tracker=None, include_all_leaves=False):
+    def fake_split_check_llm(client, system_blocks, section_text, branch_node, model, tracker=None, include_all_leaves=False):
         branch_calls.append(branch_node["id"])
         return {"splits": {}, "duplicates": {}}
 
@@ -893,7 +933,7 @@ def test_run_split_check_phase_commits_state(tmp_path):
 def test_run_split_check_phase_removes_duplicate_leaf(tmp_path):
     state = _split_check_state()
 
-    def fake_split_check_llm(client, system_blocks, section_text, rubric, branch_node, model, tracker=None, include_all_leaves=False):
+    def fake_split_check_llm(client, system_blocks, section_text, branch_node, model, tracker=None, include_all_leaves=False):
         if branch_node["id"] == "branch-a":
             return {"splits": {}, "duplicates": {"atomic-leaf-2": "atomic-leaf-1"}}
         return {"splits": {}, "duplicates": {}}
@@ -911,7 +951,7 @@ def test_run_split_check_phase_removes_duplicate_leaf(tmp_path):
 def test_run_split_check_phase_logs_duplicate_removal(tmp_path):
     state = _split_check_state()
 
-    def fake_split_check_llm(client, system_blocks, section_text, rubric, branch_node, model, tracker=None, include_all_leaves=False):
+    def fake_split_check_llm(client, system_blocks, section_text, branch_node, model, tracker=None, include_all_leaves=False):
         if branch_node["id"] == "branch-a":
             return {"splits": {}, "duplicates": {"atomic-leaf-2": "atomic-leaf-1"}}
         return {"splits": {}, "duplicates": {}}
@@ -928,7 +968,7 @@ def test_run_split_check_phase_logs_duplicate_removal(tmp_path):
 def test_run_split_check_phase_processes_duplicates_before_splits_for_same_leaf(tmp_path):
     state = _split_check_state()
 
-    def fake_split_check_llm(client, system_blocks, section_text, rubric, branch_node, model, tracker=None, include_all_leaves=False):
+    def fake_split_check_llm(client, system_blocks, section_text, branch_node, model, tracker=None, include_all_leaves=False):
         if branch_node["id"] == "branch-a":
             return {
                 "splits": {"bundled-leaf": [
@@ -951,7 +991,7 @@ def test_run_split_check_phase_processes_duplicates_before_splits_for_same_leaf(
 def test_run_split_check_phase_skips_duplicate_with_missing_duplicate_of_target(tmp_path):
     state = _split_check_state()
 
-    def fake_split_check_llm(client, system_blocks, section_text, rubric, branch_node, model, tracker=None, include_all_leaves=False):
+    def fake_split_check_llm(client, system_blocks, section_text, branch_node, model, tracker=None, include_all_leaves=False):
         if branch_node["id"] == "branch-a":
             return {"splits": {}, "duplicates": {"atomic-leaf-2": "ghost-leaf"}}
         return {"splits": {}, "duplicates": {}}
@@ -968,7 +1008,7 @@ def test_run_split_check_phase_skips_duplicate_with_missing_duplicate_of_target(
 def test_run_split_check_phase_skips_self_referential_duplicate(tmp_path):
     state = _split_check_state()
 
-    def fake_split_check_llm(client, system_blocks, section_text, rubric, branch_node, model, tracker=None, include_all_leaves=False):
+    def fake_split_check_llm(client, system_blocks, section_text, branch_node, model, tracker=None, include_all_leaves=False):
         if branch_node["id"] == "branch-a":
             return {"splits": {}, "duplicates": {"atomic-leaf-2": "atomic-leaf-2"}}
         return {"splits": {}, "duplicates": {}}
@@ -987,7 +1027,7 @@ def test_run_split_check_phase_passes_include_all_leaves_true_for_capped_branch(
     state["capped_branches"] = ["branch-a"]
     calls = {}
 
-    def fake_split_check_llm(client, system_blocks, section_text, rubric, branch_node, model, tracker=None, include_all_leaves=False):
+    def fake_split_check_llm(client, system_blocks, section_text, branch_node, model, tracker=None, include_all_leaves=False):
         calls[branch_node["id"]] = include_all_leaves
         return {"splits": {}, "duplicates": {}}
 

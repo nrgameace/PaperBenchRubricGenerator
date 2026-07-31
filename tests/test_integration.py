@@ -49,14 +49,12 @@ def _patch_llm(monkeypatch):
     monkeypatch.setattr(rubric_gen, "run_base_llm", lambda *a, **k: _BASE)
     monkeypatch.setattr(rubric_gen, "run_expansion_llm", lambda *a, **k: _EXPANSION)
     def _fake_weight_llm(*args, **kwargs):
-        from pb_schema import iter_nodes
-        rubric = args[3]
-        return {node["id"]: 1 for node in iter_nodes(rubric)}
+        return {nid: 1 for nid in kwargs.get("node_ids") or []}
     monkeypatch.setattr(rubric_gen, "run_weight_llm", _fake_weight_llm)
 
     def _fake_weight_llm_branch(*args, **kwargs):
         from pb_schema import iter_nodes
-        branch_node = args[4]
+        branch_node = args[3]
         return {node["id"]: 1 for node in iter_nodes(branch_node)}
     monkeypatch.setattr(rubric_gen, "run_weight_llm_branch", _fake_weight_llm_branch)
     monkeypatch.setattr(rubric_gen, "run_split_check_llm", lambda *a, **k: {})
