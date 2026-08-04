@@ -1,0 +1,1698 @@
+{
+  "id": "root",
+  "requirements": "The core contributions of 'Fine-tuning Reinforcement Learning Models is Secretly a Forgetting Mitigation Problem' have been reproduced, demonstrating that vanilla fine-tuning of pre-trained RL models suffers from forgetting of pre-trained capabilities (state coverage gap and imperfect cloning gap) across NetHack, Montezuma's Revenge, and RoboticSequence, and that knowledge retention techniques (EWC, BC, KS, EM) mitigate this problem, including achieving a new neural-model state-of-the-art of over 10K points on NetHack Human Monk.",
+  "weight": 1,
+  "sub_tasks": [
+    {
+      "id": "nethack-experiments",
+      "requirements": "The NetHack Human Monk fine-tuning experiments have been reproduced, showing that vanilla fine-tuning deteriorates while knowledge retention methods (KS, BC, EWC) surpass the prior state-of-the-art, with KS achieving over 10K points, driven by the imperfect cloning gap.",
+      "weight": 3,
+      "sub_tasks": [
+        {
+          "id": "nethack-env-setup",
+          "requirements": "The NetHack Learning Environment (NLE) with the Human Monk character configuration is correctly installed and configured for the fine-tuning experiments, matching the environment used to obtain the prior neural-model state-of-the-art baseline.",
+          "weight": 2,
+          "sub_tasks": [
+            {
+              "id": "nle-package-installation",
+              "requirements": "The NetHack Learning Environment (NLE) package (Küttler et al., 2020) is installed and provides a Gym-compatible interface to the terminal roguelike game NetHack, exposing the 'score' task reward signal used throughout the paper's NetHack experiments.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Environment & Infrastructure Setup"
+            },
+            {
+              "id": "nethack-human-monk-role-config",
+              "requirements": "The NLE environment is configured to use the Human Monk character/role (the 'Chaotic Good Human Monk' setup), matching the specific role configuration used to obtain the pre-trained state-of-the-art policy from Tuyls et al. (2023) that serves as π* for the fine-tuning experiments.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Environment & Infrastructure Setup"
+            },
+            {
+              "id": "nethack-monk-no-inventory-management",
+              "requirements": "The Human Monk character setup is confirmed not to require inventory management (as stated in Appendix B.1: 'the game setup for the Human Monk is relatively straightforward, as it does not require the agent to manage the inventory'), consistent with why this character was chosen for the experiments.",
+              "weight": 1,
+              "sub_tasks": [
+                {
+                  "id": "monk-no-inventory-management-claim",
+                  "requirements": "It is verified that the Human Monk character configuration in NetHack does not require the agent to manage the inventory, matching the exact statement in Appendix B.1: 'the game setup for the Human Monk is relatively straightforward, as it does not require the agent to manage the inventory.'",
+                  "weight": 1,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                }
+              ],
+              "task_category": null,
+              "finegrained_task_category": null
+            },
+            {
+              "id": "nethack-multimodal-observation-space",
+              "requirements": "The NLE observation space is correctly exposed as multimodal, consisting of the 2D dungeon map/screen (image-like grid of characters and colors), the blstats vector (player status information such as health and hunger), and the message text (textual notifications/warnings), matching the architecture description in Appendix B.1.",
+              "weight": 2,
+              "sub_tasks": [
+                {
+                  "id": "nle-observation-dungeon-map-component",
+                  "requirements": "The NLE observation space includes the 2D dungeon map/screen component, an image-like grid of characters and colors representing the current view of the dungeon level, matching the multimodal observation description in Appendix B.1.",
+                  "weight": 2,
+                  "sub_tasks": [],
+                  "task_category": "Code Development",
+                  "finegrained_task_category": "Environment & Infrastructure Setup"
+                },
+                {
+                  "id": "nle-observation-blstats-component",
+                  "requirements": "The NLE observation space includes the blstats vector component, containing player status information such as health and hunger, matching the multimodal observation description in Appendix B.1.",
+                  "weight": 1,
+                  "sub_tasks": [],
+                  "task_category": "Code Development",
+                  "finegrained_task_category": "Environment & Infrastructure Setup"
+                },
+                {
+                  "id": "nle-observation-message-text-component",
+                  "requirements": "The NLE observation space includes the message text component, containing textual notifications/warnings displayed to the player, matching the multimodal observation description in Appendix B.1.",
+                  "weight": 1,
+                  "sub_tasks": [],
+                  "task_category": "Code Development",
+                  "finegrained_task_category": "Environment & Infrastructure Setup"
+                }
+              ],
+              "task_category": null,
+              "finegrained_task_category": null
+            },
+            {
+              "id": "nethack-120-discrete-action-space",
+              "requirements": "The NLE action space is correctly configured as a set of 120 discrete actions, matching the action space size described in Appendix B.1.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Environment & Infrastructure Setup"
+            },
+            {
+              "id": "nethack-score-reward-task",
+              "requirements": "The NLE 'score' task is used as the environmental reward signal, computed as the increase in the in-game score between two consecutive time steps, matching the reward formulation described in Appendix B.1.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Environment & Infrastructure Setup"
+            },
+            {
+              "id": "nethack-procedural-generation-each-run",
+              "requirements": "The NLE dungeon is configured to be procedurally generated anew in each run/episode, matching the paper's statement that 'in each run, the dungeon is generated anew, so the agent does not ever see a specific level twice,' requiring the agent to learn general behavioral patterns rather than memorize specific level solutions.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Environment & Infrastructure Setup"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "nethack-pretrained-model-acquisition",
+          "requirements": "A pre-trained NetHack Human Monk policy π* is obtained or trained, serving as the starting point for all fine-tuning conditions (vanilla, EWC, BC, KS), consistent with the paper's use of a strong existing pre-trained model as the base for fine-tuning experiments.",
+          "weight": 3,
+          "sub_tasks": [
+            {
+              "id": "nethack-pretrained-checkpoint-source",
+              "requirements": "The pre-trained NetHack Human Monk policy checkpoint is obtained from the prior work of Tuyls et al. (2023), which trained the model via behavioral cloning on AutoAscend bot trajectories combined with APPO fine-tuning, representing the prior neural-model state-of-the-art that the paper's fine-tuning experiments build upon.",
+              "weight": 3,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Dataset and Model Acquisition"
+            },
+            {
+              "id": "nethack-pretrained-model-architecture-match",
+              "requirements": "The obtained pre-trained policy uses the same multimodal APPO network architecture (processing the dungeon map, blstats vector, and message text, and outputting one of 120 discrete actions) as described in Appendix B.1, ensuring compatibility with the fine-tuning pipeline used for all downstream conditions (vanilla, EWC, BC, KS).",
+              "weight": 2,
+              "sub_tasks": [
+                {
+                  "id": "nethack-pretrained-model-multimodal-inputs-match",
+                  "requirements": "The obtained pre-trained policy's network processes the same three input modalities (dungeon map, blstats vector, and message text) as described in Appendix B.1.",
+                  "weight": 1,
+                  "sub_tasks": [],
+                  "task_category": "Code Development",
+                  "finegrained_task_category": "Method Implementation"
+                },
+                {
+                  "id": "nethack-pretrained-model-action-output-match",
+                  "requirements": "The obtained pre-trained policy's network outputs one of 120 discrete actions, matching the action space described in Appendix B.1 and ensuring compatibility with the fine-tuning pipeline used for all downstream conditions (vanilla, EWC, BC, KS).",
+                  "weight": 1,
+                  "sub_tasks": [],
+                  "task_category": "Code Development",
+                  "finegrained_task_category": "Method Implementation"
+                }
+              ],
+              "task_category": null,
+              "finegrained_task_category": null
+            },
+            {
+              "id": "nethack-pretrained-model-large-scale-training",
+              "requirements": "The pre-trained policy π* is verified to have been pre-trained on a large amount of AutoAscend bot gameplay data, consistent with the paper's description of π* as 'a relatively big model pre-trained on a large amount of data,' establishing it as a strong starting checkpoint for fine-tuning rather than a weak or undertrained model.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Dataset and Model Acquisition"
+            },
+            {
+              "id": "nethack-pretrained-model-imperfect-cloning",
+              "requirements": "It is verified that the obtained pre-trained policy π* exhibits the imperfect cloning gap described in Section 5, i.e., it fails to capture some of AutoAscend's complex behaviors and long-term strategy, and shows a distribution shift relative to the expert as illustrated in Figure 4, confirming this is the correct checkpoint exhibiting the phenomena studied in the paper.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Dataset and Model Acquisition"
+            },
+            {
+              "id": "nethack-pretrained-model-checkpoint-loading",
+              "requirements": "Code exists to load the pre-trained π* checkpoint's weights into the APPO training pipeline such that all four fine-tuning conditions (vanilla, EWC, BC, KS) are initialized from the identical set of pre-trained parameters, ensuring a fair and controlled comparison across knowledge retention methods.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Dataset and Model Acquisition"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "nethack-appo-training-setup",
+          "requirements": "The Asynchronous Proximal Policy Optimization (APPO) training pipeline used for NetHack fine-tuning is correctly configured with the shared encoder frozen and the entropy bonus disabled during knowledge-retention fine-tuning runs (EWC, BC, KS), as described for the NetHack knowledge-retention experiments.",
+          "weight": 2,
+          "sub_tasks": [],
+          "task_category": "Code Development",
+          "finegrained_task_category": "Method Implementation"
+        },
+        {
+          "id": "nethack-training-runs",
+          "requirements": "Training runs are executed for Fine-tuning (vanilla), Fine-tuning + EWC, Fine-tuning + BC, and Fine-tuning + KS on NetHack Human Monk, all initialized from the same pre-trained policy π*, using APPO.",
+          "weight": 3,
+          "sub_tasks": [],
+          "task_category": "Code Execution",
+          "finegrained_task_category": "Experimental Setup"
+        },
+        {
+          "id": "nethack-fig1-plot",
+          "requirements": "Figure 1 (or the corresponding NetHack main results figure) has been reproduced, plotting average episode return over training environment steps for Fine-tuning, Fine-tuning + EWC, Fine-tuning + BC, and Fine-tuning + KS on Human Monk.",
+          "weight": 3,
+          "sub_tasks": [
+            {
+              "id": "nethack-fig1-vanilla-ft-curve-gen",
+              "requirements": "The 'Fine-tuning' (vanilla) curve data for Figure 1/3a is generated from the completed training run: average episode return is logged and plotted against training environment steps for the pre-trained NetHack Human Monk policy π* fine-tuned without any knowledge retention technique.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Logging, Analysis & Presentation"
+            },
+            {
+              "id": "nethack-fig1-ewc-curve-gen",
+              "requirements": "The 'Fine-tuning + EWC' curve data for Figure 1/3a is generated from the completed training run: average episode return is logged and plotted against training environment steps for the pre-trained NetHack Human Monk policy π* fine-tuned with Elastic Weight Consolidation.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Logging, Analysis & Presentation"
+            },
+            {
+              "id": "nethack-fig1-bc-curve-gen",
+              "requirements": "The 'Fine-tuning + BC' curve data for Figure 1/3a is generated from the completed training run: average episode return is logged and plotted against training environment steps for the pre-trained NetHack Human Monk policy π* fine-tuned with behavioral cloning replay against the AutoAscend-derived expert distribution.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Logging, Analysis & Presentation"
+            },
+            {
+              "id": "nethack-fig1-ks-curve-gen",
+              "requirements": "The 'Fine-tuning + KS' curve data for Figure 1/3a is generated from the completed training run: average episode return is logged and plotted against training environment steps for the pre-trained NetHack Human Monk policy π* fine-tuned with kickstarting.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Logging, Analysis & Presentation"
+            },
+            {
+              "id": "nethack-fig1-sota-reference-line",
+              "requirements": "The plot reproducing Figure 1/3a includes a reference marker or line indicating the prior neural-model state-of-the-art performance of approximately 5,000 average return points (Tuyls et al., 2023), against which the fine-tuning conditions are compared, consistent with the paper's statement of achieving '2x, 10K points when compared to the previous 5K'.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Logging, Analysis & Presentation"
+            },
+            {
+              "id": "nethack-fig1-plot-assembly",
+              "requirements": "A single combined plot reproducing Figure 1 (NetHack panel, Figure 3a) is assembled, overlaying the four curves (Fine-tuning, Fine-tuning + EWC, Fine-tuning + BC, Fine-tuning + KS) on shared axes of average episode return (y-axis) versus training environment steps (x-axis) for NetHack Human Monk.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Logging, Analysis & Presentation"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "nethack-vanilla-ft-deterioration",
+          "requirements": "The results show that vanilla fine-tuning on NetHack Human Monk deteriorates relative to the pre-trained policy's performance, consistent with the paper's description of vanilla fine-tuning suffering from the imperfect cloning gap.",
+          "weight": 3,
+          "sub_tasks": [],
+          "task_category": "Result Analysis",
+          "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+        },
+        {
+          "id": "nethack-bc-ewc-surpass-sota",
+          "requirements": "The results show that Fine-tuning + BC and Fine-tuning + EWC also surpass the prior neural-model state-of-the-art on NetHack Human Monk, though to a lesser extent than KS, consistent with the paper's description that KS, BC, and EWC all outperform vanilla fine-tuning and the prior state-of-the-art.",
+          "weight": 3,
+          "sub_tasks": [
+            {
+              "id": "nethack-bc-surpasses-sota",
+              "requirements": "The results show that Fine-tuning + BC surpasses the prior neural-model state-of-the-art average return of approximately 5,000 points on NetHack Human Monk, though achieving a lower average return than Fine-tuning + KS, consistent with Figure 1/3a.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "nethack-ewc-surpasses-sota",
+              "requirements": "The results show that Fine-tuning + EWC surpasses the prior neural-model state-of-the-art average return of approximately 5,000 points on NetHack Human Monk, though achieving a lower average return than Fine-tuning + KS, consistent with Figure 1/3a.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "nethack-ks-highest-of-three",
+              "requirements": "The results show that Fine-tuning + KS achieves a higher average return than both Fine-tuning + BC and Fine-tuning + EWC on NetHack Human Monk, consistent with the paper's description that KS, BC, and EWC all outperform vanilla fine-tuning and the prior state-of-the-art, with KS achieving the largest improvement (over 10K points).",
+              "weight": 3,
+              "sub_tasks": [
+                {
+                  "id": "nethack-ks-vs-bc-higher-return",
+                  "requirements": "The results show that Fine-tuning + KS (kickstarting) achieves a higher average return than Fine-tuning + BC on NetHack Human Monk throughout the later stages of training, consistent with Figure 1/3a and the paper's statement that KS achieves the largest improvement, exceeding 10K points.",
+                  "weight": 2,
+                  "sub_tasks": [
+                    {
+                      "id": "nethack-ks-vs-bc-higher-return-only",
+                      "requirements": "The results show that Fine-tuning + KS (kickstarting) achieves a higher average return than Fine-tuning + BC on NetHack Human Monk throughout the later stages of training, consistent with Figure 1/3a.",
+                      "weight": 2,
+                      "sub_tasks": [],
+                      "task_category": "Result Analysis",
+                      "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                    }
+                  ],
+                  "task_category": null,
+                  "finegrained_task_category": null
+                },
+                {
+                  "id": "nethack-ks-vs-ewc-higher-return",
+                  "requirements": "The results show that Fine-tuning + KS (kickstarting) achieves a higher average return than Fine-tuning + EWC on NetHack Human Monk throughout the later stages of training, consistent with Figure 1/3a and the paper's statement that KS achieves the largest improvement, exceeding 10K points while EWC saturates at a comparatively lower value.",
+                  "weight": 2,
+                  "sub_tasks": [
+                    {
+                      "id": "nethack-ks-vs-ewc-higher-return-only",
+                      "requirements": "The results show that Fine-tuning + KS (kickstarting) achieves a higher average return than Fine-tuning + EWC on NetHack Human Monk throughout the later stages of training, consistent with Figure 1/3a, and that EWC saturates at a comparatively lower value.",
+                      "weight": 2,
+                      "sub_tasks": [],
+                      "task_category": "Result Analysis",
+                      "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                    }
+                  ],
+                  "task_category": null,
+                  "finegrained_task_category": null
+                },
+                {
+                  "id": "nethack-ks-2x-prior-sota",
+                  "requirements": "The results show that Fine-tuning + KS achieves roughly 2x the average return of the prior neural-model state-of-the-art (approximately 10K points versus the prior ~5K points), matching the paper's explicit statement of a '2x, 10K points when compared to the previous 5K' improvement, and that this margin is larger than the margins achieved by BC or EWC over the same baseline.",
+                  "weight": 3,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                }
+              ],
+              "task_category": null,
+              "finegrained_task_category": null
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "nethack-imperfect-cloning-gap-attribution",
+          "requirements": "The paper's explanation is verified: the improvement of knowledge retention methods over vanilla fine-tuning on NetHack Human Monk is attributed primarily to mitigation of the imperfect cloning gap (rather than the state coverage gap), consistent with the paper's framing of NetHack as a setting dominated by the imperfect cloning gap.",
+          "weight": 2,
+          "sub_tasks": [],
+          "task_category": "Result Analysis",
+          "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+        }
+      ],
+      "task_category": null,
+      "finegrained_task_category": null
+    },
+    {
+      "id": "montezuma-experiments",
+      "requirements": "The Montezuma's Revenge fine-tuning experiments have been reproduced, showing that BC (and to a lesser extent EWC) improve over vanilla fine-tuning and training from scratch by mitigating the state coverage gap, verified via Room 7 success rate.",
+      "weight": 3,
+      "sub_tasks": [
+        {
+          "id": "montezuma-env-setup",
+          "requirements": "The Montezuma's Revenge environment and pre-trained policy setup for the fine-tuning experiments has been correctly configured.",
+          "weight": 3,
+          "sub_tasks": [
+            {
+              "id": "montezuma-ale-installation",
+              "requirements": "The Arcade Learning Environment (ALE) is installed and configured to provide the Montezuma's Revenge game environment (Machado et al., 2018b), providing a Gym-compatible interface for training and evaluation.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Environment & Infrastructure Setup"
+            },
+            {
+              "id": "montezuma-frame-preprocessing",
+              "requirements": "Standard Atari frame preprocessing is applied for Montezuma's Revenge as specified in Table 2, including resizing to PreProcHeight 84 and ProProcWidth 84, stacking StateStackSize 4 consecutive frames, and using StickyAction True with ActionProb 0.25.",
+              "weight": 2,
+              "sub_tasks": [
+                {
+                  "id": "montezuma-preproc-frame-resize",
+                  "requirements": "Frame preprocessing for Montezuma's Revenge resizes each raw game frame to PreProcHeight 84 by ProProcWidth 84 pixels, as specified in Table 2 (Appendix B.2).",
+                  "weight": 1,
+                  "sub_tasks": [],
+                  "task_category": "Code Development",
+                  "finegrained_task_category": "Data Processing & Preparation"
+                },
+                {
+                  "id": "montezuma-preproc-frame-stacking",
+                  "requirements": "Frame preprocessing for Montezuma's Revenge stacks StateStackSize 4 consecutive preprocessed frames to form the observation input to the PPO+RND agent, as specified in Table 2 (Appendix B.2).",
+                  "weight": 1,
+                  "sub_tasks": [],
+                  "task_category": "Code Development",
+                  "finegrained_task_category": "Data Processing & Preparation"
+                },
+                {
+                  "id": "montezuma-preproc-sticky-actions",
+                  "requirements": "Frame preprocessing for Montezuma's Revenge applies StickyAction True with ActionProb 0.25, meaning that with probability 0.25 the environment repeats the agent's previous action instead of executing the newly selected action, as specified in Table 2 (Appendix B.2).",
+                  "weight": 1,
+                  "sub_tasks": [],
+                  "task_category": "Code Development",
+                  "finegrained_task_category": "Data Processing & Preparation"
+                }
+              ],
+              "task_category": null,
+              "finegrained_task_category": null
+            },
+            {
+              "id": "montezuma-room-layout-acquisition",
+              "requirements": "The room layout/progression of Montezuma's Revenge (as shown in Figure 12, Appendix B.2) is obtained or reconstructed, defining the numbered sequence of rooms starting from Room 1 where the player begins gameplay.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Dataset and Model Acquisition"
+            },
+            {
+              "id": "montezuma-room-completion-detection",
+              "requirements": "Code exists to detect room completion during an episode, defined as the agent achieving at least one of: earning a coin reward, acquiring a new item, or exiting the room through a passage different from the one used to enter, matching the definition used for Figure 6 room-success evaluation.",
+              "weight": 3,
+              "sub_tasks": [
+                {
+                  "id": "montezuma-room-completion-coin-detection",
+                  "requirements": "Code exists to detect that the agent has earned a coin reward within the current room during an episode, treating this event as one satisfying condition for room completion, matching the room-success definition used in Figure 6.",
+                  "weight": 1,
+                  "sub_tasks": [],
+                  "task_category": "Code Development",
+                  "finegrained_task_category": "Method Implementation"
+                },
+                {
+                  "id": "montezuma-room-completion-item-detection",
+                  "requirements": "Code exists to detect that the agent has acquired a new item within the current room during an episode (e.g., via inventory/state change detection), treating this event as one satisfying condition for room completion, matching the room-success definition used in Figure 6.",
+                  "weight": 1,
+                  "sub_tasks": [],
+                  "task_category": "Code Development",
+                  "finegrained_task_category": "Method Implementation"
+                },
+                {
+                  "id": "montezuma-room-completion-passage-detection",
+                  "requirements": "Code exists to detect that the agent has exited the current room through a passage different from the one used to enter it, by tracking the entry passage/location at the start of the room and comparing it to the exit passage/location, treating this event as one satisfying condition for room completion.",
+                  "weight": 1,
+                  "sub_tasks": [],
+                  "task_category": "Code Development",
+                  "finegrained_task_category": "Method Implementation"
+                },
+                {
+                  "id": "montezuma-room-completion-logical-or-combination",
+                  "requirements": "The overall room-completion signal is computed as the logical OR of the three individual detectors (coin reward earned, new item acquired, exited through a different passage than entered), such that a room is marked complete for a given episode if at least one of the three conditions is triggered.",
+                  "weight": 1,
+                  "sub_tasks": [],
+                  "task_category": "Code Development",
+                  "finegrained_task_category": "Method Implementation"
+                },
+                {
+                  "id": "montezuma-room-completion-figure6-integration",
+                  "requirements": "The room-completion detector (coin, item, or different-passage exit) is correctly wired into the Room 7 evaluation pipeline used to compute the success rate time series plotted in Figure 6, such that an episode initialized in Room 7 is marked as a success if and only if the room-completion signal fires before episode termination.",
+                  "weight": 2,
+                  "sub_tasks": [
+                    {
+                      "id": "montezuma-room-completion-detector-implementation",
+                      "requirements": "A room-completion detector is implemented that fires when the agent earns a coin reward, acquires a new item, or exits the room through a passage different from the one used to enter, as defined in Appendix B.2 for Montezuma's Revenge.",
+                      "weight": 1,
+                      "sub_tasks": [],
+                      "task_category": "Code Development",
+                      "finegrained_task_category": "Method Implementation"
+                    },
+                    {
+                      "id": "montezuma-room7-episode-success-wiring",
+                      "requirements": "The room-completion detector is wired into the Room 7 evaluation pipeline such that an episode initialized in Room 7 is marked as a success if and only if the room-completion signal fires before episode termination, feeding into the success rate time series plotted in Figure 6.",
+                      "weight": 1,
+                      "sub_tasks": [],
+                      "task_category": "Code Development",
+                      "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                    }
+                  ],
+                  "task_category": null,
+                  "finegrained_task_category": null
+                }
+              ],
+              "task_category": null,
+              "finegrained_task_category": null
+            },
+            {
+              "id": "montezuma-rnd-target-network",
+              "requirements": "A randomly initialized, fixed (non-trained) target network is implemented that takes an observation as input and outputs a 512-dimensional embedding vector, following the RND formulation of Burda et al. (2018) as used in Montezuma's Revenge experiments.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "montezuma-rnd-predictor-network",
+              "requirements": "A trainable prediction network is implemented that takes the same observation as input and is trained (via UpdateProportion 0.25 subsampling per Table 2) to regress the fixed target network's 512-dimensional output, with prediction error used as the intrinsic novelty/exploration reward, following Burda et al. (2018).",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "montezuma-intrinsic-extrinsic-reward-combination",
+              "requirements": "The PPO+RND agent combines extrinsic and intrinsic rewards using separate value heads/discount factors, with extrinsic reward scaled by ExtCoef 2.0 and discounted by Gamma 0.999, and intrinsic reward scaled by IntCoef 1.0 and discounted by IntGamma 0.99, as specified in Table 2.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "montezuma-restricted-env-room7-onward",
+              "requirements": "A restricted version of the Montezuma's Revenge environment is implemented/configured such that gameplay (and reward signal) is limited to Room 7 and subsequent rooms, matching the paper's main-text pre-training setup where pre-training starts from Room 7.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Environment & Infrastructure Setup"
+            },
+            {
+              "id": "montezuma-pretrain-policy-room7-convergence",
+              "requirements": "The PPO+RND policy is pre-trained on the Room-7-restricted environment until it achieves strong performance (consistent with the pre-trained agent used for BC data collection achieving an episode cumulative reward of around 7000), producing the pre-trained policy π* used to initialize all main-text fine-tuning runs.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "montezuma-close-far-definition",
+              "requirements": "The CLOSE and FAR state sets for Montezuma's Revenge are correctly conceptualized: CLOSE corresponds to rooms preceding Room 7 (not seen during pre-training), and FAR corresponds to Room 7 and all subsequent rooms (the region the pre-trained policy π* was trained to solve).",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "montezuma-ppo-rnd-architecture",
+          "requirements": "The PPO agent with Random Network Distillation (RND) is implemented following Burda et al. (2018): a randomly initialized target network and a trainable prediction network, both taking the observation as input and outputting a 512-dimensional vector, with the prediction error used as an intrinsic exploration bonus.",
+          "weight": 3,
+          "sub_tasks": [
+            {
+              "id": "montezuma-rnd-target-network-arch",
+              "requirements": "The RND target network is implemented as a randomly initialized convolutional network that is never trained (parameters frozen throughout training), taking the raw observation (stacked preprocessed frames) as input and outputting a fixed 512-dimensional embedding vector, following Burda et al. (2018).",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "montezuma-rnd-predictor-network-arch",
+              "requirements": "The RND predictor network is implemented as a trainable convolutional network with the same input (the observation) as the target network, outputting a 512-dimensional vector that is trained via regression to match the target network's output, following Burda et al. (2018).",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "montezuma-rnd-intrinsic-reward-computation",
+              "requirements": "The intrinsic exploration reward is computed as the prediction error (e.g., mean squared error) between the predictor network's output and the fixed target network's output for a given observation, used as an additional reward signal alongside the extrinsic environment reward in the PPO+RND agent.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "montezuma-hyperparameters",
+          "requirements": "The PPO+RND hyperparameters from Table 2 (Appendix B.2) are implemented, including MaxStepPerEpisode 4500, ExtCoef 2.0, LearningRate 1e-4, NumEnv 128, NumStep 128, Gamma 0.999, IntGamma 0.99, Lambda 0.95, IntCoef 1.0, PPOEps 0.1, Epoch 4, MiniBatch 4, and StickyAction True with ActionProb 0.25.",
+          "weight": 1,
+          "sub_tasks": [],
+          "task_category": "Code Development",
+          "finegrained_task_category": "Experimental Setup"
+        },
+        {
+          "id": "montezuma-room-enumeration",
+          "requirements": "Rooms in Montezuma's Revenge are enumerated according to the progression shown in Figure 12 (Appendix B.2), starting from Room 1 where the player begins gameplay, and room completion is defined as earning a coin, acquiring a new item, or exiting through a different passage than the one entered.",
+          "weight": 1,
+          "sub_tasks": [],
+          "task_category": "Code Development",
+          "finegrained_task_category": "Method Implementation"
+        },
+        {
+          "id": "montezuma-pretrained-policy-room7",
+          "requirements": "A pre-trained policy π* is trained on a restricted version of the environment including only rooms from Room 7 onward, which is used as the pre-trained policy for the main text fine-tuning experiments (with Room 7 and subsequent rooms as FAR states, and preceding rooms as CLOSE states).",
+          "weight": 3,
+          "sub_tasks": [
+            {
+              "id": "montezuma-room7-restricted-training-env",
+              "requirements": "A restricted training environment for Montezuma's Revenge is configured such that the agent only interacts with Room 7 and subsequent rooms (i.e., the game is initialized/reset within the Room-7-onward subset of the map), used exclusively for pre-training π*.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Environment & Infrastructure Setup"
+            },
+            {
+              "id": "montezuma-pretrain-ppo-rnd-room7",
+              "requirements": "The PPO+RND agent (with the hyperparameters of Table 2) is trained from scratch on the Room-7-restricted environment until convergence, producing the pre-trained policy π* used to initialize all main-text NetHack-analogous Montezuma's Revenge fine-tuning runs.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "montezuma-close-set-preceding-rooms",
+              "requirements": "The CLOSE state set for Montezuma's Revenge is defined as all rooms preceding Room 7 (rooms 1 through 6, per the room progression in Figure 12), representing regions never visited during π* pre-training.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "montezuma-far-set-room7-onward",
+              "requirements": "The FAR state set for Montezuma's Revenge is defined as Room 7 and all subsequent rooms, representing the region the pre-trained policy π* was trained to solve, used as the basis for the Room 7 success-rate evaluation in Figure 6.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "montezuma-bc-dataset-collection",
+          "requirements": "For the behavioral cloning knowledge retention method, more than 500 trajectories are collected from a pre-trained PPO+RND agent that achieves an episode cumulative reward of around 7000, to construct the BC buffer.",
+          "weight": 1,
+          "sub_tasks": [],
+          "task_category": "Code Execution",
+          "finegrained_task_category": "Data Processing & Preparation"
+        },
+        {
+          "id": "montezuma-ewc-implementation",
+          "requirements": "Fine-tuning + EWC is implemented for Montezuma's Revenge using the same EWC formulation as elsewhere in the paper (regularization based on the diagonal Fisher Information Matrix penalizing deviation from pre-trained actor parameters), applied only to the actor.",
+          "weight": 2,
+          "sub_tasks": [],
+          "task_category": "Code Development",
+          "finegrained_task_category": "Method Implementation"
+        },
+        {
+          "id": "montezuma-bc-implementation",
+          "requirements": "Fine-tuning + BC is implemented for Montezuma's Revenge using the KL-divergence behavioral cloning auxiliary loss between the pre-trained policy π* and the current policy, computed on the collected BC buffer of pre-trained-agent trajectories, applied only to the actor.",
+          "weight": 2,
+          "sub_tasks": [],
+          "task_category": "Code Development",
+          "finegrained_task_category": "Method Implementation"
+        },
+        {
+          "id": "montezuma-training-runs",
+          "requirements": "Training runs are executed for From Scratch, Fine-tuning (vanilla), Fine-tuning + EWC, and Fine-tuning + BC on Montezuma's Revenge, using PPO with RND for exploration, starting fine-tuning runs from the Room-7-onward pre-trained policy π*.",
+          "weight": 2,
+          "sub_tasks": [],
+          "task_category": "Code Execution",
+          "finegrained_task_category": "Experimental Setup"
+        },
+        {
+          "id": "montezuma-fig3b-plot",
+          "requirements": "Figure 3b has been reproduced: a plot of average return over training environment steps on Montezuma's Revenge for From Scratch, Fine-tuning, Fine-tuning + EWC, and Fine-tuning + BC (KS is omitted as it underperforms and is not reported for this environment).",
+          "weight": 4,
+          "sub_tasks": [
+            {
+              "id": "montezuma-fig3b-from-scratch-curve-gen",
+              "requirements": "The 'From Scratch' curve data for Figure 3b is generated from the completed training run: average return is logged and plotted against training environment steps for the agent trained without pre-trained initialization on the full Montezuma's Revenge game.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Logging, Analysis & Presentation"
+            },
+            {
+              "id": "montezuma-fig3b-vanilla-ft-curve-gen",
+              "requirements": "The 'Fine-tuning' (vanilla) curve data for Figure 3b is generated from the completed training run: average return is logged and plotted against training environment steps for the pre-trained policy π* fine-tuned without any knowledge retention technique.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Logging, Analysis & Presentation"
+            },
+            {
+              "id": "montezuma-fig3b-ewc-curve-gen",
+              "requirements": "The 'Fine-tuning + EWC' curve data for Figure 3b is generated from the completed training run: average return is logged and plotted against training environment steps for the pre-trained policy π* fine-tuned with Elastic Weight Consolidation.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Logging, Analysis & Presentation"
+            },
+            {
+              "id": "montezuma-fig3b-bc-curve-gen",
+              "requirements": "The 'Fine-tuning + BC' curve data for Figure 3b is generated from the completed training run: average return is logged and plotted against training environment steps for the pre-trained policy π* fine-tuned with behavioral cloning replay from a pre-trained PPO+RND agent's trajectories.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Logging, Analysis & Presentation"
+            },
+            {
+              "id": "montezuma-fig3b-combined-plot-assembly",
+              "requirements": "A single combined plot reproducing Figure 3b is assembled, overlaying the four curves (From Scratch, Fine-tuning, Fine-tuning + EWC, Fine-tuning + BC) on shared axes of average return (y-axis) versus training environment steps (x-axis) for Montezuma's Revenge, with KS correctly omitted since it is not reported for this environment.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Logging, Analysis & Presentation"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "montezuma-fig3b-from-scratch-curve",
+          "requirements": "Figure 3b includes the 'From Scratch' (labeled PPO in some figures) training curve, plotting average return over training environment steps for an agent trained without any pre-trained initialization on the full Montezuma's Revenge game.",
+          "weight": 1,
+          "sub_tasks": [],
+          "task_category": "Code Execution",
+          "finegrained_task_category": "Experimental Setup"
+        },
+        {
+          "id": "montezuma-fig3b-vanilla-ft-curve",
+          "requirements": "Figure 3b includes the 'Fine-tuning' (vanilla) training curve, plotting average return over training environment steps for the pre-trained policy π* fine-tuned without knowledge retention.",
+          "weight": 1,
+          "sub_tasks": [],
+          "task_category": "Code Execution",
+          "finegrained_task_category": "Experimental Setup"
+        },
+        {
+          "id": "montezuma-fig3b-ewc-curve",
+          "requirements": "Figure 3b includes the 'Fine-tuning + EWC' training curve, plotting average return over training environment steps for the pre-trained policy π* fine-tuned with Elastic Weight Consolidation.",
+          "weight": 1,
+          "sub_tasks": [],
+          "task_category": "Code Execution",
+          "finegrained_task_category": "Experimental Setup"
+        },
+        {
+          "id": "montezuma-fig3b-bc-curve",
+          "requirements": "Figure 3b includes the 'Fine-tuning + BC' training curve, plotting average return over training environment steps for the pre-trained policy π* fine-tuned with behavioral cloning replay.",
+          "weight": 1,
+          "sub_tasks": [],
+          "task_category": "Code Execution",
+          "finegrained_task_category": "Experimental Setup"
+        },
+        {
+          "id": "montezuma-fig3b-plot-generation",
+          "requirements": "A plot reproducing Figure 3b has been generated combining the four curves (From Scratch, Fine-tuning, Fine-tuning + EWC, Fine-tuning + BC) on the same axes of average return versus training environment steps for Montezuma's Revenge.",
+          "weight": 1,
+          "sub_tasks": [],
+          "task_category": "Code Development",
+          "finegrained_task_category": "Logging, Analysis & Presentation"
+        },
+        {
+          "id": "montezuma-bc-improves-speed-and-performance",
+          "requirements": "Figure 3b shows that Fine-tuning + BC improves both the speed of learning and the final performance compared to vanilla fine-tuning or training from scratch, consistent with Section 4's description of Montezuma's Revenge results.",
+          "weight": 4,
+          "sub_tasks": [
+            {
+              "id": "montezuma-bc-improves-speed",
+              "requirements": "Figure 3b shows that Fine-tuning + BC improves the speed of learning compared to vanilla fine-tuning or training from scratch, consistent with Section 4's description of Montezuma's Revenge results.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "montezuma-bc-improves-final-performance",
+              "requirements": "Figure 3b shows that Fine-tuning + BC improves the final performance compared to vanilla fine-tuning or training from scratch, consistent with Section 4's description of Montezuma's Revenge results.",
+              "weight": 2,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "montezuma-ewc-outperforms-scratch-but-saturates",
+          "requirements": "Figure 3b shows that Fine-tuning + EWC outperforms training from scratch and converges faster than vanilla fine-tuning, although it saturates at a lower average return than BC, consistent with Section 4's description of Montezuma's Revenge results.",
+          "weight": 3,
+          "sub_tasks": [
+            {
+              "id": "montezuma-ewc-outperforms-scratch-converges-faster",
+              "requirements": "Figure 3b shows that Fine-tuning + EWC outperforms training from scratch and converges faster than vanilla fine-tuning, consistent with Section 4's description of Montezuma's Revenge results.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "montezuma-ewc-saturates-lower-than-bc",
+              "requirements": "Figure 3b shows that Fine-tuning + EWC saturates at a lower average return than Fine-tuning + BC, consistent with Section 4's description of Montezuma's Revenge results.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "montezuma-bc-divergence-at-20m-steps",
+          "requirements": "The BC fine-tuned curve in Figure 3b begins to diverge from vanilla fine-tuning at around 20M environment steps, coinciding with when the agent starts entering Room 7 (the first room observed in pre-training), reflecting the onset of state coverage gap mitigation benefits as described in Section 4.",
+          "weight": 2,
+          "sub_tasks": [],
+          "task_category": "Result Analysis",
+          "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+        },
+        {
+          "id": "montezuma-room7-eval-setup",
+          "requirements": "The Room 7 success rate evaluation methodology is implemented: agents are periodically evaluated throughout training by measuring their success rate when initialized in Room 7 (the first room present in pre-training, marking the CLOSE/FAR transition boundary), to reproduce Figure 6.",
+          "weight": 3,
+          "sub_tasks": [
+            {
+              "id": "montezuma-room7-episode-initialization",
+              "requirements": "An evaluation environment configuration is implemented that initializes/resets episodes directly within Room 7 (rather than requiring the agent to traverse rooms 1-6 first), enabling a targeted measurement of FAR-state performance independent of CLOSE-state traversal ability.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Environment & Infrastructure Setup"
+            },
+            {
+              "id": "montezuma-room7-success-metric-definition",
+              "requirements": "The Room 7 success metric is computed using the room-completion definition (earning a coin reward, acquiring a new item, or exiting through a passage different from the one used to enter), applied specifically to episodes initialized in Room 7, and aggregated into a success rate (fraction of evaluation episodes that complete the room).",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "montezuma-room7-periodic-evaluation-schedule",
+              "requirements": "The Room 7 success-rate evaluation is executed periodically throughout each training run (From Scratch, Fine-tuning, Fine-tuning + EWC, Fine-tuning + BC), producing a time series of success rate versus training environment steps used to construct Figure 6.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "montezuma-room7-pretrained-policy-baseline",
+              "requirements": "The pre-trained policy π* (trained on the Room-7-onward restricted environment) is evaluated with the same Room 7 success-rate protocol to obtain the reference/baseline success rate shown as a horizontal or reference line in Figure 6.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "montezuma-fig6-plot",
+          "requirements": "Figure 6 has been reproduced: a plot of success rate in Room 7 throughout fine-tuning training for From Scratch, Fine-tuning, Fine-tuning + EWC, and Fine-tuning + BC (and the pre-trained policy π* baseline), representing the FAR-state evaluation.",
+          "weight": 4,
+          "sub_tasks": [
+            {
+              "id": "montezuma-fig6-from-scratch-curve",
+              "requirements": "Figure 6 includes the 'From Scratch' training curve, plotting Room 7 success rate over training environment steps for an agent trained without any pre-trained initialization on the full Montezuma's Revenge game.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "montezuma-fig6-vanilla-ft-curve",
+              "requirements": "Figure 6 includes the 'Fine-tuning' (vanilla) training curve, plotting Room 7 success rate over training environment steps for the pre-trained policy π* fine-tuned without any knowledge retention technique.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "montezuma-fig6-ewc-curve",
+              "requirements": "Figure 6 includes the 'Fine-tuning + EWC' training curve, plotting Room 7 success rate over training environment steps for the pre-trained policy π* fine-tuned with Elastic Weight Consolidation.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "montezuma-fig6-bc-curve",
+              "requirements": "Figure 6 includes the 'Fine-tuning + BC' training curve, plotting Room 7 success rate over training environment steps for the pre-trained policy π* fine-tuned with behavioral cloning replay.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "montezuma-fig6-pretrained-baseline-curve",
+              "requirements": "Figure 6 includes a reference line/curve for the pre-trained policy π* (trained restricted to Room 7 onward) showing its Room 7 success rate baseline, against which the fine-tuned agents are compared.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "montezuma-fig6-plot-assembly",
+              "requirements": "A single combined plot reproducing Figure 6 has been generated, overlaying the five series (From Scratch, Fine-tuning, Fine-tuning + EWC, Fine-tuning + BC, and pre-trained policy π* baseline) on shared axes of Room 7 success rate (y-axis) versus training environment steps (x-axis).",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Logging, Analysis & Presentation"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "montezuma-bc-ewc-stable-room7",
+          "requirements": "Figure 6 shows that both Fine-tuning + BC and Fine-tuning + EWC maintain a stable success rate in Room 7 throughout training, closely resembling the performance of the pre-trained expert policy π* that was trained restricted to levels following Room 7, consistent with Section 5's description.",
+          "weight": 2,
+          "sub_tasks": [],
+          "task_category": "Result Analysis",
+          "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+        }
+      ],
+      "task_category": null,
+      "finegrained_task_category": null
+    },
+    {
+      "id": "roboticsequence-experiments",
+      "requirements": "The RoboticSequence (Meta-World) multi-stage fine-tuning experiments have been reproduced, showing that BC, EM, and EWC mitigate the state coverage gap and outperform vanilla fine-tuning and training from scratch, with BC solving all four stages 80% of the time.",
+      "weight": 3,
+      "sub_tasks": [
+        {
+          "id": "roboticsequence-env-setup",
+          "requirements": "The RoboticSequence multi-stage environment built from Meta-World has been correctly configured, consisting of the four sub-tasks hammer, push, peg-unplug-side, and push-wall executed sequentially in a single episode.",
+          "weight": 3,
+          "sub_tasks": [
+            {
+              "id": "roboticsequence-metaworld-installation",
+              "requirements": "The Meta-World benchmark (Yu et al., 2020) is installed and configured, providing the underlying robotic manipulation task environments (hammer, push, peg-unplug-side, push-wall) used to construct RoboticSequence.",
+              "weight": 2,
+              "sub_tasks": [
+                {
+                  "id": "roboticsequence-metaworld-benchmark-installed",
+                  "requirements": "The Meta-World benchmark (Yu et al., 2020) is installed and configured as the underlying simulation environment library.",
+                  "weight": 1,
+                  "sub_tasks": [],
+                  "task_category": "Code Execution",
+                  "finegrained_task_category": "Environment & Infrastructure Setup"
+                },
+                {
+                  "id": "roboticsequence-metaworld-four-tasks-available",
+                  "requirements": "The four specific Meta-World sub-task environments (hammer-v2, push-v2, peg-unplug-side-v2, push-wall-v2) used to construct RoboticSequence are accessible and instantiable from the installed Meta-World package.",
+                  "weight": 1,
+                  "sub_tasks": [],
+                  "task_category": "Code Execution",
+                  "finegrained_task_category": "Environment & Infrastructure Setup"
+                }
+              ],
+              "task_category": null,
+              "finegrained_task_category": null
+            },
+            {
+              "id": "roboticsequence-four-stage-sequence-definition",
+              "requirements": "The RoboticSequence environment is configured as a fixed ordered sequence of exactly four Meta-World sub-tasks: hammer (hammer in a nail), push (push an object from one place to another), peg-unplug-side (remove a bolt from a wall), and push-wall (push an object around a wall), executed in this order within a single episode.",
+              "weight": 3,
+              "sub_tasks": [
+                {
+                  "id": "roboticsequence-stage-hammer-config",
+                  "requirements": "The 'hammer' Meta-World sub-task (hammer-v2, hammer in a nail) is configured as the first stage (E_1) in the RoboticSequence, using the standard Meta-World hammer task success condition to determine when the agent advances to the next stage.",
+                  "weight": 1,
+                  "sub_tasks": [],
+                  "task_category": "Code Development",
+                  "finegrained_task_category": "Environment & Infrastructure Setup"
+                },
+                {
+                  "id": "roboticsequence-stage-push-config",
+                  "requirements": "The 'push' Meta-World sub-task (push-v2, push an object from one place to another) is configured as the second stage (E_2) in the RoboticSequence, using the standard Meta-World push task success condition to determine when the agent advances to the next stage.",
+                  "weight": 1,
+                  "sub_tasks": [],
+                  "task_category": "Code Development",
+                  "finegrained_task_category": "Environment & Infrastructure Setup"
+                },
+                {
+                  "id": "roboticsequence-stage-peg-unplug-side-config",
+                  "requirements": "The 'peg-unplug-side' Meta-World sub-task (peg-unplug-side-v2, remove a bolt from a wall) is configured as the third stage (E_3) in the RoboticSequence, using the standard Meta-World peg-unplug-side task success condition to determine when the agent advances to the next stage.",
+                  "weight": 1,
+                  "sub_tasks": [],
+                  "task_category": "Code Development",
+                  "finegrained_task_category": "Environment & Infrastructure Setup"
+                },
+                {
+                  "id": "roboticsequence-stage-push-wall-config",
+                  "requirements": "The 'push-wall' Meta-World sub-task (push-wall-v2, push an object around a wall) is configured as the fourth and final stage (E_4) in the RoboticSequence, using the standard Meta-World push-wall task success condition to determine episode completion.",
+                  "weight": 1,
+                  "sub_tasks": [],
+                  "task_category": "Code Development",
+                  "finegrained_task_category": "Environment & Infrastructure Setup"
+                },
+                {
+                  "id": "roboticsequence-fixed-stage-ordering",
+                  "requirements": "The four sub-tasks are wired together into a single fixed ordering (hammer -> push -> peg-unplug-side -> push-wall) such that the agent must complete each stage in this exact sequence within one episode, with no reordering or skipping of stages permitted.",
+                  "weight": 1,
+                  "sub_tasks": [],
+                  "task_category": "Code Development",
+                  "finegrained_task_category": "Method Implementation"
+                },
+                {
+                  "id": "roboticsequence-single-episode-continuity",
+                  "requirements": "The environment is implemented such that transitioning between the four sub-tasks (hammer, push, peg-unplug-side, push-wall) occurs within a single continuous episode (i.e., the underlying Meta-World environment/state is swapped or reconfigured for the next stage without resetting the overall episode/step counter across stages), rather than treating each sub-task as an independent episode.",
+                  "weight": 1,
+                  "sub_tasks": [],
+                  "task_category": "Code Development",
+                  "finegrained_task_category": "Environment & Infrastructure Setup"
+                }
+              ],
+              "task_category": null,
+              "finegrained_task_category": null
+            },
+            {
+              "id": "roboticsequence-observation-space-construction",
+              "requirements": "The observation space for RoboticSequence is constructed by concatenating the current robot configuration information (as defined by the underlying Meta-World task, per Yu et al. 2020) with a one-hot encoded vector representing the current stage ID, as described in Appendix B.3.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "roboticsequence-episode-success-only-on-full-completion",
+              "requirements": "An episode of RoboticSequence is only considered fully successful if the robot sequentially completes all four sub-tasks (hammer, push, peg-unplug-side, push-wall) within a single episode, matching the paper's statement that 'the robot is successful only if during a single episode it completes sequentially' all four sub-tasks.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "roboticsequence-sac-architecture",
+          "requirements": "The Soft Actor-Critic (SAC) policy and Q-value networks are implemented as 4-hidden-layer MLPs with 256 neurons each and Leaky-ReLU activations, with layer normalization applied after the first layer, and a separate output head per stage selected via the stage ID.",
+          "weight": 2,
+          "sub_tasks": [
+            {
+              "id": "roboticsequence-sac-mlp-architecture",
+              "requirements": "The Soft Actor-Critic (SAC) policy and Q-value networks are implemented as 4-hidden-layer MLPs with 256 neurons each and Leaky-ReLU activations, with layer normalization applied after the first layer.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "roboticsequence-sac-per-stage-output-head",
+              "requirements": "The SAC policy and Q-value networks use a separate output head per stage, selected via the stage ID, as described in Appendix B.3.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "roboticsequence-algorithm1-stage-advancement",
+          "requirements": "Algorithm 1 (RoboticSequence) is implemented: starting at environment index i=1 and timestep t=1, the agent takes steps in environment E_i using policy π, advancing to the next environment and resetting the timestep counter upon solving E_i, until all N environments are solved or the time limit T is reached, returning the number of solved environments.",
+          "weight": 2,
+          "sub_tasks": [
+            {
+              "id": "algo1-initialization-index-timestep",
+              "requirements": "Algorithm 1 for RoboticSequence is implemented such that the environment index i is initialized to 1 (i.e., E_1 = hammer, the first stage in the sequence) and the timestep counter t is initialized to 1 at the start of a rollout/episode.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "algo1-policy-step-in-current-env",
+              "requirements": "Algorithm 1 is implemented such that at each timestep the agent takes an action sampled from policy π conditioned on the current observation (which includes the stage one-hot ID as per the observation space construction) and executes it in the current sub-environment E_i, receiving the next observation and reward.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "algo1-stage-solved-advance-and-reset",
+              "requirements": "Algorithm 1 is implemented such that when the agent solves the current sub-environment E_i (success condition met), the environment index i is incremented to move to the next sub-environment E_{i+1} and the timestep counter t is reset to 1, matching the per-stage advancement logic described in Algorithm 1.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "algo1-termination-all-solved-or-time-limit",
+              "requirements": "Algorithm 1 is implemented such that the episode/rollout loop terminates when either all N=4 environments (hammer, push, peg-unplug-side, push-wall) have been solved, or the time limit T (200 steps per stage) is reached without the current stage being solved, whichever occurs first.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "algo1-return-num-solved-envs",
+              "requirements": "Algorithm 1 is implemented to return the number of environments solved (an integer between 0 and N=4) as the outcome of the rollout, which is used as the basis for computing the overall RoboticSequence performance metric plotted in Figure 3c.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "roboticsequence-terminal-state-handling",
+          "requirements": "The environment terminates the episode exactly when the agent succeeds at the current stage or when the time limit (200 steps) is reached, in both cases signaling SAC that the state is terminal (i.e., no bootstrapping of the Q-value target is applied), diverging from the original Meta-World's indefinite-horizon convention.",
+          "weight": 1,
+          "sub_tasks": [],
+          "task_category": "Code Development",
+          "finegrained_task_category": "Method Implementation"
+        },
+        {
+          "id": "roboticsequence-normalized-timestep-observation",
+          "requirements": "The normalized timestep (current timestep divided by the maximum steps per stage, T=200) is appended to the observation vector to preserve full observability of the augmented finite-horizon MDP.",
+          "weight": 1,
+          "sub_tasks": [],
+          "task_category": "Code Development",
+          "finegrained_task_category": "Method Implementation"
+        },
+        {
+          "id": "roboticsequence-augmented-success-reward",
+          "requirements": "When an episode ends in success, the agent receives an augmented 'remaining' reward r'_t = β·r_t·(T−t) with β=1.5, encouraging the agent to succeed and terminate rather than avoid finishing to keep collecting per-step rewards.",
+          "weight": 1,
+          "sub_tasks": [],
+          "task_category": "Code Development",
+          "finegrained_task_category": "Method Implementation"
+        },
+        {
+          "id": "roboticsequence-random-start-goal-sampling",
+          "requirements": "Start and goal conditions for each stage are randomly sampled at the beginning of each episode, following the same randomization approach as in Wołczyk et al. (2021) Continual World, to increase task difficulty.",
+          "weight": 1,
+          "sub_tasks": [],
+          "task_category": "Code Development",
+          "finegrained_task_category": "Environment & Infrastructure Setup"
+        },
+        {
+          "id": "roboticsequence-pretrained-policy",
+          "requirements": "A pre-trained policy π* is trained with SAC on the last two stages of the sequence (peg-unplug-side and push-wall) until convergence, achieving a 100% success rate on both stages, before being used to initialize all fine-tuning runs.",
+          "weight": 1,
+          "sub_tasks": [],
+          "task_category": "Code Execution",
+          "finegrained_task_category": "Experimental Setup"
+        },
+        {
+          "id": "roboticsequence-close-far-definition",
+          "requirements": "The CLOSE and FAR state sets for RoboticSequence are correctly defined: CLOSE corresponds to the first two stages (hammer, push), which the pre-trained policy π* cannot solve, and FAR corresponds to the last two stages (peg-unplug-side, push-wall), which π* can solve.",
+          "weight": 2,
+          "sub_tasks": [
+            {
+              "id": "roboticsequence-close-hammer-stage",
+              "requirements": "The 'hammer' sub-task (hammer in a nail) is defined as one of the two CLOSE stages for RoboticSequence, representing a part of the state space the pre-trained policy π* cannot solve.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "roboticsequence-close-push-stage",
+              "requirements": "The 'push' sub-task (push an object from one place to another) is defined as one of the two CLOSE stages for RoboticSequence, representing a part of the state space the pre-trained policy π* cannot solve.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "roboticsequence-far-peg-unplug-side-stage",
+              "requirements": "The 'peg-unplug-side' sub-task (remove a bolt from a wall) is defined as one of the two FAR stages for RoboticSequence, representing a part of the state space the pre-trained policy π* can solve with a 100% success rate.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "roboticsequence-far-push-wall-stage",
+              "requirements": "The 'push-wall' sub-task (push an object around a wall) is defined as one of the two FAR stages for RoboticSequence, representing a part of the state space the pre-trained policy π* can solve with a 100% success rate.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Method Implementation"
+            },
+            {
+              "id": "roboticsequence-close-set-inability-verification",
+              "requirements": "It is verified (e.g., via evaluation of π* prior to fine-tuning) that the pre-trained policy π* cannot solve the CLOSE stages (hammer, push), consistent with the paper's characterization of these stages as never encountered/mastered during pre-training.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "roboticsequence-far-set-100pct-verification",
+              "requirements": "It is verified that the pre-trained policy π* achieves a 100% success rate on the FAR stages (peg-unplug-side, push-wall) prior to fine-tuning, consistent with the paper's description of π* as trained to convergence on the last two stages.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "roboticsequence-close-far-stage-ordering-consistency",
+              "requirements": "The CLOSE stages (hammer, push) are correctly ordered as stages 1 and 2 and the FAR stages (peg-unplug-side, push-wall) as stages 3 and 4 in the RoboticSequence pipeline, consistent with the sequential ordering defined in Section 5 and Algorithm 1, ensuring the CLOSE/FAR designation aligns with the pre-training boundary.",
+              "weight": 1,
+              "sub_tasks": [
+                {
+                  "id": "roboticsequence-close-stages-ordered-first",
+                  "requirements": "The CLOSE stages (hammer, push) are correctly ordered as stages 1 and 2 in the RoboticSequence pipeline, consistent with the sequential ordering defined in Section 5 and Algorithm 1.",
+                  "weight": 1,
+                  "sub_tasks": [],
+                  "task_category": "Code Development",
+                  "finegrained_task_category": "Experimental Setup"
+                },
+                {
+                  "id": "roboticsequence-far-stages-ordered-last",
+                  "requirements": "The FAR stages (peg-unplug-side, push-wall) are correctly ordered as stages 3 and 4 in the RoboticSequence pipeline, consistent with the sequential ordering defined in Section 5 and Algorithm 1, ensuring the CLOSE/FAR designation aligns with the pre-training boundary.",
+                  "weight": 1,
+                  "sub_tasks": [],
+                  "task_category": "Code Development",
+                  "finegrained_task_category": "Experimental Setup"
+                }
+              ],
+              "task_category": null,
+              "finegrained_task_category": null
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "roboticsequence-ewc-implementation",
+          "requirements": "Fine-tuning + EWC is implemented for RoboticSequence with an actor regularization coefficient of 100 and a critic regularization coefficient of 0 (i.e., EWC is applied only to the actor), following Table 3 of Appendix B.3.",
+          "weight": 1,
+          "sub_tasks": [],
+          "task_category": "Code Development",
+          "finegrained_task_category": "Method Implementation"
+        },
+        {
+          "id": "roboticsequence-bc-implementation",
+          "requirements": "Fine-tuning + BC is implemented for RoboticSequence with an actor regularization coefficient of 1, a critic regularization coefficient of 0, and a memory buffer of 10,000 state-action pairs sampled from the pre-trained stages, following Table 3 of Appendix B.3.",
+          "weight": 1,
+          "sub_tasks": [],
+          "task_category": "Code Development",
+          "finegrained_task_category": "Method Implementation"
+        },
+        {
+          "id": "roboticsequence-em-implementation",
+          "requirements": "Fine-tuning + EM (episodic memory) is implemented by sampling 10,000 state-action-reward tuples from the pre-trained stages using the pre-trained policy and keeping them protected (never overwritten) in SAC's 100,000-capacity replay buffer throughout downstream training, following Table 3 of Appendix B.3.",
+          "weight": 1,
+          "sub_tasks": [],
+          "task_category": "Code Development",
+          "finegrained_task_category": "Method Implementation"
+        },
+        {
+          "id": "roboticsequence-training-runs",
+          "requirements": "Training runs are executed for From Scratch, Fine-tuning (vanilla), Fine-tuning + EWC, Fine-tuning + BC, and Fine-tuning + EM on the four-stage RoboticSequence (hammer, push, peg-unplug-side, push-wall) using SAC, with at least 20 random seeds per condition and results reported with 90% confidence intervals, as stated in Appendix B.3. KS is not run for this environment since it underperforms.",
+          "weight": 1,
+          "sub_tasks": [],
+          "task_category": "Code Execution",
+          "finegrained_task_category": "Experimental Setup"
+        },
+        {
+          "id": "roboticsequence-fig3c-plot",
+          "requirements": "Figure 3c has been reproduced: a plot of overall RoboticSequence performance over training environment steps for From Scratch, Fine-tuning, Fine-tuning + EWC, Fine-tuning + BC, and Fine-tuning + EM (with KS correctly omitted as it is not reported for this environment).",
+          "weight": 3,
+          "sub_tasks": [
+            {
+              "id": "fig3c-from-scratch-curve",
+              "requirements": "Figure 3c includes the 'From Scratch' training curve, plotting overall RoboticSequence performance (number of stages solved, out of 4) over training environment steps for an agent trained without any pre-trained initialization, aggregated over at least 20 random seeds with 90% confidence intervals.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "fig3c-vanilla-ft-curve",
+              "requirements": "Figure 3c includes the 'Fine-tuning' (vanilla) training curve, plotting overall RoboticSequence performance over training environment steps for the pre-trained policy π* fine-tuned without any knowledge retention technique, aggregated over at least 20 random seeds with 90% confidence intervals.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "fig3c-ewc-curve",
+              "requirements": "Figure 3c includes the 'Fine-tuning + EWC' training curve, plotting overall RoboticSequence performance over training environment steps for the pre-trained policy π* fine-tuned with Elastic Weight Consolidation, aggregated over at least 20 random seeds with 90% confidence intervals.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "fig3c-bc-curve",
+              "requirements": "Figure 3c includes the 'Fine-tuning + BC' training curve, plotting overall RoboticSequence performance over training environment steps for the pre-trained policy π* fine-tuned with behavioral cloning replay, aggregated over at least 20 random seeds with 90% confidence intervals.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "fig3c-em-curve",
+              "requirements": "Figure 3c includes the 'Fine-tuning + EM' training curve, plotting overall RoboticSequence performance over training environment steps for the pre-trained policy π* fine-tuned with episodic memory, aggregated over at least 20 random seeds with 90% confidence intervals.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Experimental Setup"
+            },
+            {
+              "id": "fig3c-ks-omission-verification",
+              "requirements": "Figure 3c correctly omits a 'Fine-tuning + KS' (kickstarting) curve for RoboticSequence, consistent with the paper's statement that KS underperforms and is not reported for this environment.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "fig3c-plot-assembly",
+              "requirements": "A single combined plot reproducing Figure 3c is generated, overlaying the five curves (From Scratch, Fine-tuning, Fine-tuning + EWC, Fine-tuning + BC, Fine-tuning + EM) on shared axes of overall RoboticSequence performance (number of stages solved) versus training environment steps.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Logging, Analysis & Presentation"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "roboticsequence-bc-best-performance",
+          "requirements": "Figure 3c shows that Fine-tuning + BC is the most effective method in terms of both performance and speed of learning among the knowledge retention techniques, followed by EM and EWC respectively, consistent with Section 4's description of RoboticSequence results.",
+          "weight": 1,
+          "sub_tasks": [],
+          "task_category": "Result Analysis",
+          "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+        },
+        {
+          "id": "roboticsequence-bc-80pct-success",
+          "requirements": "Fine-tuning + BC successfully solves all four stages of RoboticSequence 80% of the time, consistent with Section 4's statement that this is a strong result given compounding failure probabilities across the four sequential stages.",
+          "weight": 1,
+          "sub_tasks": [],
+          "task_category": "Result Analysis",
+          "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+        },
+        {
+          "id": "roboticsequence-vanilla-ft-indistinguishable-from-scratch",
+          "requirements": "Figure 3c shows that vanilla fine-tuning and training from scratch are virtually indistinguishable in overall performance, and both fall significantly behind Fine-tuning + BC, Fine-tuning + EM, and Fine-tuning + EWC, consistent with Section 4's description of RoboticSequence results.",
+          "weight": 1,
+          "sub_tasks": [],
+          "task_category": "Result Analysis",
+          "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+        },
+        {
+          "id": "roboticsequence-fig7-plot",
+          "requirements": "Figure 7 has been reproduced: success rate curves for each of the four stages of RoboticSequence (hammer, push, peg-unplug-side, push-wall) over training environment steps, broken down by training condition (From Scratch, Fine-tuning, EWC, BC, EM).",
+          "weight": 3,
+          "sub_tasks": [
+            {
+              "id": "fig7-pretrained-policy-context-annotation",
+              "requirements": "Figure 7 (or its accompanying caption/plot) correctly reflects that the fine-tuning experiments start from a pre-trained policy π* that performs well on the peg-unplug-side and push-wall stages (i.e., the FAR stages), matching the paper's stated caption for Figure 7.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "fig7-plot-assembly-4x5-grid",
+              "requirements": "A combined figure reproducing Figure 7 is assembled as a 4-panel layout (one panel per stage: hammer, push, peg-unplug-side, push-wall), each panel overlaying the five training-condition curves (From Scratch, Fine-tuning, Fine-tuning + EWC, Fine-tuning + BC, Fine-tuning + EM) on shared axes of success rate (y-axis) versus training environment steps (x-axis).",
+              "weight": 2,
+              "sub_tasks": [
+                {
+                  "id": "fig7-panel-hammer-assembly",
+                  "requirements": "The hammer-stage panel of Figure 7 is assembled by plotting the success rate (y-axis) against training environment steps (x-axis) for hammer, overlaying all five training-condition curves: From Scratch, Fine-tuning, Fine-tuning + EWC, Fine-tuning + BC, and Fine-tuning + EM.",
+                  "weight": 2,
+                  "sub_tasks": [
+                    {
+                      "id": "fig7-hammer-panel-overlay-assembly",
+                      "requirements": "The five individual curves (From Scratch, Fine-tuning, Fine-tuning + EWC, Fine-tuning + BC, Fine-tuning + EM) for the hammer stage are overlaid on a single set of axes (success rate on the y-axis, training environment steps on the x-axis) to form the completed hammer panel of Figure 7, with a legend distinguishing the five training conditions.",
+                      "weight": 1,
+                      "sub_tasks": [],
+                      "task_category": "Code Development",
+                      "finegrained_task_category": "Logging, Analysis & Presentation"
+                    }
+                  ],
+                  "task_category": null,
+                  "finegrained_task_category": null
+                },
+                {
+                  "id": "fig7-panel-push-assembly",
+                  "requirements": "The push-stage panel of Figure 7 is assembled by plotting the success rate (y-axis) against training environment steps (x-axis) for push, overlaying all five training-condition curves: From Scratch, Fine-tuning, Fine-tuning + EWC, Fine-tuning + BC, and Fine-tuning + EM.",
+                  "weight": 2,
+                  "sub_tasks": [
+                    {
+                      "id": "fig7-push-panel-overlay-assembly",
+                      "requirements": "The five individual curves (From Scratch, Fine-tuning, Fine-tuning + EWC, Fine-tuning + BC, Fine-tuning + EM) for the push stage are overlaid on a single set of axes (success rate on the y-axis, training environment steps on the x-axis) to form the completed push panel of Figure 7, with a legend distinguishing the five training conditions.",
+                      "weight": 1,
+                      "sub_tasks": [],
+                      "task_category": "Code Development",
+                      "finegrained_task_category": "Logging, Analysis & Presentation"
+                    }
+                  ],
+                  "task_category": null,
+                  "finegrained_task_category": null
+                },
+                {
+                  "id": "fig7-panel-peg-unplug-side-assembly",
+                  "requirements": "The peg-unplug-side-stage panel of Figure 7 is assembled by plotting the success rate (y-axis) against training environment steps (x-axis) for peg-unplug-side, overlaying all five training-condition curves: From Scratch, Fine-tuning, Fine-tuning + EWC, Fine-tuning + BC, and Fine-tuning + EM.",
+                  "weight": 2,
+                  "sub_tasks": [
+                    {
+                      "id": "fig7-peg-unplug-side-panel-overlay-assembly",
+                      "requirements": "The five individual curves (From Scratch, Fine-tuning, Fine-tuning + EWC, Fine-tuning + BC, Fine-tuning + EM) for the peg-unplug-side stage are overlaid on a single set of axes (success rate on the y-axis, training environment steps on the x-axis) to form the completed peg-unplug-side panel of Figure 7, with a legend distinguishing the five training conditions.",
+                      "weight": 1,
+                      "sub_tasks": [],
+                      "task_category": "Code Development",
+                      "finegrained_task_category": "Logging, Analysis & Presentation"
+                    }
+                  ],
+                  "task_category": null,
+                  "finegrained_task_category": null
+                },
+                {
+                  "id": "fig7-panel-push-wall-assembly",
+                  "requirements": "The push-wall-stage panel of Figure 7 is assembled by plotting the success rate (y-axis) against training environment steps (x-axis) for push-wall, overlaying all five training-condition curves: From Scratch, Fine-tuning, Fine-tuning + EWC, Fine-tuning + BC, and Fine-tuning + EM.",
+                  "weight": 1,
+                  "sub_tasks": [],
+                  "task_category": "Code Development",
+                  "finegrained_task_category": null
+                },
+                {
+                  "id": "fig7-from-scratch-curve-plotted-all-panels",
+                  "requirements": "The 'From Scratch' success rate curve is plotted consistently across all four panels (hammer, push, peg-unplug-side, push-wall) of the assembled Figure 7, using the corresponding per-stage success-rate time series generated from the From Scratch training run.",
+                  "weight": 1,
+                  "sub_tasks": [],
+                  "task_category": "Code Execution",
+                  "finegrained_task_category": "Logging, Analysis & Presentation"
+                },
+                {
+                  "id": "fig7-vanilla-ft-curve-plotted-all-panels",
+                  "requirements": "The 'Fine-tuning' (vanilla) success rate curve is plotted consistently across all four panels (hammer, push, peg-unplug-side, push-wall) of the assembled Figure 7, using the corresponding per-stage success-rate time series generated from the vanilla fine-tuning run.",
+                  "weight": 1,
+                  "sub_tasks": [],
+                  "task_category": "Code Execution",
+                  "finegrained_task_category": "Logging, Analysis & Presentation"
+                },
+                {
+                  "id": "fig7-ewc-curve-plotted-all-panels",
+                  "requirements": "The 'Fine-tuning + EWC' success rate curve is plotted consistently across all four panels (hammer, push, peg-unplug-side, push-wall) of the assembled Figure 7, using the corresponding per-stage success-rate time series generated from the EWC fine-tuning run.",
+                  "weight": 1,
+                  "sub_tasks": [],
+                  "task_category": "Code Execution",
+                  "finegrained_task_category": "Logging, Analysis & Presentation"
+                },
+                {
+                  "id": "fig7-bc-curve-plotted-all-panels",
+                  "requirements": "The 'Fine-tuning + BC' success rate curve is plotted consistently across all four panels (hammer, push, peg-unplug-side, push-wall) of the assembled Figure 7, using the corresponding per-stage success-rate time series generated from the BC fine-tuning run.",
+                  "weight": 1,
+                  "sub_tasks": [],
+                  "task_category": "Code Execution",
+                  "finegrained_task_category": "Logging, Analysis & Presentation"
+                },
+                {
+                  "id": "fig7-em-curve-plotted-all-panels",
+                  "requirements": "The 'Fine-tuning + EM' success rate curve is plotted consistently across all four panels (hammer, push, peg-unplug-side, push-wall) of the assembled Figure 7, using the corresponding per-stage success-rate time series generated from the episodic memory fine-tuning run.",
+                  "weight": 1,
+                  "sub_tasks": [],
+                  "task_category": "Code Execution",
+                  "finegrained_task_category": "Logging, Analysis & Presentation"
+                },
+                {
+                  "id": "fig7-shared-axes-scale-consistency",
+                  "requirements": "All four panels of the assembled Figure 7 use shared/consistent axis scales (success rate from 0 to 1 on the y-axis, and training environment steps on the x-axis spanning the same range across panels), enabling direct visual comparison of forgetting/recovery dynamics between the CLOSE stages (hammer, push) and FAR stages (peg-unplug-side, push-wall).",
+                  "weight": 1,
+                  "sub_tasks": [],
+                  "task_category": "Code Development",
+                  "finegrained_task_category": "Logging, Analysis & Presentation"
+                }
+              ],
+              "task_category": null,
+              "finegrained_task_category": null
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "roboticsequence-fig7-far-stage-forgetting",
+          "requirements": "Figure 7 shows that the vanilla fine-tuned agent forgets on the FAR stages (peg-unplug-side and push-wall) while learning on the CLOSE stages (hammer, push), with severe deterioration such that performance grows slowly when training finally reaches these stages, consistent with Section 5's description.",
+          "weight": 1,
+          "sub_tasks": [],
+          "task_category": "Result Analysis",
+          "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+        },
+        {
+          "id": "roboticsequence-fig7-retention-methods-recover",
+          "requirements": "Figure 7 shows that BC, EM, and EWC are able to maintain or regain performance on the FAR stages (peg-unplug-side, push-wall) to varying degrees depending on the method, in contrast to vanilla fine-tuning's severe deterioration, consistent with Section 5's description.",
+          "weight": 3,
+          "sub_tasks": [
+            {
+              "id": "roboticsequence-fig7-bc-recovery-far-stages",
+              "requirements": "Figure 7 shows that Fine-tuning + BC maintains or regains the strongest performance on the FAR stages (peg-unplug-side, push-wall) among the three knowledge retention methods, consistently rehearsing the correct behavior via expert-gathered trajectories, consistent with Section 5's description that BC constantly rehearses the correct way of solving via expert data.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "roboticsequence-fig7-em-recovery-far-stages",
+              "requirements": "Figure 7 shows that Fine-tuning + EM maintains or regains performance on the FAR stages (peg-unplug-side, push-wall) to an intermediate degree, outperforming vanilla fine-tuning but generally trailing BC, consistent with Section 5's description and the overall RoboticSequence ranking (BC > EM > EWC) reported in Section 4.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "roboticsequence-fig7-ewc-partial-recovery-far-stages",
+              "requirements": "Figure 7 shows that Fine-tuning + EWC is able to partially maintain or regain performance on the FAR stages (peg-unplug-side, push-wall), representing the weakest recovery among the three knowledge retention methods (BC, EM, EWC), while still clearly outperforming vanilla fine-tuning's severe deterioration, consistent with Section 5's description.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Result Analysis",
+              "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+            },
+            {
+              "id": "roboticsequence-fig7-methods-vary-by-degree",
+              "requirements": "Figure 7 shows that the exact degree of performance maintenance/recovery on the FAR stages (peg-unplug-side, push-wall) varies across the three knowledge retention methods (BC, EM, EWC), i.e., they do not all recover to the same extent, matching the paper's statement that 'exact results vary by the method', which is verified by comparing the relative curve heights/recovery speeds of BC, EM, and EWC within the peg-unplug-side and push-wall panels of Figure 7.",
+              "weight": 2,
+              "sub_tasks": [
+                {
+                  "id": "roboticsequence-fig7-bc-vs-em-relative-recovery",
+                  "requirements": "Within the peg-unplug-side and push-wall panels of Figure 7, Fine-tuning + BC shows visibly higher and/or faster-recovering success rate curves than Fine-tuning + EM throughout the FAR-stage training period, reflecting BC's stronger rehearsal of expert behavior via a fixed buffer of expert state-action pairs compared to EM's replay buffer approach, consistent with the paper's statement that 'exact results vary by the method'.",
+                  "weight": 1,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                },
+                {
+                  "id": "roboticsequence-fig7-em-vs-ewc-relative-recovery",
+                  "requirements": "Within the peg-unplug-side and push-wall panels of Figure 7, Fine-tuning + EM shows visibly higher and/or faster-recovering success rate curves than Fine-tuning + EWC throughout the FAR-stage training period, reflecting EM's use of protected replay data versus EWC's parameter-regularization-only approach, consistent with the paper's statement that 'exact results vary by the method'.",
+                  "weight": 1,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                },
+                {
+                  "id": "roboticsequence-fig7-bc-vs-ewc-relative-recovery",
+                  "requirements": "Within the peg-unplug-side and push-wall panels of Figure 7, Fine-tuning + BC shows the largest gap in recovered/maintained success rate compared to Fine-tuning + EWC among the three retention methods, with BC's curves consistently the highest and EWC's the lowest of the three retention methods on the FAR stages, consistent with the paper's statement that 'exact results vary by the method' and the overall RoboticSequence ranking BC > EM > EWC reported in Section 4.",
+                  "weight": 1,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                },
+                {
+                  "id": "roboticsequence-fig7-method-ranking-consistency-across-far-stages",
+                  "requirements": "The relative ranking of the three knowledge retention methods (BC highest, EM second, EWC lowest) observed in the peg-unplug-side panel of Figure 7 is qualitatively consistent with the ranking observed in the push-wall panel, and matches the overall RoboticSequence performance ranking (BC > EM > EWC) established in Figure 3c, confirming the method-dependent variation described in Section 5 holds across both FAR stages.",
+                  "weight": 1,
+                  "sub_tasks": [],
+                  "task_category": "Result Analysis",
+                  "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+                }
+              ],
+              "task_category": null,
+              "finegrained_task_category": null
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "roboticsequence-expert-loglikelihood-computation",
+          "requirements": "Code exists to compute, for the push-wall environment, the log-likelihood assigned by the fine-tuned policy to state-action pairs (s, a*) where a* ~ π*(s), collected from expert trajectories generated by the pre-trained policy π*.",
+          "weight": 1,
+          "sub_tasks": [],
+          "task_category": "Code Development",
+          "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+        },
+        {
+          "id": "roboticsequence-fig8-pca-visualization",
+          "requirements": "Figure 8 has been reproduced: a visualization combining (top row) success rate over training and (bottom row) 2D PCA projections of the push-wall state space color-coded by log-likelihood under the fine-tuned policy of expert state-action pairs, at multiple points during fine-tuning (e.g., 100K and 500K steps).",
+          "weight": 2,
+          "sub_tasks": [
+            {
+              "id": "roboticsequence-expert-loglikelihood-pca-code",
+              "requirements": "Code exists to reduce the collected push-wall state space to a 2D projection using PCA, color-coded by the log-likelihood assigned by the fine-tuned policy to expert state-action pairs.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Development",
+              "finegrained_task_category": "Logging, Analysis & Presentation"
+            },
+            {
+              "id": "roboticsequence-fig8-generation-at-checkpoints",
+              "requirements": "Figure 8 is generated combining (top row) success rate over training and (bottom row) the 2D PCA projections at multiple points during fine-tuning (e.g., 100K and 500K steps) on push-wall.",
+              "weight": 1,
+              "sub_tasks": [],
+              "task_category": "Code Execution",
+              "finegrained_task_category": "Logging, Analysis & Presentation"
+            }
+          ],
+          "task_category": null,
+          "finegrained_task_category": null
+        },
+        {
+          "id": "roboticsequence-fig8-early-collapse-analysis",
+          "requirements": "Figure 8 shows that after 100K steps, the fine-tuned model still assigns high probability to some correct expert actions in part of the state space, yet its overall push-wall success rate has already collapsed to 0, demonstrating that partial forgetting substantially impacts performance even before likelihoods fully collapse, consistent with Section 5's description.",
+          "weight": 1,
+          "sub_tasks": [],
+          "task_category": "Result Analysis",
+          "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+        },
+        {
+          "id": "roboticsequence-fig8-full-collapse-and-relearning",
+          "requirements": "Figure 8 shows that after 500K steps the log-likelihood values collapse across all expert trajectories, and although the agent eventually relearns to succeed at push-wall, the resulting log-likelihoods under the relearned policy do not return to the original pre-trained values, indicating the fine-tuned agent converges to a different policy rather than recovering the original one, consistent with Section 5's description.",
+          "weight": 1,
+          "sub_tasks": [],
+          "task_category": "Result Analysis",
+          "finegrained_task_category": "Evaluation, Metrics & Benchmarking"
+        }
+      ],
+      "task_category": null,
+      "finegrained_task_category": null
+    },
+    {
+      "id": "knowledge-retention-methods",
+      "requirements": "The four knowledge retention methods used throughout the paper — Elastic Weight Consolidation (EWC), behavioral cloning replay (BC), kickstarting (KS), and episodic memory (EM) — have been correctly implemented as auxiliary losses/buffers applied to the actor only.",
+      "weight": 3,
+      "sub_tasks": [
+        {
+          "id": "ewc-fisher-regularization-loss",
+          "requirements": "Elastic Weight Consolidation (EWC) is implemented as an auxiliary regularization loss (Eq. 2) applied only to the actor parameters, penalizing squared deviation of current actor parameters from the pre-trained parameters, weighted by the diagonal Fisher Information Matrix computed with respect to the pre-trained policy, scaled by an environment-specific regularization coefficient (2·10^6 for NetHack, per Table 1/3 elsewhere in the rubric).",
+          "weight": 20,
+          "sub_tasks": [],
+          "task_category": "Code Development",
+          "finegrained_task_category": "Method Implementation"
+        },
+        {
+          "id": "ewc-fisher-information-matrix-estimation",
+          "requirements": "The diagonal Fisher Information Matrix used in the EWC loss is estimated from the pre-trained policy π* (e.g., via squared gradients of the log-likelihood of actions sampled from π* on pre-training-distribution states), correctly matching the formulation referenced in Section 2/Appendix C.",
+          "weight": 13,
+          "sub_tasks": [],
+          "task_category": "Code Development",
+          "finegrained_task_category": "Method Implementation"
+        },
+        {
+          "id": "bc-kl-divergence-loss",
+          "requirements": "Behavioral cloning (BC) is implemented as an auxiliary KL-divergence loss (Eq. 3) applied only to the actor, penalizing the KL divergence between the pre-trained policy π* and the current fine-tuned policy π, evaluated on states sampled from a buffer of trajectories collected using π* (the expert/pre-trained model), scaled by an environment-specific coefficient.",
+          "weight": 20,
+          "sub_tasks": [],
+          "task_category": "Code Development",
+          "finegrained_task_category": "Method Implementation"
+        },
+        {
+          "id": "bc-buffer-construction",
+          "requirements": "A fixed buffer of state-action pairs or trajectories generated by the pre-trained policy π* (or, for Montezuma's Revenge, a separately pre-trained PPO+RND agent achieving ~7000 reward) is constructed prior to fine-tuning and used as the data source for computing the BC auxiliary loss throughout training, matching the environment-specific buffer sizes described elsewhere (e.g., 10,000 pairs for RoboticSequence, >500 trajectories for Montezuma's Revenge).",
+          "weight": 13,
+          "sub_tasks": [],
+          "task_category": "Code Development",
+          "finegrained_task_category": "Method Implementation"
+        },
+        {
+          "id": "ks-kl-divergence-online-loss",
+          "requirements": "Kickstarting (KS) is implemented as an auxiliary KL-divergence loss (Eq. 4) applied only to the actor, penalizing the KL divergence between the pre-trained policy π* and the current fine-tuned policy π, evaluated on states visited online by the current fine-tuned policy during training (rather than on a fixed pre-collected buffer), distinguishing it from BC's use of expert-visited states.",
+          "weight": 20,
+          "sub_tasks": [],
+          "task_category": "Code Development",
+          "finegrained_task_category": "Method Implementation"
+        },
+        {
+          "id": "ks-loss-scaling-and-decay",
+          "requirements": "The KS auxiliary loss is scaled by a coefficient (0.5 for NetHack) with an exponential decay schedule applied per training step (decay factor 0.99998 for NetHack), progressively reducing the influence of the kickstarting loss as training proceeds, matching the description in Section 4/Appendix C.",
+          "weight": 13,
+          "sub_tasks": [],
+          "task_category": "Code Development",
+          "finegrained_task_category": "Method Implementation"
+        },
+        {
+          "id": "em-protected-replay-buffer",
+          "requirements": "Episodic memory (EM) is implemented as a mechanism that pre-populates the off-policy replay buffer (used by SAC) with a fixed set of state-action-reward transitions collected from the pre-trained policy π* on the pre-training-distribution stages, and protects these entries from being overwritten/evicted for the remainder of training, ensuring the policy continues to be trained on them alongside newly collected online transitions.",
+          "weight": 20,
+          "sub_tasks": [],
+          "task_category": "Code Development",
+          "finegrained_task_category": "Method Implementation"
+        },
+        {
+          "id": "em-off-policy-only-applicability",
+          "requirements": "The implementation correctly restricts episodic memory (EM) to algorithms using an off-policy replay buffer (SAC, used for RoboticSequence), and does not attempt to apply EM to APPO (NetHack) or PPO (Montezuma's Revenge), consistent with the paper's statement that EM cannot be trivially applied to on-policy algorithms.",
+          "weight": 13,
+          "sub_tasks": [],
+          "task_category": "Code Development",
+          "finegrained_task_category": "Method Implementation"
+        },
+        {
+          "id": "knowledge-retention-critic-not-regularized",
+          "requirements": "For all four knowledge retention methods (EWC, BC, KS, EM) across all environments, the auxiliary loss or buffer protection is applied exclusively to the actor/policy network, with the critic/value network trained purely via the standard RL objective (no auxiliary regularization or protected critic-only replay data), consistent with the critic regularization coefficient of 0 specified for RoboticSequence (Table 3) and the general description that knowledge retention targets the actor.",
+          "weight": 13,
+          "sub_tasks": [],
+          "task_category": "Code Development",
+          "finegrained_task_category": "Method Implementation"
+        },
+        {
+          "id": "knowledge-retention-encoders-frozen-entropy-off",
+          "requirements": "When applying any of EWC, BC, or KS during fine-tuning (as specified for NetHack), the shared encoders are frozen and the entropy bonus is turned off during training, matching the training configuration described for the NetHack knowledge-retention experiments.",
+          "weight": 7,
+          "sub_tasks": [],
+          "task_category": "Code Development",
+          "finegrained_task_category": "Method Implementation"
+        },
+        {
+          "id": "ks-omission-in-state-coverage-environments",
+          "requirements": "Kickstarting (KS) is correctly omitted from the Montezuma's Revenge and RoboticSequence experiments, consistent with the paper's finding that KS fails in state coverage gap settings because it tries to match the pre-trained model's outputs on CLOSE states that were never visited during pre-training.",
+          "weight": 13,
+          "sub_tasks": [],
+          "task_category": "Code Development",
+          "finegrained_task_category": "Method Implementation"
+        }
+      ],
+      "task_category": null,
+      "finegrained_task_category": null
+    }
+  ],
+  "task_category": null,
+  "finegrained_task_category": null
+}

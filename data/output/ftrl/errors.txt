@@ -1,0 +1,91 @@
+montezuma-vanilla-ft-room7-periodic-evaluation: Branch 'main-results-retention-mitigates-fpc' hit the 100-node cap; forced to leaf.
+roboticsequence-bc-ranked-most-effective-figure3c: Branch 'main-results-retention-mitigates-fpc' hit the 100-node cap; forced to leaf.
+roboticsequence-em-ranked-second-figure3c: Branch 'main-results-retention-mitigates-fpc' hit the 100-node cap; forced to leaf.
+roboticsequence-ewc-ranked-third-figure3c: Branch 'main-results-retention-mitigates-fpc' hit the 100-node cap; forced to leaf.
+roboticsequence-bc-all-four-stages-80-percent-match: Branch 'main-results-retention-mitigates-fpc' hit the 100-node cap; forced to leaf.
+figure3c-from-scratch-vs-bc-em-ewc-gap: Branch 'main-results-retention-mitigates-fpc' hit the 100-node cap; forced to leaf.
+figure7-exact-results-vary-by-method-quantification: Branch 'analysis-forgetting-hinders-finetuning' hit the 100-node cap; forced to leaf.
+figure8-two-row-plot-assembly: Branch 'analysis-forgetting-hinders-finetuning' hit the 100-node cap; forced to leaf.
+figure8-100k-zero-success-despite-partial-high-likelihood: Branch 'analysis-forgetting-hinders-finetuning' hit the 100-node cap; forced to leaf.
+figure6-vanilla-ft-room-completion-coin-reward-check: Branch 'analysis-forgetting-hinders-finetuning' hit the 100-node cap; forced to leaf.
+figure7-pegunplug-bc-maintains-or-regains: Branch 'analysis-forgetting-hinders-finetuning' hit the 100-node cap; forced to leaf.
+figure7-pegunplug-em-maintains-or-regains: Branch 'analysis-forgetting-hinders-finetuning' hit the 100-node cap; forced to leaf.
+figure7-pegunplug-ewc-maintains-or-regains: Branch 'analysis-forgetting-hinders-finetuning' hit the 100-node cap; forced to leaf.
+figure7-pegunplug-methods-differ-in-degree: Branch 'analysis-forgetting-hinders-finetuning' hit the 100-node cap; forced to leaf.
+figure7-pushwall-bc-maintains-or-regains-recheck: Branch 'analysis-forgetting-hinders-finetuning' hit the 100-node cap; forced to leaf.
+figure7-pushwall-em-maintains-or-regains-recheck: Branch 'analysis-forgetting-hinders-finetuning' hit the 100-node cap; forced to leaf.
+figure7-pushwall-ewc-maintains-or-regains-recheck: Branch 'analysis-forgetting-hinders-finetuning' hit the 100-node cap; forced to leaf.
+figure7-pushwall-methods-differ-in-degree-recheck: Branch 'analysis-forgetting-hinders-finetuning' hit the 100-node cap; forced to leaf.
+figure7-pegunplug-bc-maintains-or-regains-final: Branch 'analysis-forgetting-hinders-finetuning' hit the 100-node cap; forced to leaf.
+figure7-pushwall-bc-maintains-or-regains-final: Branch 'analysis-forgetting-hinders-finetuning' hit the 100-node cap; forced to leaf.
+figure7-em-pegunplug-maintains-or-regains-distinguishable: Branch 'analysis-forgetting-hinders-finetuning' hit the 100-node cap; forced to leaf.
+figure7-em-pushwall-maintains-or-regains-distinguishable: Branch 'analysis-forgetting-hinders-finetuning' hit the 100-node cap; forced to leaf.
+figure7-em-vs-vanilla-ft-quantified-gap-both-stages: Branch 'analysis-forgetting-hinders-finetuning' hit the 100-node cap; forced to leaf.
+figure7-ewc-pegunplug-maintains-or-regains-distinct: Branch 'analysis-forgetting-hinders-finetuning' hit the 100-node cap; forced to leaf.
+figure7-ewc-pushwall-maintains-or-regains-distinct: Branch 'analysis-forgetting-hinders-finetuning' hit the 100-node cap; forced to leaf.
+figure7-ewc-vs-vanilla-ft-quantified-gap-both-stages: Branch 'analysis-forgetting-hinders-finetuning' hit the 100-node cap; forced to leaf.
+algo1-return-solved-count: split-check split into 2 children (branch 'roboticsequence-environment').
+nethack-bc-final-score-7610-table4: split-check removed as duplicate of 'table4-bc-score-computation'.
+nethack-ks-final-score-10588-surpasses-bc: split-check removed as duplicate of 'nethack-ks-highest-score-table4'.
+nethack-vanilla-ft-final-score-647-underperforms: split-check removed as duplicate of 'table4-vanilla-ft-score-computation'.
+nethack-from-scratch-final-score-776-underperforms: split-check removed as duplicate of 'table4-from-scratch-score-computation'.
+nethack-bc-strong-performer-cross-env: forced to leaf after its last child 'nethack-from-scratch-final-score-776-underperforms' was removed as a duplicate.
+bc-cross-env-nethack-second-to-ks: split-check removed as duplicate of 'nethack-bc-second-highest-score-table4'.
+bc-cross-env-roboticsequence-best: split-check removed as duplicate of 'roboticsequence-bc-ranked-most-effective-figure3c'.
+bc-cross-env-montezuma-clear-improvement: split-check removed as duplicate of 'montezuma-bc-improves-speed-and-performance-figure3b'.
+montezuma-bc-strong-performer-cross-env: split-check removed as duplicate of 'montezuma-bc-improves-speed-and-performance-figure3b'.
+roboticsequence-bc-strong-performer-cross-env: split-check removed as duplicate of 'roboticsequence-bc-ranked-most-effective-figure3c'.
+roboticsequence-vanilla-ft-fails-pretrained-stages: split-check removed as duplicate of 'figure3c-vanilla-ft-vs-from-scratch-quantitative-gap'.
+nethack-vanilla-ft-fails-far: split-check removed as duplicate of 'nethack-vanilla-ft-underperforms-figure3a'.
+montezuma-vanilla-ft-fails-room7: split-check removed as duplicate of 'montezuma-vanilla-ft-room7-drops-and-fails-to-recover'.
+montezuma-retention-methods-improve-room7: split-check removed as duplicate of 'montezuma-bc-ewc-stable-room7-success'.
+nethack-2x-sota-result: split-check removed as duplicate of 'nethack-ks-bc-surpass-scaled-bc-sota-table5'.
+nethack-training-runs-vanilla-ft-from-scratch: split-check split into 2 children (branch 'main-results-retention-mitigates-fpc').
+table4-full-table-assembly: split-check split into 2 children (branch 'main-results-retention-mitigates-fpc').
+nethack-ks-bc-surpass-scaled-bc-sota-table5: split-check split into 2 children (branch 'main-results-retention-mitigates-fpc').
+montezuma-vanilla-ft-ppo-rnd-table2-execution: split-check split into 2 children (branch 'main-results-retention-mitigates-fpc').
+montezuma-bc-improves-speed-and-performance-figure3b: split-check split into 2 children (branch 'main-results-retention-mitigates-fpc').
+roboticsequence-bc-compounding-failure-context: split-check split into 1 children (branch 'main-results-retention-mitigates-fpc').
+bc-cross-env-top-two-summary: split-check split into 3 children (branch 'main-results-retention-mitigates-fpc').
+figure6-vanilla-ft-recovers-after-20m-steps-but-not-fully: split-check removed as duplicate of 'figure6-vanilla-ft-improves-after-20m-not-matching-pi-star'.
+figure7-pegunplug-bc-maintains-or-regains-final: split-check removed as duplicate of 'figure7-pegunplug-bc-maintains-or-regains'.
+figure7-pushwall-bc-maintains-or-regains-final: split-check removed as duplicate of 'figure7-pushwall-bc-maintains-or-regains-recheck'.
+figure7-em-pegunplug-maintains-or-regains-distinguishable: split-check removed as duplicate of 'figure7-pegunplug-em-maintains-or-regains'.
+figure7-em-pushwall-maintains-or-regains-distinguishable: split-check removed as duplicate of 'figure7-pushwall-em-maintains-or-regains-recheck'.
+figure7-ewc-pegunplug-maintains-or-regains-distinct: split-check removed as duplicate of 'figure7-pegunplug-ewc-maintains-or-regains'.
+figure7-ewc-pushwall-maintains-or-regains-distinct: split-check removed as duplicate of 'figure7-pushwall-ewc-maintains-or-regains-recheck'.
+figure7-methods-differ-in-degree-of-retention: split-check removed as duplicate of 'figure7-exact-results-vary-by-method-quantification'.
+figure7-ewc-degree-differs-from-bc-em: split-check removed as duplicate of 'figure7-exact-results-vary-by-method-quantification'.
+figure7-pushwall-methods-differ-in-degree-recheck: split-check removed as duplicate of 'figure7-pegunplug-methods-differ-in-degree'.
+figure7-bc-vs-vanilla-ft-quantified-gap-both-stages: split-check removed as duplicate of 'figure7-pegunplug-bc-maintains-or-regains'.
+figure7-bc-maintains-or-regains-far-performance: forced to leaf after its last child 'figure7-bc-vs-vanilla-ft-quantified-gap-both-stages' was removed as a duplicate.
+figure7-em-vs-vanilla-ft-quantified-gap-both-stages: split-check removed as duplicate of 'figure7-pegunplug-em-maintains-or-regains'.
+figure7-em-maintains-or-regains-far-performance: forced to leaf after its last child 'figure7-em-vs-vanilla-ft-quantified-gap-both-stages' was removed as a duplicate.
+figure7-ewc-vs-vanilla-ft-quantified-gap-both-stages: split-check removed as duplicate of 'figure7-pegunplug-ewc-maintains-or-regains'.
+figure7-ewc-maintains-or-regains-far-performance: forced to leaf after its last child 'figure7-ewc-vs-vanilla-ft-quantified-gap-both-stages' was removed as a duplicate.
+figure8-100k-checkpoint-loglikelihood-computation: split-check split into 2 children (branch 'analysis-forgetting-hinders-finetuning').
+table4-fromscratch-score-turns-metrics: split-check split into 2 children (branch 'nethack-additional-metrics-evaluation').
+table4-fromscratch-steps-dlvl-metrics: split-check split into 2 children (branch 'nethack-additional-metrics-evaluation').
+table4-fromscratch-xplvl-eating-metrics: split-check split into 2 children (branch 'nethack-additional-metrics-evaluation').
+table4-fromscratch-gold-scout-metrics: split-check split into 2 children (branch 'nethack-additional-metrics-evaluation').
+table4-fromscratch-sokoban-staircase-metrics: split-check split into 2 children (branch 'nethack-additional-metrics-evaluation').
+table4-vanillaft-score-turns-metrics: split-check split into 2 children (branch 'nethack-additional-metrics-evaluation').
+table4-vanillaft-steps-dlvl-metrics: split-check split into 2 children (branch 'nethack-additional-metrics-evaluation').
+table4-vanillaft-xplvl-eating-metrics: split-check split into 2 children (branch 'nethack-additional-metrics-evaluation').
+table4-vanillaft-gold-scout-metrics: split-check split into 2 children (branch 'nethack-additional-metrics-evaluation').
+table4-vanillaft-sokoban-staircase-metrics: split-check split into 2 children (branch 'nethack-additional-metrics-evaluation').
+table4-ewc-score-turns-metrics: split-check split into 2 children (branch 'nethack-additional-metrics-evaluation').
+table4-ewc-steps-dlvl-metrics: split-check split into 2 children (branch 'nethack-additional-metrics-evaluation').
+table4-ewc-xplvl-eating-metrics: split-check split into 2 children (branch 'nethack-additional-metrics-evaluation').
+table4-ewc-gold-scout-metrics: split-check split into 2 children (branch 'nethack-additional-metrics-evaluation').
+table4-ewc-sokoban-staircase-metrics: split-check split into 2 children (branch 'nethack-additional-metrics-evaluation').
+table4-bc-score-turns-metrics: split-check split into 2 children (branch 'nethack-additional-metrics-evaluation').
+table4-bc-steps-dlvl-metrics: split-check split into 2 children (branch 'nethack-additional-metrics-evaluation').
+table4-bc-xplvl-eating-metrics: split-check split into 2 children (branch 'nethack-additional-metrics-evaluation').
+table4-bc-gold-scout-metrics: split-check split into 2 children (branch 'nethack-additional-metrics-evaluation').
+table4-bc-sokoban-staircase-metrics: split-check split into 2 children (branch 'nethack-additional-metrics-evaluation').
+table4-ks-score-turns-metrics: split-check split into 2 children (branch 'nethack-additional-metrics-evaluation').
+table4-ks-steps-dlvl-metrics: split-check split into 2 children (branch 'nethack-additional-metrics-evaluation').
+table4-ks-xplvl-eating-metrics: split-check split into 2 children (branch 'nethack-additional-metrics-evaluation').
+table4-ks-gold-scout-metrics: split-check split into 2 children (branch 'nethack-additional-metrics-evaluation').
+table4-ks-sokoban-staircase-metrics: split-check split into 2 children (branch 'nethack-additional-metrics-evaluation').
