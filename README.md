@@ -1,5 +1,6 @@
 # PaperBenchRubricGenerator
 
+
 Generate a [PaperBench](https://github.com/openai/preparedness)-style grading **rubric**
 from a research paper PDF, so you can measure how well a codebase reproduces that paper.
 
