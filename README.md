@@ -677,7 +677,7 @@ assignment.
 `--output` flags. Output files are written to the `--output` directory rather than alongside
 the input PDF.
 
-These changes together reduce the per-paper cost from ~$9 to ~$4.
+These changes together reduce the per-paper cost from ~$43 to ~$20.
 
 ---
 
