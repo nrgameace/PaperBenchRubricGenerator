@@ -9,7 +9,7 @@ parse, then drives Claude through a sequence of human-reviewed passes to build a
 `TaskNode`s — a hierarchy of precise, verifiable requirements that a faithful reproduction
 of the paper must satisfy. You review and edit the model's output at every step.
 
-> **Cost:** A full rubric for one paper costs roughly **~$4 USD** in Anthropic API usage.
+> **Cost:** A full rubric for one paper costs roughly **~$20 USD** in Anthropic API usage.
 > Costs are kept low via extended prompt caching (1-hour TTL, with per-branch cache
 > breakpoints for the expansion and weight passes — see [Prompt caching](#prompt-caching))
 > and model tiering (Opus only for the base pass; Sonnet for all expansion and weight passes).
